@@ -4975,3 +4975,19 @@ document.addEventListener('click', e => {
 });
 requestAnimationFrame(enhance20);
 })();
+
+/* ===== v21 TRUE GLASS DOCK ===== */
+(()=>{'use strict';if(window.__ST21)return;window.__ST21=1;
+const pages=[['today','⌂','Today'],['planning','▦','Agenda'],['meals','♨','Weekmenu'],['groceries','✓','Boodschappen'],['chores','⌁','Huishouden'],['stock','▤','Voorraad'],['trips','✈','Reizen'],['ideas','♡','Date ideeën'],['home','⌂','Woning'],['budget19','€','Budget'],['extra19','＋','Extra'],['settings','⚙','Instellingen']],direct=['today','planning','meals','groceries'];
+function go(id){if(window.SamenThuisGo)SamenThuisGo(id);else{current=id;render()}}
+function dock(){
+ document.querySelectorAll('.mobile-nav,.bottom-nav').forEach(x=>x.classList.add('old21'));
+ let n=document.querySelector('#dock21');if(!n){n=document.createElement('nav');n.id='dock21';n.className='dock21';document.body.append(n)}
+ n.innerHTML=direct.map(id=>{let p=pages.find(x=>x[0]===id);return`<button data-go21="${id}" class="${current===id?'on':''}"><span>${p[1]}</span><small>${p[2]}</small></button>`}).join('')+`<button data-more21 class="${direct.includes(current)?'':'on'}"><span>•••</span><small>Meer</small></button>`;
+ document.querySelectorAll('.sync-info,[class*="info-box"],[class*="sync-info"]').forEach(x=>x.classList.add('surface21'));
+}
+function sheet(){document.querySelector('#sheet21')?.remove();let w=document.createElement('div');w.id='sheet21';w.className='sheetwrap21';w.innerHTML=`<button class="shade21" data-close21></button><section class="sheet21"><header><div><small>SNEL NAAR</small><strong>Alle pagina's</strong></div><button data-close21>×</button></header><div>${pages.filter(p=>!direct.includes(p[0])).map(p=>`<button data-go21="${p[0]}" class="${current===p[0]?'on':''}"><span>${p[1]}</span><b>${p[2]}</b></button>`).join('')}</div></section>`;document.body.append(w)}
+const rr=render;render=function(...a){let x=rr(...a);requestAnimationFrame(dock);return x};
+document.addEventListener('click',e=>{let g=e.target.closest('[data-go21]');if(g){e.preventDefault();document.querySelector('#sheet21')?.remove();go(g.dataset.go21);return}if(e.target.closest('[data-more21]')){e.preventDefault();sheet();return}if(e.target.closest('[data-close21]'))document.querySelector('#sheet21')?.remove()});
+requestAnimationFrame(dock);
+})();
