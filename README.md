@@ -1,13 +1,124 @@
-# Samen Thuis v17.1 — stabiele herstelbuild
+# Samen Thuis
 
-Deze versie herstelt de blanco v17-test door de bewezen laadvolgorde van de werkende Samen-thuis hoofdrepository te behouden.
+Een zelfstandige gezamenlijke thuisapp voor Kees en Daphne. De app draait als
+PWA op GitHub Pages en werkt ook offline op iPhone, iPad en laptop.
 
-Upload ALLE bestanden uit deze map naar de root van Samen-thuis-v2 en kies vervangen waar GitHub dat vraagt.
+## Functies
 
-Belangrijk:
-- Verwijder in Samen-thuis-v2 eerst de mislukte v17 app.js/styles.css/index.html/sw.js of overschrijf ze met deze bestanden.
-- Laat de losse updatebestanden in deze testversie staan.
-- Test eerst navigatie, Vandaag, toevoegen, importer, huishouden en scrollbehoud.
-- Pas nadat deze basis werkt, maken we een tweede gecontroleerde stap naar één geïntegreerde app.js/styles.css.
+- dagelijkse vraag waarvan de antwoorden pas zichtbaar worden nadat Kees en
+  Daphne allebei hebben geantwoord;
+- Quote of the Day via `https://www.brainyquote.com/link/quotebr.rss`, met de
+  officiële BrainyQuote-Javascriptfeed als browserfallback;
+- agenda met afzonderlijk zichtbare agenda's voor Persoonlijk, Vitestro,
+  Coach O23 en Daphne werk;
+- import vanuit Apple Agenda via een Apple Opdracht;
+- weekmenu en snelle Osta-import;
+- boodschappenlijst uploaden of plakken, met automatische categorieën;
+- flexibele huishoudplanning zonder vaste weekdagen, berekend vanaf de laatste
+  echte uitvoerdatum;
+- huishoudtaken van `Dagelijks` en `2×/3× per week` tot maandelijkse,
+  kwartaal-, halfjaarlijkse, jaarlijkse en `Wanneer nodig`-taken;
+- één centrale, bewerkbare importer voor Agenda, Weekmenu, Boodschappen,
+  Huishouden, Voorraad, Ideeën, Woning en Reizen;
+- voorraad, ideeën, woninginformatie en reizen;
+- lokale offline opslag, JSON-back-ups en optionele versleutelde synchronisatie.
 
-Deze herstelbuild kiest stabiliteit boven opschonen.
+Bestaande gegevens uit eerdere appversies worden automatisch behouden. Een
+afgeronde huishoudtaak wordt per datum bijgehouden; de volgende termijn wordt
+vanaf die echte uitvoerdatum berekend.
+
+## Bestandsopbouw v17
+
+De productieversie gebruikt één JavaScriptbestand en één stylesheet:
+
+- `index.html` laadt de app;
+- `app.js` bevat alle app-, import-, reis-, prijs- en planningslogica;
+- `styles.css` bevat alle vormgeving;
+- `sw.js` verzorgt de offlinecache;
+- `manifest.webmanifest` en `icon.svg` verzorgen de PWA-installatie.
+
+Oudere losse `upgrade-` en `samen-thuis-update-` bestanden zijn vanaf v17 niet
+meer nodig.
+
+## Publiceren via GitHub Pages
+
+1. Open op GitHub **Settings → Pages**.
+2. Kies bij **Build and deployment** voor **Deploy from a branch**.
+3. Selecteer branch **main**, map **/(root)** en kies **Save**.
+4. Open de Pages-link op elk apparaat en kies in Safari eventueel
+   **Zet op beginscherm**.
+
+De app zelf gebruikt geen externe AI-dienst. Zonder synchronisatie blijven de
+gegevens alleen op het apparaat waarop ze zijn ingevoerd.
+
+## Synchronisatie tussen apparaten
+
+Synchronisatie is optioneel en gebruikt een gratis Supabase-project als
+opslag. De volledige appinhoud wordt in de browser met AES-GCM versleuteld
+voordat deze wordt verzonden. Supabase ontvangt alleen versleutelde data.
+
+1. Maak een Supabase-project.
+2. Open **SQL Editor** en voer dit één keer uit:
+
+```sql
+create table public.household_data (
+  id text primary key,
+  payload jsonb not null,
+  updated_at timestamptz not null default now()
+);
+
+alter table public.household_data enable row level security;
+
+create policy "encrypted household read" on public.household_data
+  for select to anon using (true);
+create policy "encrypted household insert" on public.household_data
+  for insert to anon with check (true);
+create policy "encrypted household update" on public.household_data
+  for update to anon using (true) with check (true);
+```
+
+3. Ga in de app naar **Instellingen**.
+4. Vul de Project URL, de publishable/anon key en een gedeelde huishoudcode van
+   minimaal twaalf tekens in.
+5. Gebruik op elk apparaat exact dezelfde drie gegevens.
+
+De huishoudcode wordt alleen lokaal opgeslagen en staat niet in een back-up.
+Bij gelijktijdige wijzigingen op twee apparaten blijft de laatst opgeslagen
+versie behouden.
+
+## Apple Agenda importeren
+
+Maak in Apple Opdrachten een opdracht die afspraken uit de gewenste agenda's
+ophaalt en per afspraak één tekstregel maakt:
+
+```text
+Agenda | 2026-09-04 | 09:00 | Titel | Kees
+```
+
+Meerdere regels kunnen in één keer onder **Agenda** worden geplakt. Het formaat
+is achtereenvolgens: agendanaam, datum, begintijd, titel en persoon. Een zesde
+veld mag de eindtijd bevatten. Een onbekende agendanaam wordt automatisch
+toegevoegd. Zo bepaalt de selectie in Apple Opdrachten welke Apple-agenda's in
+Samen Thuis terechtkomen.
+
+## Osta en boodschappen
+
+Onder **Weekmenu** kan tekst uit Osta direct worden geplakt. Deze regels vullen
+het weekmenu:
+
+```text
+Maandag: curry
+Dinsdag: risotto
+```
+
+Een blok vanaf `# Grocery List` gaat naar Boodschappen. Onder
+**Boodschappen** kunnen ook TXT-, CSV- en JSON-bestanden worden gekozen. Elke
+tekstregel wordt als één product gezien; hoeveelheden blijven intact en de app
+kiest automatisch een categorie. Een regel die met `✓` begint wordt meteen als
+gekocht gemarkeerd.
+
+## Back-up
+
+Gebruik **Back-up maken** om alle appgegevens als JSON-bestand te bewaren. Met
+**Back-up laden** kan dat bestand later worden teruggezet. Synchronisatiegegevens
+en de huishoudcode worden bewust niet geëxporteerd.
