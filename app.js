@@ -5163,3 +5163,129 @@ requestAnimationFrame(nav219);
 })();
 
 /* v21.9 build 2026-09-16 21:08:05 +0000 */
+
+
+/* =========================================================
+   v22 — BUDGETDASHBOARD ZOALS EXCEL + VASTE LICHTE KAARTEN
+   ========================================================= */
+(()=>{
+'use strict';
+if(window.__ST220)return; window.__ST220=1;
+
+function B220(){ return budget219(); }
+function C220(){ return calc219(); }
+const E220=n=>Number(n||0).toLocaleString('nl-NL',{minimumFractionDigits:2,maximumFractionDigits:2});
+const P220=n=>Math.max(0,Math.min(100,Number(n)||0));
+
+function donut220(value,max,label,sub){
+ const pct=P220(max?value/max*100:0), r=42, circ=2*Math.PI*r, dash=circ*pct/100;
+ return `<div class="donut220">
+  <svg viewBox="0 0 110 110" aria-label="${esc(label)} ${Math.round(pct)} procent">
+   <circle class="donut220-bg" cx="55" cy="55" r="${r}"></circle>
+   <circle class="donut220-value" cx="55" cy="55" r="${r}" stroke-dasharray="${dash} ${circ-dash}" transform="rotate(-90 55 55)"></circle>
+  </svg>
+  <div class="donut220-center"><b>${Math.round(pct)}%</b><small>${esc(label)}</small></div>
+  <span>${sub}</span>
+ </div>`;
+}
+function bars220(rows){
+ const max=Math.max(1,...rows.map(x=>Math.abs(x.value)));
+ return `<div class="bars220">${rows.map(x=>`<div class="bar220">
+  <span>${esc(x.label)}</span><div class="bar220-track"><i style="width:${Math.max(2,Math.abs(x.value)/max*100)}%"></i></div><b>€ ${E220(x.value)}</b>
+ </div>`).join('')}</div>`;
+}
+function savingsProjection220(goal){
+ const cur=Number(goal.current||0), target=Number(goal.target||0), monthly=Number(goal.monthly||0);
+ const remaining=Math.max(0,target-cur), months=monthly>0?Math.ceil(remaining/monthly):null;
+ return months===0?'Doel bereikt':months?`Nog circa ${months} maanden`:'Geen maandbedrag ingesteld';
+}
+
+/* Volledige Excel-achtige budgetweergave:
+   boven KPI's, daarna verdeling, vaste lasten, doelen, grafieken en detailberekening. */
+window.budgetPage220=function(){
+ const b=B220(),c=C220();
+ const contributionK=c.k*c.pct, contributionD=c.d*c.pct;
+ const requiredPct=c.totalIncome?c.needed/c.totalIncome*100:0;
+ const goalCards=(b.goals||[]).map((g,i)=>`<article class="budget220-goal light-fixed220">
+  <div class="budget220-goalhead"><div><small>SPAARDOEL</small><h3>${esc(g.title)}</h3><p>${esc(g.deadline||'Geen deadline')}</p></div><button class="secondary" data-b219-goal="${i}">Bewerk</button></div>
+  ${donut220(Number(g.current||0),Number(g.target||0),g.title,`€ ${E220(g.current)} van € ${E220(g.target)}`)}
+  <div class="budget220-goalmeta"><span>Per maand <b>€ ${E220(g.monthly)}</b></span><span>${savingsProjection220(g)}</span></div>
+ </article>`).join('');
+
+ const fixed=(b.fixed||[]).map((x,i)=>`<div class="budget220-table-row light-fixed220">
+   <div><b>${esc(x.title)}</b><small>${x.period==='jaar'?'Jaarlijks':x.period==='kwartaal'?'Per kwartaal':'Maandelijks'}</small></div>
+   <span>€ ${E220(x.amount)}</span><strong>€ ${E220(monthly219(x))}/mnd</strong>
+   <button class="secondary" data-b219-fixed="${i}">Bewerk</button>
+ </div>`).join('');
+
+ const expenseRows=[
+  {label:'Vaste lasten',value:c.fixed},{label:'Huisbudget',value:Number(b.houseBudget||0)},
+  {label:'Spaardoelen',value:c.saving},{label:'Beleggen',value:Number(b.investing||0)}
+ ];
+ return `<div class="budget220">
+  <header class="budget220-title"><div><p class="eyebrow">SAMEN THUIS · FINANCIËN</p><h1>Budgetdashboard</h1><p>Maandoverzicht, verdeling en voortgang van jullie doelen.</p></div></header>
+
+  <section class="budget220-kpis">
+   <article class="kpi220"><small>NETTO INKOMEN</small><b>€ ${E220(c.totalIncome)}</b><span>per maand samen</span></article>
+   <article class="kpi220"><small>MAANDELIJKS NODIG</small><b>€ ${E220(c.needed)}</b><span>lasten + budget + sparen + beleggen</span></article>
+   <article class="kpi220"><small>GEZAMENLIJKE AFDACHT</small><b>€ ${E220(c.contribution)}</b><span>${E220(b.contributionPct)}% van inkomen</span></article>
+   <article class="kpi220 ${c.remainder<0?'bad220':'good220'}"><small>${c.remainder<0?'TEKORT':'OVERSCHOT'}</small><b>€ ${E220(Math.abs(c.remainder))}</b><span>na alle maandposten</span></article>
+  </section>
+
+  <section class="budget220-grid2">
+   <article class="sheet220">
+    <div class="sheet220-head"><div><small>INKOMEN & AFDACHT</small><h2>Kees en Daphne</h2></div><span>Benodigd: ${E220(requiredPct)}%</span></div>
+    <div class="person220"><div><b>Kees</b><strong>€ ${E220(c.k)}</strong><span>Afdracht € ${E220(contributionK)}</span><span>Persoonlijk € ${E220(c.kPersonal)}</span></div>
+    <div><b>Daphne</b><strong>€ ${E220(c.d)}</strong><span>Afdracht € ${E220(contributionD)}</span><span>Persoonlijk € ${E220(c.dPersonal)}</span></div></div>
+    <div class="budget220-fields">
+     <label>Kees netto<input inputmode="decimal" data-b219-field="incomes.Kees" value="${c.k}"></label>
+     <label>Daphne netto<input inputmode="decimal" data-b219-field="incomes.Daphne" value="${c.d}"></label>
+     <label>Afdracht %<input inputmode="decimal" data-b219-field="contributionPct" value="${b.contributionPct}"></label>
+     <label>Huisbudget<input inputmode="decimal" data-b219-field="houseBudget" value="${b.houseBudget}"></label>
+     <label>Beleggen<input inputmode="decimal" data-b219-field="investing" value="${b.investing}"></label>
+    </div>
+   </article>
+   <article class="sheet220">
+    <div class="sheet220-head"><div><small>MAANDBUDGET</small><h2>Waar gaat het geld heen?</h2></div></div>
+    ${bars220(expenseRows)}
+    <div class="budget220-calc">
+      <span>Beschikbaar via afdracht <b>€ ${E220(c.contribution)}</b></span>
+      <span>Totale maandbehoefte <b>€ ${E220(c.needed)}</b></span>
+      <span class="total">Resterend <b>€ ${E220(c.remainder)}</b></span>
+    </div>
+   </article>
+  </section>
+
+  <section class="sheet220">
+   <div class="sheet220-head"><div><small>SPAARDOELEN</small><h2>Voortgang</h2></div><button class="primary" data-b219-addgoal>+ Spaardoel</button></div>
+   <div class="budget220-goals">${goalCards}</div>
+  </section>
+
+  <section class="budget220-grid2">
+   <article class="sheet220">
+    <div class="sheet220-head"><div><small>VASTE LASTEN</small><h2>€ ${E220(c.fixed)} per maand</h2></div><button class="primary" data-b219-addfixed>+ Vaste last</button></div>
+    <div class="budget220-table">${fixed}</div>
+   </article>
+   <article class="sheet220">
+    <div class="sheet220-head"><div><small>VERDELING</small><h2>Maandelijkse posten</h2></div></div>
+    <div class="pie220-wrap">${donut220(c.fixed,c.needed,'Vaste lasten',`${Math.round(c.fixed/c.needed*100||0)}% van maandbehoefte`)}</div>
+    ${bars220([{label:'Sparen',value:c.saving},{label:'Huis',value:Number(b.houseBudget||0)},{label:'Beleggen',value:Number(b.investing||0)}])}
+   </article>
+  </section>
+ </div>`;
+};
+
+/* Render na alle oudere budgetlagen overschrijven zodat v22 daadwerkelijk zichtbaar is. */
+const render220Previous=render;
+render=function(...args){
+ if(current==='budget19'){
+   const view=document.querySelector('#view');
+   if(view)view.innerHTML=window.budgetPage220();
+   requestAnimationFrame(()=>{ if(typeof nav219==='function')nav219(); });
+   return;
+ }
+ return render220Previous(...args);
+};
+})();
+
+/* v22 build 2026-09-16 21:16:30 +0000 */

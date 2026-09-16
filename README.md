@@ -1,20 +1,19 @@
-# Samen Thuis v21.9
+# Samen Thuis v22.0
 
-Build: 2026-09-16 21:08:05 +0000
+Build: 2026-09-16 21:16:30 +0000
 
-Wijzigingen:
-- vaste glazen mobiele onderbalk die horizontaal te schuiven is;
-- alle 12 pagina's rechtstreeks in die balk, zonder aparte Meer-sheet;
-- actieve pagina schuift automatisch in beeld;
-- dark-mode contrast van huishoudkaarten en dashboardkaarten hersteld;
-- Budget uitgebreid op basis van de eerdere budget-Excel;
-- netto inkomen Kees €2.731 en Daphne €3.427 als startwaarden;
-- gezamenlijke afdracht 75%;
-- vaste lasten met maand/kwartaal/jaar-omrekening;
-- huisbudget €1.000 per maand;
-- spaardoelen Buffer €3.000, Vakantie €5.000/jaar, Huis €15.000 eind 2027, Overig €10.000;
-- beleggen standaard €75 per maand;
-- één centrale berekening voor gezamenlijk resterend, zodat er geen twee verschillende restbedragen ontstaan;
-- bedragen, vaste lasten, doelen en bijdragepercentage zijn bewerkbaar.
+## Belangrijkste wijzigingen
+- Lichte/witte vakken gebruiken in light en dark exact hetzelfde systeemlettertype en dezelfde donkere tekstkleuren.
+- Accentkleur mag wel mee veranderen met het gekozen apparaataccent.
+- Budgetpagina volledig vernieuwd naar een Excel-achtig dashboard.
+- KPI-kaarten: netto inkomen, maandelijks nodig, gezamenlijke afdracht en overschot/tekort.
+- Kees/Daphne-overzicht met inkomen, afdracht en persoonlijk resterend.
+- Huidige afdracht versus benodigd percentage.
+- Vaste lasten met maand/kwartaal/jaar-omrekening.
+- Huisbudget en beleggen zijn bewerkbaar.
+- Spaardoelen met voortgangsringen, percentage, huidig/doelbedrag, maandbedrag en geschatte resterende maanden.
+- Grafiek met maandelijkse uitgavencategorieën en grafische verdeling van de maandbehoefte.
+- Eén centrale berekening voor alle restbedragen.
+- Schuifbare vaste mobiele navigatie uit v21.9 blijft behouden.
 
 Upload alle zeven bestanden samen.
