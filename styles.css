@@ -689,3 +689,161 @@ html[data-theme20="dark"] body.st-glass20 .white-card * {
   color:#17253a !important;
   -webkit-text-fill-color:#17253a !important;
 }
+
+
+/* =========================================================
+   v21.5 — EXACTE FIX VOOR VRAAG VAN VANDAAG
+   De daadwerkelijke HTML gebruikt .answer-grid > article.
+   ========================================================= */
+
+/* De twee witte antwoordkaarten blijven ook in DARK MODE wit. */
+html[data-theme20="dark"] body.st-glass20 .daily-question .answer-grid > article {
+  background:#ffffff !important;
+  background-color:#ffffff !important;
+  border:1px solid #d6e0ea !important;
+  color:#17253a !important;
+  -webkit-text-fill-color:#17253a !important;
+  opacity:1 !important;
+}
+
+/* Antwoordtekst: donker zoals tekst in een licht invoerveld. */
+html[data-theme20="dark"] body.st-glass20 .daily-question .answer-grid > article p {
+  color:#17253a !important;
+  -webkit-text-fill-color:#17253a !important;
+  opacity:1 !important;
+}
+
+/* KEES / DAPHNE blijven blauw. */
+html[data-theme20="dark"] body.st-glass20 .daily-question .answer-grid > article > span {
+  color:#2474ad !important;
+  -webkit-text-fill-color:#2474ad !important;
+  opacity:1 !important;
+}
+
+/* Zelfde resultaat in light mode, zodat de kaart niet van kleur verandert bij themawissel. */
+html[data-theme20="light"] body.st-glass20 .daily-question .answer-grid > article {
+  background:#ffffff !important;
+  background-color:#ffffff !important;
+  border:1px solid #d6e0ea !important;
+  color:#17253a !important;
+}
+html[data-theme20="light"] body.st-glass20 .daily-question .answer-grid > article p {
+  color:#17253a !important;
+  -webkit-text-fill-color:#17253a !important;
+}
+html[data-theme20="light"] body.st-glass20 .daily-question .answer-grid > article > span {
+  color:#2474ad !important;
+  -webkit-text-fill-color:#2474ad !important;
+}
+
+/* Vergrendelde antwoordknoppen: duidelijk contrast in beide thema's. */
+body.st-glass20 .daily-question .button-row button.secondary:disabled {
+  background:#e9eef4 !important;
+  background-color:#e9eef4 !important;
+  color:#4c5c70 !important;
+  -webkit-text-fill-color:#4c5c70 !important;
+  border:1px solid #d2dbe5 !important;
+  opacity:1 !important;
+}
+
+/* Samen Thuis v21.6 · build 2026-09-16 22:xx · styles.css volledig opnieuw uitgegeven */
+
+/* v21.7 fresh build: 2026-09-16 20:58:16 +0000 */
+
+/* =========================================================
+   v21.8 — STANDAARD LETTERTYPE + VASTE LEESBAARHEID
+   ========================================================= */
+
+/* Eén standaard systeemlettertype op elk apparaat. */
+html, body, button, input, select, textarea {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+}
+
+/* Geen apart font of font-style per licht/donker thema. */
+body.st-glass20,
+body.st-glass20 * {
+  font-family: inherit;
+}
+
+/* Donkere oppervlakken: altijd lichte tekst, onafhankelijk van accent. */
+body.st-glass20 .weather18,
+body.st-glass20 .weather18 *,
+html[data-theme20="dark"] body.st-glass20 .card:not(.light-card):not(.white-card),
+html[data-theme20="dark"] body.st-glass20 .panel,
+html[data-theme20="dark"] body.st-glass20 .section-card {
+  color:#f5f8ff;
+}
+
+/* Bewust lichte/witte vlakken: altijd dezelfde donkere tekst in ELK thema. */
+body.st-glass20 .daily-question .answer-grid > article,
+body.st-glass20 .daily-answer,
+body.st-glass20 .question-answer,
+body.st-glass20 .answer-card,
+body.st-glass20 [data-answer],
+body.st-glass20 .light-card,
+body.st-glass20 .white-card {
+  background:#ffffff !important;
+  background-color:#ffffff !important;
+  color:#17253a !important;
+  -webkit-text-fill-color:#17253a !important;
+}
+body.st-glass20 .daily-question .answer-grid > article p,
+body.st-glass20 .daily-answer *,
+body.st-glass20 .question-answer *,
+body.st-glass20 .answer-card *,
+body.st-glass20 [data-answer] *,
+body.st-glass20 .light-card *,
+body.st-glass20 .white-card * {
+  color:#17253a !important;
+  -webkit-text-fill-color:#17253a !important;
+  opacity:1 !important;
+}
+
+/* Labels op lichte antwoordkaarten gebruiken de gekozen accentkleur. */
+body.st-glass20 .daily-question .answer-grid > article > span,
+body.st-glass20 .daily-answer .name,
+body.st-glass20 .question-answer .name,
+body.st-glass20 .answer-card .name {
+  color:var(--blue) !important;
+  -webkit-text-fill-color:var(--blue) !important;
+}
+
+/* Lichtgrijze/vergrendelde vlakken blijven altijd hetzelfde. */
+body.st-glass20 button:disabled,
+body.st-glass20 [disabled],
+body.st-glass20 .disabled {
+  background:#edf1f5 !important;
+  background-color:#edf1f5 !important;
+  color:#566579 !important;
+  -webkit-text-fill-color:#566579 !important;
+  border-color:#d5dde6 !important;
+  opacity:1 !important;
+}
+body.st-glass20 button:disabled *,
+body.st-glass20 [disabled] *,
+body.st-glass20 .disabled * {
+  color:#566579 !important;
+  -webkit-text-fill-color:#566579 !important;
+}
+
+/* Invoervelden volgen het oppervlak voor contrast, niet een ander lettertype. */
+html[data-theme20="dark"] body.st-glass20 input,
+html[data-theme20="dark"] body.st-glass20 textarea,
+html[data-theme20="dark"] body.st-glass20 select {
+  background:#112f4a !important;
+  color:#f7f9ff !important;
+  -webkit-text-fill-color:#f7f9ff !important;
+}
+html[data-theme20="light"] body.st-glass20 input,
+html[data-theme20="light"] body.st-glass20 textarea,
+html[data-theme20="light"] body.st-glass20 select {
+  background:#ffffff !important;
+  color:#17253a !important;
+  -webkit-text-fill-color:#17253a !important;
+}
+
+/* Accentkleuren blijven apparaatgebonden. */
+:root[data-accent20="purple"] { --blue:#7057d9; }
+:root[data-accent20="blue"]   { --blue:#246ca6; }
+:root[data-accent20="orange"] { --blue:#d56e38; }
+:root[data-accent20="bluePurple"] { --blue:#5f63d8; }

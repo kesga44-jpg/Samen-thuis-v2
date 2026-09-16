@@ -1,10 +1,16 @@
-# Samen Thuis v21.4 — lichte blokken vastgezet
+# Samen Thuis v21.8 — standaard lettertype
 
-In donkere modus blijven de bewust lichte/witte antwoordblokken nu exact licht.
-De tekst daarin blijft donkerblauw en de labels Kees/Daphne blijven blauw.
-Vergrendelde antwoordknoppen blijven lichtgrijs met donkergrijze tekst.
+Build: 2026-09-16 21:01:28 +0000
 
-De fix gebruikt hogere CSS-specificiteit en staat als laatste in styles.css,
-zodat oudere dark-mode regels de kleuren niet opnieuw kunnen overschrijven.
+Alle zeven bestanden horen bij dezelfde build.
 
-Alle overige v21-functionaliteit en de glass dock zijn behouden.
+Nieuw:
+- standaard systeemlettertype op iPhone, Windows en macOS;
+- het lettertype wisselt niet meer tussen licht en donker;
+- witte/lichtgrijze vlakken behouden altijd donkere tekst;
+- donkere vlakken behouden lichte tekst;
+- accenttekst blijft gekoppeld aan de gekozen accentkleur;
+- de bestaande glass dock, 12 pagina's en functionaliteit blijven behouden.
+
+Assetversie: v218.
+Service-worker-cache: samen-thuis-v21-8-system-font.

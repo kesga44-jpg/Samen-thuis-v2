@@ -4991,3 +4991,9 @@ const rr=render;render=function(...a){let x=rr(...a);requestAnimationFrame(dock)
 document.addEventListener('click',e=>{let g=e.target.closest('[data-go21]');if(g){e.preventDefault();document.querySelector('#sheet21')?.remove();go(g.dataset.go21);return}if(e.target.closest('[data-more21]')){e.preventDefault();sheet();return}if(e.target.closest('[data-close21]'))document.querySelector('#sheet21')?.remove()});
 requestAnimationFrame(dock);
 })();
+
+/* Samen Thuis v21.6 · build 2026-09-16 22:xx · app.js volledig opnieuw uitgegeven */
+
+/* v21.7 fresh build: 2026-09-16 20:58:16 +0000 */
+
+/* v21.8 build 2026-09-16 21:01:28 +0000 */
