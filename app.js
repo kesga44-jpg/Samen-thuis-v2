@@ -1,5 +1,5 @@
-
-/* ===== GEÏNTEGREERD: app.js ===== */
+const APP_VERSION = '17.1';
+const DATA_SCHEMA_VERSION = 3;
 const STORAGE_KEY = 'samenThuisDataV2';
 const LEGACY_STORAGE_KEY = 'samenThuisDataV1';
 const SYNC_KEY = 'samenThuisSyncV1';
@@ -73,7 +73,7 @@ const defaultCalendars = () => [
 ];
 
 const initialData = {
-  meta: { version: 2, updatedAt: new Date().toISOString() },
+  meta: { version: DATA_SCHEMA_VERSION, appVersion: APP_VERSION, updatedAt: new Date().toISOString() },
   planning: [{ id: 'p1', title: 'Samen koken', date: todayISO(), time: '18:30', endTime: '', person: 'Samen', calendarId: 'persoonlijk' }],
   calendars: defaultCalendars(),
   excludedCalendars: [],
@@ -113,7 +113,10 @@ const initialData = {
   trips: [
     { id: 'r2', tripFolderId: 'trip-vietnam', tripSectionId: 'trip-vietnam-voorbereiding', title: 'Paspoorten controleren', date: addDays(todayISO(), 7), type: 'Voorbereiding', note: 'Controleer geldigheid', checkable: true, done: false }
   ],
-  dailyAnswers: {}
+  dailyAnswers: {},
+  priceReferences: [],
+  priceReferenceSource: '',
+  priceReferenceUpdatedAt: ''
 };
 
 const clone = value => structuredClone(value);
@@ -174,6 +177,11 @@ function migrateData(raw) {
     .filter(item => item && typeof item.name === 'string' && !excludedNames.has(calendarNameKey(item.name)))
     .map(item => ({ ...item, person: validCalendarPerson(item.person) || inferCalendarPerson(item.name) }));
   migrated.dailyAnswers = raw.dailyAnswers && typeof raw.dailyAnswers === 'object' ? raw.dailyAnswers : {};
+  migrated.priceReferences = Array.isArray(raw.priceReferences)
+    ? raw.priceReferences.filter(item => item && (item.product || item.title)).map(item => ({ ...item }))
+    : [];
+  migrated.priceReferenceSource = String(raw.priceReferenceSource || '');
+  migrated.priceReferenceUpdatedAt = String(raw.priceReferenceUpdatedAt || '');
   migrated.planning = migrated.planning.map(item => ({
     endTime: '',
     calendarId: 'persoonlijk',
@@ -185,7 +193,8 @@ function migrateData(raw) {
     return { secondWeekday: '', notes: '', ...item, completedDates };
   });
   migrated.meta = {
-    version: 2,
+    version: DATA_SCHEMA_VERSION,
+    appVersion: APP_VERSION,
     updatedAt: raw.meta?.updatedAt || new Date().toISOString()
   };
   return migrated;
@@ -595,6 +604,7 @@ function renderSettings() {
     ${renderCalendarSettings()}
     <section class="card settings-card"><div class="card-head"><div><p class="eyebrow">Gegevens</p><h2>Back-up</h2></div></div><p>Maak een los JSON-bestand of laad een eerdere back-up. De synchronisatiecode en sleutel worden niet in de back-up gezet.</p><div class="button-row"><button class="secondary" data-action="backup">Back-up maken</button><button class="secondary" data-action="restore">Back-up laden</button></div></section>
     <section class="card settings-card"><div class="card-head"><div><p class="eyebrow">Apple Opdracht</p><h2>Eenvoudig tekstformaat</h2></div></div><p>Laat de Opdracht per afspraak één regel maken:</p><pre><code>Agendanaam | 2026-09-04 | 09:00 | Titel</code></pre><p>De persoon volgt uit de agenda. Een vijfde veld met Kees, Daphne of Samen is optioneel en gaat voor de agendakeuze. Een zesde veld mag de eindtijd bevatten. Bij onbekende namen kies je de persoon één keer.</p><p>Dit is een import, geen tweerichtingskoppeling. Verplaatsen of verwijderen in Apple Agenda wordt niet automatisch overgenomen.</p></section>
+    <section class="card settings-card version-card"><div class="card-head"><div><p class="eyebrow">Appversie</p><h2>Samen Thuis v${esc(APP_VERSION)}</h2></div><span class="tag green">Actief</span></div><p>Alle functies uit v4, v11, v13, v14, v15 en v16 zijn verwerkt in één <code>app.js</code> en één <code>styles.css</code>. Er worden geen losse updatebestanden geladen.</p><p class="muted">Gegevensschema ${DATA_SCHEMA_VERSION} · offlinecache v${esc(APP_VERSION)}</p></section>
   </div>`;
 }
 
@@ -710,7 +720,7 @@ function handleSubmit(event) {
     toast('Map toegevoegd');
     return;
   }
-  ['amount', 'min'].forEach(key => { if (key in formData) formData[key] = Number(formData[key]); });
+  ['amount', 'min', 'desired', 'cost'].forEach(key => { if (key in formData) formData[key] = Number(formData[key]); });
   if (current === 'groceries') formData.done = false;
   if (current === 'chores') formData.completedDates = [];
   if (current === 'planning') formData.personSource = 'manual';
@@ -1599,7 +1609,23 @@ document.querySelector('#eyebrow').textContent = new Intl.DateTimeFormat('nl-NL'
 window.addEventListener('online', () => { updateSyncBadge(); syncNow(); });
 window.addEventListener('offline', () => updateSyncBadge());
 
-if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js');
+if ('serviceWorker' in navigator) {
+  let reloadingForUpdate = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (reloadingForUpdate) return;
+    reloadingForUpdate = true;
+    window.location.reload();
+  });
+  window.addEventListener('load', async () => {
+    try {
+      const registration = await navigator.serviceWorker.register(`./sw.js?v=${APP_VERSION.replace(/\D/g, '')}`, { updateViaCache: 'none' });
+      await registration.update();
+      if (registration.waiting) registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+    } catch (error) {
+      console.warn('Service worker kon niet worden bijgewerkt', error);
+    }
+  });
+}
 setupNav();
 render();
 handleInitialAgendaImport();
@@ -1607,14 +1633,12 @@ setTimeout(captureBrainyQuote, 600);
 refreshBrainyQuoteRSS();
 if (syncConfigured()) syncNow();
 
-;
+/* ================================================================ */
 
-
-/* ===== GEÏNTEGREERD: upgrade-v11.js ===== */
-/* Samen Thuis v11 – travel editing, import preview, priorities and automatic two-way sync */
+/* Samen Thuis v17 — reisbeheer, prioriteiten en automatische synchronisatie */
 (() => {
-  if (window.__SAMEN_THUIS_V11_LOADED__) return;
-  window.__SAMEN_THUIS_V11_LOADED__ = true;
+  if (window.__SAMEN_THUIS_V17_TRAVEL_SYNC__) return;
+  window.__SAMEN_THUIS_V17_TRAVEL_SYNC__ = true;
 
   const AUTO_SYNC_INTERVAL_MS = 30000;
   const PRIORITIES = ['low', 'medium', 'high'];
@@ -2193,421 +2217,17 @@ if (syncConfigured()) syncNow();
   syncNow();
 })();
 
-;
+/* ================================================================ */
 
-
-/* ===== GEÏNTEGREERD: samen-thuis-update-v4.js ===== */
-console.info('Samen Thuis update 12.0 geladen');
-
-(() => {
-  'use strict';
-
-  // Deze file wordt na app.js en upgrade-v11.js geladen en gebruikt bewust
-  // de bestaande Samen Thuis data/functions in plaats van een tweede opslaglaag.
-
-  const IMPORT_TARGETS = {
-    planning: 'Agenda',
-    meals: 'Weekmenu',
-    groceries: 'Boodschappen',
-    chores: 'Huishouden',
-    stock: 'Voorraad',
-    ideas: 'Samen doen',
-    home: 'Woning',
-    trips: 'Reizen'
-  };
-
-  const importState = { target: 'planning', text: '', filename: '', preview: [] };
-  const oldRender = render;
-
-  sections.imports = { label: 'Importeren', icon: '↥' };
-
-  function importEsc(value='') { return esc(value); }
-
-  function ensureImportDialog() {
-    if (document.querySelector('#editItemDialogV12')) return;
-    const dialog = document.createElement('dialog');
-    dialog.id = 'editItemDialogV12';
-    dialog.innerHTML = `
-      <form id="editItemFormV12">
-        <div class="dialog-head">
-          <div><p class="eyebrow">Bewerken</p><h2 id="editItemTitleV12">Item bewerken</h2></div>
-          <button type="button" class="icon-btn" data-edit-close>×</button>
-        </div>
-        <div id="editItemFieldsV12" class="form-grid"></div>
-        <div class="dialog-actions">
-          <button type="button" class="secondary" data-edit-close>Annuleren</button>
-          <button type="submit" class="primary">Wijzigingen opslaan</button>
-        </div>
-      </form>`;
-    document.body.appendChild(dialog);
-    dialog.querySelectorAll('[data-edit-close]').forEach(b => b.addEventListener('click', () => dialog.close()));
-  }
-
-  function renderImportsV12() {
-    return `<div class="settings-grid import-center-v12">
-      <section class="card settings-card">
-        <div class="card-head">
-          <div><p class="eyebrow">Één centrale ingang</p><h2>Bestand of lijst importeren</h2></div>
-          <span class="tag green">Eerst controleren</span>
-        </div>
-        <p>Kies waar de informatie hoort. Daarna leest de app het bestand of de geplakte tekst en toont eerst een controlelijst. Pas na bevestigen worden de items toegevoegd.</p>
-        <div class="form-grid">
-          <div class="field">
-            <label for="centralImportTarget">Waar hoort dit bij?</label>
-            <select id="centralImportTarget">
-              ${Object.entries(IMPORT_TARGETS).map(([key,label]) => `<option value="${key}" ${key===importState.target?'selected':''}>${label}</option>`).join('')}
-            </select>
-          </div>
-          <div class="field">
-            <label for="centralImportFile">Bestand</label>
-            <input id="centralImportFile" type="file" accept=".pdf,.docx,.xlsx,.xlsm,.xls,.csv,.txt,.md,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/plain,text/csv">
-          </div>
-          <div class="field" style="grid-column:1/-1">
-            <label for="centralImportText">Of tekst/lijst plakken</label>
-            <textarea id="centralImportText" placeholder="Plak hier de inhoud…">${importEsc(importState.text)}</textarea>
-          </div>
-        </div>
-        ${importState.filename ? `<p class="muted">Gelezen bestand: <strong>${importEsc(importState.filename)}</strong></p>` : ''}
-        <div class="button-row">
-          <button class="primary" type="button" data-central-analyse>Analyseren</button>
-          <button class="secondary" type="button" data-central-clear>Leegmaken</button>
-        </div>
-      </section>
-
-      <section class="card settings-card">
-        <div class="card-head">
-          <div><p class="eyebrow">Controle</p><h2>${importState.preview.length} gevonden items</h2></div>
-          ${importState.preview.length ? '<button class="primary" type="button" data-central-commit>Geselecteerde toevoegen</button>' : ''}
-        </div>
-        <div class="list">
-          ${importState.preview.length ? importState.preview.map((entry,index) => `
-            <div class="list-item">
-              <input type="checkbox" data-preview-check="${index}" ${entry.selected?'checked':''}>
-              <div class="item-main">
-                <strong>${importEsc(previewTitle(entry.item))}</strong>
-                <small>${importEsc(previewSubtitle(entry.item))}</small>
-              </div>
-              <button class="secondary" type="button" data-preview-edit="${index}">✎</button>
-            </div>`).join('') : empty('Nog niets geanalyseerd')}
-        </div>
-      </section>
-    </div>`;
-  }
-
-  render = function() {
-    if (current === 'imports') {
-      document.querySelector('#view').innerHTML = renderImportsV12();
-      updateSyncBadge();
-      bindImportPageV12();
-      return;
-    }
-    oldRender();
-    requestAnimationFrame(addEditButtonsV12);
-  };
-
-  function previewTitle(item) {
-    return item.title || item.name || item.task || item.text || 'Item';
-  }
-
-  function previewSubtitle(item) {
-    const bits = [item.date || item.due || '', item.type || item.category || item.repeat || '', item.person || ''].filter(Boolean);
-    return bits.join(' · ') || IMPORT_TARGETS[importState.target];
-  }
-
-  function bindImportPageV12() {
-    const target = document.querySelector('#centralImportTarget');
-    if (target) target.onchange = () => {
-      importState.target = target.value;
-      importState.preview = importState.text ? parseCentralTextV12(importState.text, importState.target) : [];
-      render();
-    };
-    const text = document.querySelector('#centralImportText');
-    if (text) text.oninput = () => { importState.text = text.value; };
-    const file = document.querySelector('#centralImportFile');
-    if (file) file.onchange = async () => {
-      const selected = file.files?.[0];
-      if (!selected) return;
-      try {
-        toast('Bestand wordt gelezen…');
-        importState.filename = selected.name;
-        importState.text = await readCentralFileV12(selected);
-        importState.preview = parseCentralTextV12(importState.text, importState.target);
-        render();
-        toast(`${importState.preview.length} items gevonden`);
-      } catch (error) {
-        console.error(error);
-        toast('Bestand lezen is mislukt');
-      }
-    };
-  }
-
-  async function loadExternalV12(src, test) {
-    if (test()) return;
-    await new Promise((resolve,reject) => {
-      const script = document.createElement('script');
-      script.src = src;
-      script.onload = resolve;
-      script.onerror = reject;
-      document.head.appendChild(script);
-    });
-  }
-
-  async function readCentralFileV12(file) {
-    const ext = file.name.toLowerCase().split('.').pop();
-    if (['txt','md','csv'].includes(ext)) return file.text();
-
-    if (ext === 'docx') {
-      await loadExternalV12('https://cdn.jsdelivr.net/npm/mammoth@1.12.2/mammoth.browser.min.js', () => Boolean(window.mammoth));
-      return (await window.mammoth.extractRawText({ arrayBuffer: await file.arrayBuffer() })).value || '';
-    }
-
-    if (['xlsx','xlsm','xls'].includes(ext)) {
-      await loadExternalV12('https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js', () => Boolean(window.XLSX));
-      const workbook = window.XLSX.read(await file.arrayBuffer(), { type:'array', cellDates:true });
-      return workbook.SheetNames.map(name => `# Werkblad: ${name}\n${window.XLSX.utils.sheet_to_csv(workbook.Sheets[name])}`).join('\n\n');
-    }
-
-    if (ext === 'pdf') {
-      // Gebruik de PDF-functie die de app al voor Reizen heeft.
-      return await extractPdfText(file);
-    }
-    throw new Error('Niet ondersteund bestandstype');
-  }
-
-  function linesV12(text) {
-    return String(text || '').replace(/\r/g,'').split(/\n+/).map(x => x.trim()).filter(Boolean)
-      .filter(x => !/^#\s*(pagina|werkblad)\b/i.test(x));
-  }
-
-  function dateInLineV12(line) {
-    const iso = line.match(/\b(20\d{2})[-/](\d{1,2})[-/](\d{1,2})\b/);
-    if (iso) return `${iso[1]}-${pad(iso[2])}-${pad(iso[3])}`;
-    const eu = line.match(/\b(\d{1,2})[-/.](\d{1,2})[-/.](20\d{2})\b/);
-    if (eu) return `${eu[3]}-${pad(eu[2])}-${pad(eu[1])}`;
-    return '';
-  }
-
-  function stripDateV12(line) {
-    return line.replace(/\b20\d{2}[-/]\d{1,2}[-/]\d{1,2}\b|\b\d{1,2}[-/.]\d{1,2}[-/.]20\d{2}\b/,'')
-      .replace(/^[\s|;,:–—-]+/,'').trim();
-  }
-
-  function parseCentralTextV12(text, target) {
-    const lines = linesV12(text);
-    const wrap = item => ({ selected:true, item });
-
-    if (target === 'planning') {
-      return lines.filter(line => dateInLineV12(line)).slice(0,200).map(line => wrap({
-        id:id(), title:stripDateV12(line) || 'Afspraak', date:dateInLineV12(line), time:'', endTime:'',
-        person:'Samen', personSource:'manual', calendarId:data.calendars[0]?.id || 'persoonlijk'
-      }));
-    }
-
-    if (target === 'meals') {
-      const dayMap = new Map(WEEKDAY_NAMES.map((name,index)=>[name.toLowerCase(), index]));
-      const start = startOfWeek(todayISO());
-      return lines.slice(0,100).map((line,index) => {
-        const match = line.match(/^(maandag|dinsdag|woensdag|donderdag|vrijdag|zaterdag|zondag)\s*[:|;-]\s*(.+)$/i);
-        return wrap({
-          id:id(),
-          date: match ? addDays(start, dayMap.get(match[1].toLowerCase())) : addDays(start, index % 7),
-          type:'Avondeten',
-          title: match ? match[2].trim() : line.replace(/^[-•]\s*/,'')
-        });
-      });
-    }
-
-    if (target === 'groceries') {
-      return parseGroceryText(text).slice(0,300).map(item => wrap({ id:id(), ...item }));
-    }
-
-    if (target === 'chores') {
-      return lines.slice(0,250).map(line => {
-        const parts = line.split(/\s+[–—-]\s+|[;|]/).map(x=>x.trim());
-        return wrap({
-          id:id(), title:parts[0], person:'Samen', due:todayISO(),
-          repeat:parts[1] || 'Wekelijks', secondWeekday:'', notes:'', completedDates:[]
-        });
-      });
-    }
-
-    if (target === 'stock') {
-      return lines.slice(0,300).map(line => {
-        const match = line.match(/^(.+?)(?:\s+(\d+(?:[.,]\d+)?)\s*([A-Za-zÀ-ÿ]+)?)?$/);
-        return wrap({
-          id:id(), title:(match?.[1] || line).trim(), category:'Overig',
-          amount:match?.[2] ? Number(match[2].replace(',','.')) : 1,
-          min:1, unit:match?.[3] || 'stuks'
-        });
-      });
-    }
-
-    if (target === 'ideas') {
-      return lines.slice(0,200).map(line => wrap({
-        id:id(), title:line.replace(/^[-•]\s*/,''), category:'Thuis', note:'', icon:'♡'
-      }));
-    }
-
-    if (target === 'home') {
-      return lines.slice(0,200).map(line => wrap({
-        id:id(), title:line.replace(/^[-•]\s*/,''), category:'Onderhoud', due:'', note:''
-      }));
-    }
-
-    if (target === 'trips') {
-      const folder = data.tripFolders[0];
-      if (!folder) return [];
-      const section = data.tripSections.find(s => s.tripFolderId === folder.id);
-      return lines.slice(0,300).map(line => wrap({
-        id:id(), tripFolderId:folder.id, tripSectionId:section?.id || '',
-        title:line.replace(/^[-•]\s*/,''), date:dateInLineV12(line), type:'Notitie',
-        note:'', checkable:false, done:false
-      }));
-    }
-    return [];
-  }
-
-  function editPreviewV12(index) {
-    const entry = importState.preview[index];
-    if (!entry) return;
-    openGenericEditorV12(importState.target, entry.item, false, () => render());
-  }
-
-  function commitPreviewV12() {
-    const selected = importState.preview.filter(x => x.selected).map(x => x.item);
-    if (!selected.length) return toast('Selecteer minimaal één item');
-    data[importState.target].push(...selected);
-    save();
-    importState.preview = [];
-    importState.text = '';
-    importState.filename = '';
-    render();
-    toast(`${selected.length} items toegevoegd aan ${IMPORT_TARGETS[importState.target]}`);
-  }
-
-  function editableSpecV12(type, item) {
-    const base = {
-      planning: [['title','Titel','text'],['date','Datum','date'],['time','Tijd','time'],['endTime','Eindtijd','time'],['person','Voor wie','select',['Samen','Kees','Daphne']]],
-      meals: [['title','Gerecht','text'],['date','Datum','date'],['type','Moment','select',['Ontbijt','Lunch','Avondeten','Snack']]],
-      groceries: [['title','Product','text'],['category','Categorie','select',GROCERY_CATEGORIES],['done','Gekocht','checkbox']],
-      chores: [['title','Taak','text'],['person','Voor wie','select',['Samen','Kees','Daphne']],['due','Eerste keer','date'],['repeat','Herhaling','select',['Eenmalig','Dagelijks','Wekelijks','2× per week','Elke 2 weken','Maandelijks']],['notes','Notitie','textarea']],
-      stock: [['title','Product','text'],['category','Plek','text'],['amount','Aantal','number'],['min','Minimum','number'],['unit','Eenheid','text']],
-      ideas: [['title','Idee','text'],['category','Categorie','text'],['note','Notitie','textarea'],['icon','Emoji','text']],
-      home: [['title','Onderwerp','text'],['category','Categorie','text'],['due','Datum','date'],['note','Notitie','textarea']],
-      trips: [['title','Onderwerp','text'],['date','Datum/deadline','date'],['type','Soort','text'],['note','Notitie','textarea'],['checkable','Afvinkbaar','checkbox'],['done','Afgerond','checkbox']]
-    };
-    return base[type] || [];
-  }
-
-  function openGenericEditorV12(type, item, persist=true, afterSave=null) {
-    ensureImportDialog();
-    const dialog = document.querySelector('#editItemDialogV12');
-    const fields = editableSpecV12(type, item);
-    document.querySelector('#editItemTitleV12').textContent = `${IMPORT_TARGETS[type] || 'Item'} bewerken`;
-    document.querySelector('#editItemFieldsV12').innerHTML = fields.map(([key,label,kind,options]) => {
-      const value = item[key] ?? '';
-      if (kind === 'checkbox') return `<label class="checkbox-field"><input type="checkbox" data-edit-field="${key}" ${value?'checked':''}><span>${label}</span></label>`;
-      if (kind === 'textarea') return `<div class="field"><label>${label}</label><textarea data-edit-field="${key}">${importEsc(value)}</textarea></div>`;
-      if (kind === 'select') return `<div class="field"><label>${label}</label><select data-edit-field="${key}">${options.map(opt=>`<option value="${importEsc(opt)}" ${String(opt)===String(value)?'selected':''}>${importEsc(opt)}</option>`).join('')}</select></div>`;
-      return `<div class="field"><label>${label}</label><input type="${kind}" data-edit-field="${key}" value="${importEsc(value)}"></div>`;
-    }).join('');
-
-    const form = document.querySelector('#editItemFormV12');
-    form.onsubmit = event => {
-      event.preventDefault();
-      fields.forEach(([key,,kind]) => {
-        const input = dialog.querySelector(`[data-edit-field="${key}"]`);
-        if (!input) return;
-        if (kind === 'checkbox') item[key] = input.checked;
-        else if (kind === 'number') item[key] = Number(input.value) || 0;
-        else item[key] = input.value;
-      });
-      if (persist) save();
-      dialog.close();
-      if (persist) render();
-      afterSave?.();
-      if (persist) toast('Wijzigingen opgeslagen');
-    };
-    dialog.showModal();
-  }
-
-  function addEditButtonsV12() {
-    if (current === 'today' || current === 'settings' || current === 'imports') return;
-    document.querySelectorAll('[data-delete]').forEach(deleteButton => {
-      if (deleteButton.parentElement?.querySelector('[data-edit-existing]')) return;
-      const raw = deleteButton.dataset.delete || '';
-      const [type,itemId] = raw.split(':');
-      if (!IMPORT_TARGETS[type] || !itemId) return;
-      const edit = document.createElement('button');
-      edit.type = 'button';
-      edit.className = 'delete edit-pencil-v12';
-      edit.dataset.editExisting = `${type}:${itemId}`;
-      edit.setAttribute('aria-label','Bewerken');
-      edit.textContent = '✎';
-      deleteButton.before(edit);
-    });
-  }
-
-  document.addEventListener('click', event => {
-    const analyse = event.target.closest('[data-central-analyse]');
-    if (analyse) {
-      importState.text = document.querySelector('#centralImportText')?.value || '';
-      importState.preview = parseCentralTextV12(importState.text, importState.target);
-      render();
-      toast(`${importState.preview.length} items gevonden`);
-      return;
-    }
-
-    if (event.target.closest('[data-central-clear]')) {
-      importState.text=''; importState.filename=''; importState.preview=[];
-      render(); return;
-    }
-
-    if (event.target.closest('[data-central-commit]')) {
-      commitPreviewV12(); return;
-    }
-
-    const previewEdit = event.target.closest('[data-preview-edit]');
-    if (previewEdit) {
-      editPreviewV12(Number(previewEdit.dataset.previewEdit)); return;
-    }
-
-    const existingEdit = event.target.closest('[data-edit-existing]');
-    if (existingEdit) {
-      const [type,itemId] = existingEdit.dataset.editExisting.split(':');
-      const item = data[type]?.find(x => x.id === itemId);
-      if (item) openGenericEditorV12(type,item,true);
-      return;
-    }
-  });
-
-  document.addEventListener('change', event => {
-    const check = event.target.closest('[data-preview-check]');
-    if (check) {
-      const entry = importState.preview[Number(check.dataset.previewCheck)];
-      if (entry) entry.selected = check.checked;
-    }
-  });
-
-  ensureImportDialog();
-  setupNav();
-  render();
-})();
-
-;
-
-
-/* ===== GEÏNTEGREERD: samen-thuis-update-v13(1).js ===== */
-/* CLEAN MASTER BUILD 2026-09-08 20:xx
-   Samen Thuis v13.1
-   Fix: gestructureerde reisdocumenten worden als blokken gelezen.
+/* Samen Thuis v17 — enige centrale importer en editor.
+   Combineert de bewerkbare controle van v13 met de flexibele invoer van v14.
 */
-console.info('Samen Thuis update 13.1 geladen');
+console.info('Samen Thuis v17 importer geladen');
 
 (() => {
   'use strict';
-  if (window.__SAMEN_THUIS_V131__) return;
-  window.__SAMEN_THUIS_V131__ = true;
+  if (window.__SAMEN_THUIS_V17_IMPORTER__) return;
+  window.__SAMEN_THUIS_V17_IMPORTER__ = true;
 
   const TARGETS = {
     planning:'Agenda', meals:'Weekmenu', groceries:'Boodschappen',
@@ -2627,6 +2247,30 @@ console.info('Samen Thuis update 13.1 geladen');
     'Elke 2 weken','Elke 4 weken','Maandelijks','Elke 2 maanden','Elke 3 maanden',
     'Elke 6 maanden','Jaarlijks','Na elke was','Wanneer nodig'
   ];
+
+  const ALIASES = {
+    agenda:'planning', planning:'planning', kalender:'planning', afspraak:'planning', afspraken:'planning',
+    weekmenu:'meals', menu:'meals', maaltijd:'meals', maaltijden:'meals', eten:'meals',
+    boodschappen:'groceries', boodschap:'groceries', grocery:'groceries', groceries:'groceries',
+    huishouden:'chores', huishoudelijk:'chores', schoonmaak:'chores', taak:'chores', taken:'chores',
+    voorraad:'stock', stock:'stock', inventaris:'stock',
+    idee:'ideas', ideeen:'ideas', ideeenlijst:'ideas', samen_doen:'ideas',
+    woning:'home', huis:'home', onderhoud:'home',
+    reizen:'trips', reis:'trips', vakantie:'trips', travel:'trips'
+  };
+
+  const SCHEMAS = {
+    planning:['type','title','startDate','startTime','endDate','endTime','allDay','location','description','repeat'],
+    meals:['type','date','mealType','title','persons','ingredients','note'],
+    groceries:['type','title','amount','unit','category','store','forMeal','done','note'],
+    chores:['type','title','category','repeat','person','startDate','nextDate','priority','done','notes'],
+    stock:['type','title','category','amount','unit','minimum','bestBefore','location','note'],
+    ideas:['type','title','category','description','person','priority','status','date','note'],
+    home:['type','title','category','description','kind','priority','startDate','deadline','status','cost','done','note'],
+    trips:['type','trip','section','title','kind','description','startDate','endDate','deadline','location','cost','priority','checkable','done','note']
+  };
+
+  sections.imports = { label:'Importeren', icon:'↥' };
 
   const state13 = {
     target:'planning',
@@ -2665,11 +2309,169 @@ console.info('Samen Thuis update 13.1 geladen');
   }
 
   function boolWord(v) {
-    return /^(1|ja|yes|true|aan|x|✓)$/i.test(String(v||'').trim());
+    const raw=String(v||'').trim();
+    return raw==='✓' || /^(1|ja|yes|true|aan|x|afgevinkt|klaar|gedaan)$/i.test(norm(raw));
   }
 
   function falseWord(v) {
     return /^(0|nee|no|false|uit)$/i.test(String(v||'').trim());
+  }
+
+  function cleanField17(value='') {
+    return String(value).trim().replace(/^\[(.*)\]$/,'$1').trim();
+  }
+
+  function splitFlexible17(line='') {
+    const raw=cleanBullet(line);
+    let parts;
+    if(raw.includes('|')) parts=raw.split('|');
+    else if(raw.includes(';')) parts=raw.split(';');
+    else if(raw.includes('\t')) parts=raw.split(/\t+/);
+    else if(/\s\/\s/.test(raw)) parts=raw.split(/\s+\/\s+/);
+    else if(/\s[-–—]\s/.test(raw)) parts=raw.split(/\s+[-–—]\s+/);
+    else if(/\s{2,}/.test(raw)) parts=raw.split(/\s{2,}/);
+    else return [raw];
+    return parts.map(cleanField17);
+  }
+
+  function targetFromToken17(value='') {
+    const key=norm(value).replace(/\s/g,'_');
+    return ALIASES[key] || ALIASES[norm(value)] || '';
+  }
+
+  function isHeader17(line,parts,target) {
+    const whole=norm(cleanBullet(line));
+    if(!whole || /^#/.test(String(line).trim())) return true;
+    const single=parts.length===1;
+    const subtypeNames=Object.values(SUBTYPES).flat().map(norm);
+    if(single && (targetFromToken17(parts[0]) || subtypeNames.includes(norm(parts[0])))) return true;
+    if(/^(aanbevolen uploadvolgorde|belangrijk|importregels|beperkingen|uitgangspunt woning|controle voor import|vaste volgorde)/.test(whole)) return true;
+
+    const p=parts.map(norm);
+    const headerWords=new Set([
+      'titel','taak','product','onderwerp','categorie','frequentie','herhaling','persoon',
+      'toegewezen aan','startdatum','einddatum','volgende datum','prioriteit','afgevinkt',
+      'omschrijving','notitie','hoeveelheid','eenheid','minimumvoorraad','minimum','gewenst',
+      'datum','begindatum','begintijd','eindtijd','maaltijdmoment','gerecht','reis','map onderdeel',
+      'locatie','winkel','voor weekmenu','personen','ingredienten','houdbaar tot','deadline',
+      'status','kosten','afvinken','afgerond','type','soort'
+    ]);
+    const headerCount=p.filter(x=>headerWords.has(x) || /^\[.+\]$/.test(x)).length;
+    if(parts.length>1 && headerCount>=Math.min(2,parts.length-1)) return true;
+    if(parts.some(x=>/^\[.+\]$/.test(String(x).trim()))) return true;
+    return false;
+  }
+
+  function priority17(value='') {
+    const v=norm(value);
+    if(/urgent|belangrijk|high|hoog/.test(v)) return 'high';
+    if(/low|laag/.test(v)) return 'low';
+    if(/normaal|normal|medium|midden/.test(v)) return 'medium';
+    return '';
+  }
+
+  function universalRecord17(line,fallbackTarget) {
+    const parts=splitFlexible17(line);
+    if(parts.length<2 || isHeader17(line,parts,fallbackTarget)) return null;
+
+    // Regels met "Veld: waarde" horen bij de documentparser hieronder.
+    if(parts.slice(1).some(x=>/^[^:]{2,35}:\s*.+/.test(x))) return null;
+
+    const explicitTarget=targetFromToken17(parts[0]);
+    const target=explicitTarget || fallbackTarget;
+    const schema=SCHEMAS[target];
+    if(!schema) return null;
+    const values=explicitTarget ? parts : [TARGETS[target],...parts];
+    const record={target};
+    schema.forEach((key,index)=>{record[key]=cleanField17(values[index]??'');});
+    return record;
+  }
+
+  function universalItem17(record) {
+    const t=record.target;
+    if(t==='planning') return {
+      id:id(),title:record.title||'Afspraak',date:isoDateFromText(record.startDate)||record.startDate||todayISO(),
+      time:record.startTime||'',endDate:isoDateFromText(record.endDate)||record.endDate||'',endTime:record.endTime||'',
+      allDay:boolWord(record.allDay),location:record.location||'',note:record.description||'',
+      repeat:record.repeat?normaliseRepeat(record.repeat):'',person:'Samen',personSource:'manual',
+      calendarId:data.calendars?.[0]?.id||'persoonlijk'
+    };
+    if(t==='meals') return {
+      id:id(),title:record.title||'Maaltijd',date:isoDateFromText(record.date)||record.date||todayISO(),
+      type:record.mealType||'Avondeten',persons:record.persons||'',ingredients:record.ingredients||'',note:record.note||''
+    };
+    if(t==='groceries') return {
+      id:id(),title:record.title||'Product',amount:num(record.amount,record.amount?0:1),unit:record.unit||'',
+      category:record.category||'Overig',store:record.store||'',forMeal:record.forMeal||'',
+      done:boolWord(record.done),note:record.note||''
+    };
+    if(t==='chores') {
+      const due=isoDateFromText(record.nextDate||record.startDate)||record.nextDate||record.startDate||todayISO();
+      const completed=boolWord(record.done);
+      const completedDate=due && due<=todayISO()?due:todayISO();
+      return {
+      id:id(),title:record.title||'Taak',category:record.category||state13.subtype||'Schoonmaak',
+      repeat:normaliseRepeat(record.repeat||'Wekelijks'),person:record.person||'Samen',
+      due,priority:priority17(record.priority),notes:record.notes||'',secondWeekday:'',
+      completedDates:completed?[completedDate]:[],lastDoneDate:completed?completedDate:''
+      };
+    }
+    if(t==='stock') {
+      const amount=num(record.amount,0),minimum=num(record.minimum,0);
+      return {
+        id:id(),title:record.title||'Product',category:record.category||stockCategory('',state13.subtype),
+        amount,unit:record.unit||'stuks',min:minimum,
+        desired:num(record.desired,Math.max(amount,minimum)),bestBefore:isoDateFromText(record.bestBefore)||record.bestBefore||'',
+        location:record.location||'',note:record.note||''
+      };
+    }
+    if(t==='ideas') return {
+      id:id(),title:record.title||'Idee',category:record.category||'Thuis',
+      note:[record.description,record.note].filter(Boolean).join('\n'),person:record.person||'',
+      priority:priority17(record.priority),status:record.status||'',date:isoDateFromText(record.date)||record.date||'',icon:'♡'
+    };
+    if(t==='home') return {
+      id:id(),title:record.title||'Woningitem',category:record.category||state13.subtype||'Onderhoud',
+      note:[record.description,record.note].filter(Boolean).join('\n'),kind:record.kind||'',
+      priority:priority17(record.priority),startDate:isoDateFromText(record.startDate)||record.startDate||'',
+      due:isoDateFromText(record.deadline||record.startDate)||record.deadline||record.startDate||'',
+      status:record.status||'',cost:num(record.cost,0),done:boolWord(record.done),repeat:''
+    };
+    if(t==='trips') {
+      const folderName=record.trip||selectedTripFolder()?.name||'Nieuwe reis';
+      const folder=findTripFolderByName(folderName);
+      const sectionName=record.section||state13.subtype||'Algemeen';
+      const section=folder?findTripSectionByName(folder.id,sectionName):null;
+      const start=isoDateFromText(record.startDate||record.deadline)||record.startDate||record.deadline||'';
+      const end=isoDateFromText(record.endDate)||record.endDate||start;
+      const notes=[];
+      if(record.location) notes.push(`Locatie: ${record.location}`);
+      if(record.cost) notes.push(`Kosten: ${record.cost}`);
+      if(record.description) notes.push(record.description);
+      if(record.note) notes.push(record.note);
+      const priority=priority17(record.priority);
+      return {
+        id:id(),tripFolderId:folder?.id||'',tripSectionId:section?.id||'',
+        _pendingFolderName:folderName,_pendingSectionName:sectionName,
+        title:record.title||'Reisitem',date:start,startDate:start,endDate:end,
+        type:record.kind||'Notitie',note:notes.join('\n'),checkable:boolWord(record.checkable),
+        important:priority==='high',priority:priority||'medium',done:boolWord(record.done)
+      };
+    }
+    return null;
+  }
+
+  function parseUniversal17(text,target) {
+    const entries=String(text||'').replace(/\r/g,'').split(/\n+/)
+      .map(x=>x.trim()).filter(Boolean).slice(0,500)
+      .map(line=>universalRecord17(line,target)).filter(Boolean)
+      .map(record=>({record,item:universalItem17(record)})).filter(entry=>entry.item)
+      .filter(entry=>entry.item.title && !isHeader17(entry.item.title,[entry.item.title],entry.record.target))
+      .map(({record,item})=>{
+        const duplicate=duplicateOf(record.target,item);
+        return {selected:!duplicate,target:record.target,item,duplicate:duplicate?.id||''};
+      });
+    return entries;
   }
 
   function isoDateFromText(s='') {
@@ -2683,18 +2485,18 @@ console.info('Samen Thuis update 13.1 geladen');
   function normaliseRepeat(raw='') {
     const v=norm(String(raw).replace(/^frequentie\s*:\s*/i,''));
     const map=[
-      [/^dagelijks$/,'Dagelijks'],[/^(om de dag|elke 2 dagen)$/,'Om de dag'],
-      [/^(2x per week|2 per week|twee keer per week)$/,'2× per week'],
+      [/^(dagelijks|elke dag|iedere dag|daily)$/,'Dagelijks'],[/^(om de dag|elke 2 dagen)$/,'Om de dag'],
+      [/^(2x per week|2 per week|twee keer per week|twice weekly)$/,'2× per week'],
       [/^(3x per week|3 per week|drie keer per week)$/,'3× per week'],
-      [/^wekelijks$/,'Wekelijks'],[/^(elke 2 weken|2 wekelijks|tweewekelijks)$/,'Elke 2 weken'],
-      [/^(elke 4 weken|4 wekelijks)$/,'Elke 4 weken'],[/^maandelijks$/,'Maandelijks'],
+      [/^(wekelijks|iedere week|elke week|weekly)$/,'Wekelijks'],[/^(elke 2 weken|2 wekelijks|om de week|tweewekelijks|biweekly)$/,'Elke 2 weken'],
+      [/^(elke 4 weken|4 wekelijks)$/,'Elke 4 weken'],[/^(maandelijks|iedere maand|elke maand|monthly)$/,'Maandelijks'],
       [/^(elke 2 maanden|2 maandelijks)$/,'Elke 2 maanden'],
-      [/^(elke 3 maanden|kwartaal|kwartaallijks)$/,'Elke 3 maanden'],
-      [/^(elke 6 maanden|halfjaarlijks)$/,'Elke 6 maanden'],
-      [/^(jaarlijks|elk jaar|1x per jaar)$/,'Jaarlijks'],
+      [/^(elke 3 maanden|kwartaal|kwartaallijks|quarterly)$/,'Elke 3 maanden'],
+      [/^(elke 6 maanden|halfjaarlijks|semiannual)$/,'Elke 6 maanden'],
+      [/^(jaarlijks|ieder jaar|elk jaar|1x per jaar|yearly)$/,'Jaarlijks'],
       [/^(na elke was|na iedere was)$/,'Na elke was'],
       [/^(wanneer nodig|indien nodig|naar behoefte)$/,'Wanneer nodig'],
-      [/^eenmalig$/,'Eenmalig']
+      [/^(eenmalig|once)$/,'Eenmalig']
     ];
     for(const [rx,label] of map) if(rx.test(v)) return label;
     return REPEATS.includes(raw)?raw:'Wekelijks';
@@ -2709,7 +2511,7 @@ console.info('Samen Thuis update 13.1 geladen');
   }
 
   function keyValueParts(line='') {
-    const chunks=cleanBullet(line).split('|').map(x=>x.trim()).filter(Boolean);
+    const chunks=splitFlexible17(line).map(x=>x.trim()).filter(Boolean);
     const title=chunks.shift()||'';
     const meta={}, loose=[];
     chunks.forEach(chunk=>{
@@ -2732,6 +2534,8 @@ console.info('Samen Thuis update 13.1 geladen');
     const arr=data[target]||[];
     return arr.find(existing=>{
       if(norm(existing.title||existing.name)!==norm(item.title||item.name)) return false;
+      if(target==='planning') return existing.date===item.date && (existing.time||'')===(item.time||'');
+      if(target==='meals') return existing.date===item.date && (existing.type||'')===(item.type||'');
       if(target==='trips' && item.tripFolderId && existing.tripFolderId) {
         return existing.tripFolderId===item.tripFolderId;
       }
@@ -2862,7 +2666,7 @@ console.info('Samen Thuis update 13.1 geladen');
   const META_KEYS=new Set([
     'type','locatie','startdatum','einddatum','datum','deadline','afvinken','afvinkbaar',
     'belangrijk','personen','route','details','notitie','notes','categorie','prijs','bedrag',
-    'status','plaats','person','voor wie','frequentie','herhaling','eenheid'
+    'status','plaats','person','voor wie','frequentie','herhaling','eenheid','prioriteit'
   ]);
 
   function isDocumentNoise(line='') {
@@ -2934,7 +2738,8 @@ console.info('Samen Thuis update 13.1 geladen');
     else if(m.afvinkbaar!==undefined) checkable=boolWord(m.afvinkbaar);
     else checkable=/\b(boek|boeken|vastleggen|reserveer|reserveren|regel|regelen|controleer|controleren|download|meenemen|inpakken)\b/i.test(title);
 
-    const important=m.belangrijk!==undefined ? boolWord(m.belangrijk) : false;
+    const priority=priority17(m.prioriteit);
+    const important=m.belangrijk!==undefined ? boolWord(m.belangrijk) : priority==='high';
 
     const notes=[];
     if(m.details) notes.push(m.details);
@@ -2961,6 +2766,7 @@ console.info('Samen Thuis update 13.1 geladen');
       note:notes.join('\n'),
       checkable,
       important,
+      priority:priority||'medium',
       done:false,
       _pendingFolderName:folder?'':state13.detectedTripName,
       _pendingSectionName:section?'':sectionName
@@ -2985,6 +2791,7 @@ console.info('Samen Thuis update 13.1 geladen');
       note:meta.notitie||meta.notes||'',
       checkable:boolWord(meta.afvinkbaar||meta.afvinken) || /\b(boeken|vastleggen|reserveren|regelen|controleren|afspraak|downloaden|meenemen|inpakken)\b/i.test(itemTitle),
       important:boolWord(meta.belangrijk),
+      priority:priority17(meta.prioriteit)||'medium',
       done:false
     };
   }
@@ -3006,7 +2813,8 @@ console.info('Samen Thuis update 13.1 geladen');
       // Als er geen blokstructuur is, val terug op de oude regelparser.
       if(!items.length) {
         items=String(text||'').replace(/\r/g,'').split(/\n+/)
-          .map(x=>x.trim()).filter(Boolean).slice(0,350)
+          .map(x=>x.trim()).filter(Boolean)
+          .filter(line=>!isHeader17(line,splitFlexible17(line),target)).slice(0,350)
           .map(parseTripLegacy).filter(Boolean);
       }
 
@@ -3018,7 +2826,8 @@ console.info('Samen Thuis update 13.1 geladen');
 
     const lines=String(text||'').replace(/\r/g,'').split(/\n+/).map(x=>x.trim()).filter(Boolean)
       .filter(x=>!/^#\s*(pagina|werkblad)\b/i.test(x))
-      .filter(x=>!/^(aanbevolen uploadvolgorde|belangrijk|importregels|beperkingen|uitgangspunt woning)$/i.test(x));
+      .filter(x=>!/^(aanbevolen uploadvolgorde|belangrijk|importregels|beperkingen|uitgangspunt woning)$/i.test(x))
+      .filter(line=>!isHeader17(line,splitFlexible17(line),target));
 
     const parser=target==='chores'?parseChore:
       target==='stock'?parseStock:
@@ -3040,6 +2849,10 @@ console.info('Samen Thuis update 13.1 geladen');
   }
 
   function previewMeta(item,target) {
+    if(target==='planning') return `${item.date||'geen datum'}${item.time?' · '+item.time:''}${item.person?' · '+item.person:''}`;
+    if(target==='meals') return `${item.date||'geen datum'} · ${item.type||'Avondeten'}`;
+    if(target==='groceries') return `${item.category||'Overig'}${item.amount?` · ${item.amount} ${item.unit||''}`:''}`;
+    if(target==='ideas') return `${item.category||'Thuis'}${item.date?' · '+item.date:''}`;
     if(target==='stock') return `${item.category} · huidig ${item.amount} · minimum ${item.min} · gewenst ${item.desired} ${item.unit}`;
     if(target==='chores') return `${item.repeat} · ${item.person}${item.category?' · '+item.category:''}`;
     if(target==='home') return `${item.category}${item.repeat?' · '+item.repeat:''}${item.due?' · '+item.due:''}`;
@@ -3053,34 +2866,81 @@ console.info('Samen Thuis update 13.1 geladen');
   }
 
   function previewEditor(entry) {
-    const x=entry.item,t=state13.target;
+    const x=entry.item,t=entry.target||state13.target;
+    if(t==='planning') return `
+      ${field('Wat?',`<input data-v13-field="title" value="${esc(x.title)}">`,'full')}
+      ${field('Datum',`<input type="date" data-v13-field="date" value="${esc(x.date||'')}">`)}
+      ${field('Begintijd',`<input type="time" data-v13-field="time" value="${esc(x.time||'')}">`)}
+      ${field('Einddatum',`<input type="date" data-v13-field="endDate" value="${esc(x.endDate||'')}">`)}
+      ${field('Eindtijd',`<input type="time" data-v13-field="endTime" value="${esc(x.endTime||'')}">`)}
+      ${field('Voor wie',`<select data-v13-field="person">${optionList(['Samen','Kees','Daphne'],x.person||'Samen')}</select>`)}
+      ${field('Locatie',`<input data-v13-field="location" value="${esc(x.location||'')}">`)}
+      ${field('Herhaling',`<select data-v13-field="repeat"><option value="">Geen herhaling</option>${optionList(REPEATS,x.repeat||'')}</select>`)}
+      <label class="checkbox-field"><input type="checkbox" data-v13-field="allDay" ${x.allDay?'checked':''}><span>Hele dag</span></label>
+      ${field('Notitie',`<textarea data-v13-field="note">${esc(x.note||'')}</textarea>`,'full')}`;
+    if(t==='meals') return `
+      ${field('Gerecht',`<input data-v13-field="title" value="${esc(x.title)}">`,'full')}
+      ${field('Datum',`<input type="date" data-v13-field="date" value="${esc(x.date||'')}">`)}
+      ${field('Moment',`<select data-v13-field="type">${optionList(['Ontbijt','Lunch','Avondeten','Snack'],x.type||'Avondeten')}</select>`)}
+      ${field('Personen',`<input data-v13-field="persons" value="${esc(x.persons||'')}">`)}
+      ${field('Ingrediënten',`<textarea data-v13-field="ingredients">${esc(x.ingredients||'')}</textarea>`,'full')}
+      ${field('Notitie',`<textarea data-v13-field="note">${esc(x.note||'')}</textarea>`,'full')}`;
+    if(t==='groceries') return `
+      ${field('Product',`<input data-v13-field="title" value="${esc(x.title)}">`,'full')}
+      ${field('Aantal',`<input type="number" step="0.01" data-v13-field="amount" value="${Number(x.amount||0)}">`)}
+      ${field('Eenheid',`<input data-v13-field="unit" value="${esc(x.unit||'')}">`)}
+      ${field('Categorie',`<select data-v13-field="category">${optionList(GROCERY_CATEGORIES,x.category||'Overig')}</select>`)}
+      ${field('Winkel',`<input data-v13-field="store" value="${esc(x.store||'')}">`)}
+      ${field('Voor weekmenu',`<input data-v13-field="forMeal" value="${esc(x.forMeal||'')}">`)}
+      <label class="checkbox-field"><input type="checkbox" data-v13-field="done" ${x.done?'checked':''}><span>Al gekocht</span></label>
+      ${field('Notitie',`<textarea data-v13-field="note">${esc(x.note||'')}</textarea>`,'full')}`;
     if(t==='stock') return `
       ${field('Product',`<input data-v13-field="title" value="${esc(x.title)}">`,'full')}
       ${field('Categorie',`<input data-v13-field="category" value="${esc(x.category)}">`)}
       ${field('Huidig',`<input type="number" step="0.01" data-v13-field="amount" value="${x.amount}">`)}
       ${field('Minimum',`<input type="number" step="0.01" data-v13-field="min" value="${x.min}">`)}
       ${field('Gewenst',`<input type="number" step="0.01" data-v13-field="desired" value="${x.desired}">`)}
-      ${field('Eenheid',`<input data-v13-field="unit" value="${esc(x.unit)}">`)}`;
+      ${field('Eenheid',`<input data-v13-field="unit" value="${esc(x.unit)}">`)}
+      ${field('Houdbaar tot',`<input type="date" data-v13-field="bestBefore" value="${esc(x.bestBefore||'')}">`)}
+      ${field('Locatie',`<input data-v13-field="location" value="${esc(x.location||'')}">`)}
+      ${field('Notitie',`<textarea data-v13-field="note">${esc(x.note||'')}</textarea>`,'full')}`;
     if(t==='chores') return `
       ${field('Taak',`<input data-v13-field="title" value="${esc(x.title)}">`,'full')}
       ${field('Frequentie',`<select data-v13-field="repeat">${optionList(REPEATS,x.repeat)}</select>`)}
       ${field('Voor wie',`<select data-v13-field="person">${optionList(['Samen','Kees','Daphne'],x.person)}</select>`)}
       ${field('Categorie',`<input data-v13-field="category" value="${esc(x.category||'')}">`)}
       ${field('Eerste keer',`<input type="date" data-v13-field="due" value="${esc(x.due||'')}">`)}
+      ${field('Prioriteit',`<select data-v13-field="priority"><option value="">Geen</option><option value="low" ${x.priority==='low'?'selected':''}>Laag</option><option value="medium" ${x.priority==='medium'?'selected':''}>Gemiddeld</option><option value="high" ${x.priority==='high'?'selected':''}>Hoog</option></select>`)}
       ${field('Notitie',`<textarea data-v13-field="notes">${esc(x.notes||'')}</textarea>`,'full')}`;
     if(t==='home') return `
       ${field('Onderwerp',`<input data-v13-field="title" value="${esc(x.title)}">`,'full')}
       ${field('Categorie',`<input data-v13-field="category" value="${esc(x.category)}">`)}
+      ${field('Type',`<input data-v13-field="kind" value="${esc(x.kind||'')}">`)}
       ${field('Frequentie',`<select data-v13-field="repeat"><option value="">Geen herhaling</option>${optionList(REPEATS,x.repeat)}</select>`)}
+      ${field('Startdatum',`<input type="date" data-v13-field="startDate" value="${esc(x.startDate||'')}">`)}
       ${field('Datum',`<input type="date" data-v13-field="due" value="${esc(x.due||'')}">`)}
+      ${field('Prioriteit',`<select data-v13-field="priority"><option value="">Geen</option><option value="low" ${x.priority==='low'?'selected':''}>Laag</option><option value="medium" ${x.priority==='medium'?'selected':''}>Gemiddeld</option><option value="high" ${x.priority==='high'?'selected':''}>Hoog</option></select>`)}
+      ${field('Status',`<input data-v13-field="status" value="${esc(x.status||'')}">`)}
+      ${field('Kosten',`<input type="number" step="0.01" data-v13-field="cost" value="${Number(x.cost||0)}">`)}
+      <label class="checkbox-field"><input type="checkbox" data-v13-field="done" ${x.done?'checked':''}><span>Afgerond</span></label>
       ${field('Notitie',`<textarea data-v13-field="note">${esc(x.note||'')}</textarea>`,'full')}`;
     if(t==='trips') return `
       ${field('Onderwerp',`<input data-v13-field="title" value="${esc(x.title)}">`,'full')}
       ${field('Startdatum',`<input type="date" data-v13-field="startDate" value="${esc(x.startDate||x.date||'')}">`)}
       ${field('Einddatum',`<input type="date" data-v13-field="endDate" value="${esc(x.endDate||x.startDate||x.date||'')}">`)}
       ${field('Soort',`<input data-v13-field="type" value="${esc(x.type||'Notitie')}">`)}
+      ${field('Prioriteit',`<select data-v13-field="priority"><option value="low" ${x.priority==='low'?'selected':''}>Laag</option><option value="medium" ${!x.priority||x.priority==='medium'?'selected':''}>Gemiddeld</option><option value="high" ${x.priority==='high'?'selected':''}>Hoog</option></select>`)}
       <label class="checkbox-field"><input type="checkbox" data-v13-field="checkable" ${x.checkable?'checked':''}><span>Afvinkbaar</span></label>
       <label class="checkbox-field"><input type="checkbox" data-v13-field="important" ${x.important?'checked':''}><span>Belangrijk ★</span></label>
+      ${field('Notitie',`<textarea data-v13-field="note">${esc(x.note||'')}</textarea>`,'full')}`;
+    if(t==='ideas') return `
+      ${field('Idee',`<input data-v13-field="title" value="${esc(x.title)}">`,'full')}
+      ${field('Categorie',`<input data-v13-field="category" value="${esc(x.category||'Thuis')}">`)}
+      ${field('Voor wie',`<select data-v13-field="person"><option value="">Niet toegewezen</option>${optionList(['Samen','Kees','Daphne'],x.person||'')}</select>`)}
+      ${field('Prioriteit',`<select data-v13-field="priority"><option value="">Geen</option><option value="low" ${x.priority==='low'?'selected':''}>Laag</option><option value="medium" ${x.priority==='medium'?'selected':''}>Gemiddeld</option><option value="high" ${x.priority==='high'?'selected':''}>Hoog</option></select>`)}
+      ${field('Status',`<input data-v13-field="status" value="${esc(x.status||'')}">`)}
+      ${field('Datum',`<input type="date" data-v13-field="date" value="${esc(x.date||'')}">`)}
+      ${field('Emoji',`<input data-v13-field="icon" value="${esc(x.icon||'♡')}">`)}
       ${field('Notitie',`<textarea data-v13-field="note">${esc(x.note||'')}</textarea>`,'full')}`;
     return field('Titel',`<input data-v13-field="title" value="${esc(x.title||'')}">`,'full');
   }
@@ -3138,6 +2998,7 @@ console.info('Samen Thuis update 13.1 geladen');
       ${field('Startdatum',`<input type="date" data-v14-manual="startDate">`)}
       ${field('Einddatum',`<input type="date" data-v14-manual="endDate">`)}
       ${field('Soort',`<select data-v14-manual="type">${optionList(['Voorbereiding','Reservering','Vervoer','Verblijf','Activiteit','Eten','Budget','Documenten','Paklijst','Notitie'],'Notitie')}</select>`)}
+      ${field('Prioriteit',`<select data-v14-manual="priority"><option value="low">Laag</option><option value="medium" selected>Gemiddeld</option><option value="high">Hoog</option></select>`)}
       ${field('Notitie',`<textarea data-v14-manual="note"></textarea>`,'full')}
       <label class="checkbox-field"><input type="checkbox" data-v14-manual="checkable"><span>Dit moet afgevinkt worden</span></label>
       <label class="checkbox-field"><input type="checkbox" data-v14-manual="important"><span>Belangrijk ★</span></label>`;
@@ -3163,7 +3024,7 @@ console.info('Samen Thuis update 13.1 geladen');
     return `<div class="import-v13">
       <section class="card">
         <div class="card-head"><div><p class="eyebrow">SAMEN THUIS · CENTRALE INVOER</p><h2>Toevoegen & importeren</h2></div><span class="tag green">${esc(methodLabel)}</span></div>
-        <p>Kies waar het hoort en daarna hoe je het wilt toevoegen.</p>
+        <p>Kies waar het hoort en daarna hoe je het wilt toevoegen. Bij lijsten herkent de app <strong>|</strong>, <strong>;</strong>, tabs, <strong> / </strong>, <strong> - </strong> en meerdere spaties als scheidingsteken.</p>
         <div class="form-grid">
           ${field('Waar hoort dit bij?',`<select id="v13Target">${Object.entries(TARGETS).map(([k,v])=>`<option value="${k}" ${k===state13.target?'selected':''}>${esc(v)}</option>`).join('')}</select>`)}
           ${state13.method!=='manual'?destinationFields13():''}
@@ -3202,10 +3063,10 @@ console.info('Samen Thuis update 13.1 geladen');
           <article class="v13-card ${entry.duplicate?'duplicate':''}" data-v13-card="${i}">
             <div class="v13-card-head">
               <label><input type="checkbox" data-v13-selected ${entry.selected?'checked':''}> Importeren</label>
-              ${entry.duplicate?'<span class="tag warning">Mogelijk al aanwezig · standaard overgeslagen</span>':''}
+              <div class="import-target-tags"><span class="tag">${esc(TARGETS[entry.target||state13.target]||'Import')}</span>${entry.duplicate?'<span class="tag warning">Mogelijk al aanwezig · standaard overgeslagen</span>':''}</div>
             </div>
             <div class="v13-fields">${previewEditor(entry)}</div>
-            <small class="muted">${esc(previewMeta(entry.item,state13.target))}</small>
+            <small class="muted">${esc(previewMeta(entry.item,entry.target||state13.target))}</small>
           </article>`).join('')}</div>
       </section>`:`<section class="card"><p class="muted">Nog niets geanalyseerd.</p></section>`):''}
     </div>`;
@@ -3230,7 +3091,7 @@ console.info('Samen Thuis update 13.1 geladen');
     if(['xlsx','xlsm','xls'].includes(ext)) {
       await loadExternal13('https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js',()=>Boolean(window.XLSX));
       const wb=window.XLSX.read(await file.arrayBuffer(),{type:'array',cellDates:true});
-      return wb.SheetNames.map(n=>window.XLSX.utils.sheet_to_csv(wb.Sheets[n])).join('\n');
+      return wb.SheetNames.map(n=>window.XLSX.utils.sheet_to_csv(wb.Sheets[n],{FS:'|'})).join('\n');
     }
     throw new Error('Bestandstype niet ondersteund');
   }
@@ -3243,7 +3104,7 @@ console.info('Samen Thuis update 13.1 geladen');
       card.querySelectorAll('[data-v13-field]').forEach(input=>{
         const k=input.dataset.v13Field;
         let v=input.type==='checkbox'?input.checked:input.value;
-        if(['amount','min','desired'].includes(k)) v=num(v,0);
+        if(['amount','min','desired','cost'].includes(k)) v=num(v,0);
         entry.item[k]=v;
       });
       if(entry.item.startDate) entry.item.date=entry.item.startDate;
@@ -3251,6 +3112,19 @@ console.info('Samen Thuis update 13.1 geladen');
   }
 
   function analyse13() {
+    const structuredTrip=state13.target==='trips' && (
+      /\bReis:\s*.+/i.test(state13.text) ||
+      /Samen Thuis importdocument/i.test(state13.text) ||
+      /\b(Startdatum|Einddatum|Afvinken|Belangrijk):/i.test(state13.text)
+    );
+    const universal=structuredTrip?[]:parseUniversal17(state13.text,state13.target);
+    if(universal.length) {
+      state13.preview=universal;
+      render();
+      toast(`${state13.preview.length} items gevonden`);
+      return;
+    }
+
     const special=parseLines13(state13.text,state13.target);
     if(special!==null) {
       state13.preview=special;
@@ -3288,8 +3162,8 @@ console.info('Samen Thuis update 13.1 geladen');
       if(!folder) {
         folder={
           id:id(),name:wantedFolder,
-          startDate:state13.detectedTripStart||'',
-          endDate:state13.detectedTripEnd||'',
+          startDate:state13.detectedTripStart||item.startDate||item.date||'',
+          endDate:state13.detectedTripEnd||item.endDate||item.startDate||item.date||'',
           note:'Aangemaakt via centrale invoer'
         };
         data.tripFolders.push(folder);
@@ -3299,8 +3173,8 @@ console.info('Samen Thuis update 13.1 geladen');
     if(!folder) return item;
 
     // Periode van de reis aanvullen wanneer die uit het document komt.
-    if(state13.detectedTripStart && !folder.startDate) folder.startDate=state13.detectedTripStart;
-    if(state13.detectedTripEnd && !folder.endDate) folder.endDate=state13.detectedTripEnd;
+    if(!folder.startDate) folder.startDate=state13.detectedTripStart||item.startDate||item.date||'';
+    if(!folder.endDate) folder.endDate=state13.detectedTripEnd||item.endDate||item.startDate||item.date||'';
 
     const wantedSection=item._pendingSectionName || travelSection(item.type,item.title);
     let section=(data.tripSections||[]).find(s=>s.id===item.tripSectionId && s.tripFolderId===folder.id);
@@ -3319,18 +3193,23 @@ console.info('Samen Thuis update 13.1 geladen');
 
   function commit13() {
     syncCardEdits();
-    let selected=state13.preview.filter(x=>x.selected).map(x=>x.item);
+    const selected=state13.preview.filter(entry=>entry.selected);
     if(!selected.length) return toast('Selecteer minimaal één item');
-    if(state13.target==='trips') selected=selected.map(resolveTripDestination13);
-
-    data[state13.target] ||= [];
-    data[state13.target].push(...selected);
+    const usedTargets=new Set();
+    selected.forEach(entry=>{
+      const target=entry.target||state13.target;
+      const item=target==='trips'?resolveTripDestination13(entry.item):entry.item;
+      data[target] ||= [];
+      data[target].push(item);
+      usedTargets.add(target);
+    });
     save();
 
     const count=selected.length;
     state13.preview=[];state13.text='';state13.filename='';
     render();
-    toast(`${count} items toegevoegd aan ${TARGETS[state13.target]}`);
+    const destination=usedTargets.size===1?TARGETS[[...usedTargets][0]]:`${usedTargets.size} pagina's`;
+    toast(`${count} items toegevoegd aan ${destination}`);
   }
 
   function manualValue13(name) {
@@ -3354,7 +3233,7 @@ console.info('Samen Thuis update 13.1 geladen');
     else if(t==='home') item={id:id(),title,category:manualValue13('category')||'Onderhoud',due:manualValue13('due')||'',repeat:manualValue13('repeat')||'',note:manualValue13('note')||''};
     else if(t==='trips') {
       const startDate=manualValue13('startDate')||'';
-      item={id:id(),title,tripFolderId:manualValue13('tripFolderId'),tripSectionId:manualValue13('tripSectionId'),date:startDate,startDate,endDate:manualValue13('endDate')||startDate,type:manualValue13('type')||'Notitie',note:manualValue13('note')||'',checkable:Boolean(manualValue13('checkable')),important:Boolean(manualValue13('important')),done:false};
+      item={id:id(),title,tripFolderId:manualValue13('tripFolderId'),tripSectionId:manualValue13('tripSectionId'),date:startDate,startDate,endDate:manualValue13('endDate')||startDate,type:manualValue13('type')||'Notitie',priority:manualValue13('priority')||'medium',note:manualValue13('note')||'',checkable:Boolean(manualValue13('checkable')),important:Boolean(manualValue13('important')),done:false};
       item=resolveTripDestination13(item);
     }
     if(!item) return;
@@ -3423,7 +3302,100 @@ console.info('Samen Thuis update 13.1 geladen');
     };
   }
 
-  render=function renderV131() {
+  function ensureEditor17() {
+    if(document.querySelector('#editItemDialogV17')) return;
+    const dialog=document.createElement('dialog');
+    dialog.id='editItemDialogV17';
+    dialog.innerHTML=`
+      <form id="editItemFormV17">
+        <div class="dialog-head">
+          <div><p class="eyebrow">Bewerken</p><h2 id="editItemTitleV17">Item bewerken</h2></div>
+          <button type="button" class="icon-btn" data-edit-close-v17 aria-label="Sluiten">×</button>
+        </div>
+        <div id="editItemFieldsV17" class="form-grid"></div>
+        <div class="dialog-actions">
+          <button type="button" class="secondary" data-edit-close-v17>Annuleren</button>
+          <button type="submit" class="primary">Wijzigingen opslaan</button>
+        </div>
+      </form>`;
+    document.body.appendChild(dialog);
+    dialog.querySelectorAll('[data-edit-close-v17]').forEach(button=>button.addEventListener('click',()=>dialog.close()));
+  }
+
+  function editableSpec17(type) {
+    const priorities=[['','Geen'],['low','Laag'],['medium','Gemiddeld'],['high','Hoog']];
+    const specs={
+      planning:[['title','Titel','text'],['date','Datum','date'],['time','Begintijd','time'],['endDate','Einddatum','date'],['endTime','Eindtijd','time'],['allDay','Hele dag','checkbox'],['calendarId','Agenda','select',(data.calendars||[]).map(calendar=>[calendar.id,calendar.name])],['person','Voor wie','select',['Samen','Kees','Daphne']],['location','Locatie','text'],['repeat','Herhaling','select',['',...REPEATS]],['note','Notitie','textarea']],
+      meals:[['title','Gerecht','text'],['date','Datum','date'],['type','Moment','select',['Ontbijt','Lunch','Avondeten','Snack']],['persons','Personen','text'],['ingredients','Ingrediënten','textarea'],['note','Notitie','textarea']],
+      groceries:[['title','Product','text'],['amount','Aantal','number'],['unit','Eenheid','text'],['category','Categorie','select',GROCERY_CATEGORIES],['store','Winkel','text'],['forMeal','Voor weekmenu','text'],['done','Gekocht','checkbox'],['note','Notitie','textarea']],
+      chores:[['title','Taak','text'],['person','Voor wie','select',['Samen','Kees','Daphne']],['due','Eerste keer','date'],['repeat','Frequentie','select',REPEATS],['category','Categorie','text'],['priority','Prioriteit','select',priorities],['notes','Notitie','textarea']],
+      stock:[['title','Product','text'],['category','Categorie/plek','text'],['amount','Huidig aantal','number'],['min','Minimum','number'],['desired','Gewenst','number'],['unit','Eenheid','text'],['bestBefore','Houdbaar tot','date'],['location','Locatie','text'],['note','Notitie','textarea']],
+      ideas:[['title','Idee','text'],['category','Categorie','text'],['person','Voor wie','select',['','Samen','Kees','Daphne']],['priority','Prioriteit','select',priorities],['status','Status','text'],['date','Datum','date'],['icon','Emoji','text'],['note','Notitie','textarea']],
+      home:[['title','Onderwerp','text'],['category','Categorie','text'],['kind','Type','text'],['priority','Prioriteit','select',priorities],['startDate','Startdatum','date'],['due','Deadline/datum','date'],['repeat','Herhaling','select',['',...REPEATS]],['status','Status','text'],['cost','Kosten','number'],['done','Afgerond','checkbox'],['note','Notitie','textarea']]
+    };
+    return specs[type]||[];
+  }
+
+  function editorOptions17(options,value) {
+    const normal=(options||[]).map(option=>Array.isArray(option)?option:[option,option]);
+    if(value!=='' && value!=null && !normal.some(([key])=>String(key)===String(value))) normal.unshift([value,value]);
+    return normal.map(([key,label])=>`<option value="${esc(key)}" ${String(key)===String(value)?'selected':''}>${esc(label)}</option>`).join('');
+  }
+
+  function openExistingEditor17(type,item) {
+    ensureEditor17();
+    const dialog=document.querySelector('#editItemDialogV17');
+    const fields=editableSpec17(type);
+    document.querySelector('#editItemTitleV17').textContent=`${TARGETS[type]||'Item'} bewerken`;
+    document.querySelector('#editItemFieldsV17').innerHTML=fields.map(([key,label,kind,options])=>{
+      const value=item[key]??'';
+      if(kind==='checkbox') return `<label class="checkbox-field"><input type="checkbox" data-edit-field-v17="${key}" ${value?'checked':''}><span>${esc(label)}</span></label>`;
+      if(kind==='textarea') return `<div class="field full"><label>${esc(label)}</label><textarea data-edit-field-v17="${key}">${esc(value)}</textarea></div>`;
+      if(kind==='select') return `<div class="field"><label>${esc(label)}</label><select data-edit-field-v17="${key}">${editorOptions17(options,value)}</select></div>`;
+      const step=kind==='number'?' step="0.01"':'';
+      return `<div class="field"><label>${esc(label)}</label><input type="${kind}"${step} data-edit-field-v17="${key}" value="${esc(value)}"></div>`;
+    }).join('');
+
+    const form=document.querySelector('#editItemFormV17');
+    form.onsubmit=event=>{
+      event.preventDefault();
+      fields.forEach(([key,,kind])=>{
+        const input=dialog.querySelector(`[data-edit-field-v17="${key}"]`);
+        if(!input) return;
+        if(kind==='checkbox') item[key]=input.checked;
+        else if(kind==='number') item[key]=num(input.value,0);
+        else item[key]=input.value;
+      });
+      if(type==='chores') {
+        item.secondWeekday='';
+        delete item.smartCycleCount;
+        delete item.smartCycleStart;
+      }
+      save();
+      dialog.close();
+      render();
+      toast('Wijzigingen opgeslagen');
+    };
+    dialog.showModal();
+  }
+
+  function addEditButtons17() {
+    if(['today','settings','imports','trips'].includes(current)) return;
+    document.querySelectorAll('[data-delete]').forEach(deleteButton=>{
+      if(deleteButton.parentElement?.querySelector('[data-edit-existing-v17]')) return;
+      const [type,itemId]=String(deleteButton.dataset.delete||'').split(':');
+      if(!TARGETS[type]||!itemId||type==='trips') return;
+      const edit=document.createElement('button');
+      edit.type='button';
+      edit.className='delete edit-pencil-v12';
+      edit.dataset.editExistingV17=`${type}:${itemId}`;
+      edit.setAttribute('aria-label','Bewerken');
+      edit.textContent='✎';
+      deleteButton.before(edit);
+    });
+  }
+
+  render=function renderUnifiedImporterV17() {
     if(current==='imports') {
       document.querySelector('#view').innerHTML=renderImports13();
       updateSyncBadge();
@@ -3431,9 +3403,34 @@ console.info('Samen Thuis update 13.1 geladen');
       return;
     }
     baseRender13();
+    requestAnimationFrame(addEditButtons17);
   };
 
   document.addEventListener('click',e=>{
+    const topAdd=e.target.closest('#addBtn');
+    if(topAdd) {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      if(current==='imports') {
+        state13.method='manual';
+        state13.preview=[];
+        render();
+      } else {
+        openAdd();
+      }
+      return;
+    }
+
+    const existingEdit=e.target.closest('[data-edit-existing-v17]');
+    if(existingEdit) {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      const [type,itemId]=existingEdit.dataset.editExistingV17.split(':');
+      const item=data[type]?.find(candidate=>candidate.id===itemId);
+      if(item) openExistingEditor17(type,item);
+      return;
+    }
+
     const method=e.target.closest('[data-v14-method]');
     if(method) {
       state13.method=method.dataset.v14Method;
@@ -3462,7 +3459,7 @@ console.info('Samen Thuis update 13.1 geladen');
       const cat=document.querySelector('#v13BulkCategory')?.value.trim();
       const rep=document.querySelector('#v13BulkRepeat')?.value;
       const person=document.querySelector('#v13BulkPerson')?.value;
-      state13.preview.filter(x=>x.selected).forEach(entry=>{
+      state13.preview.filter(entry=>entry.selected && (entry.target||state13.target)===state13.target).forEach(entry=>{
         if(cat) entry.item.category=cat;
         if(rep&&state13.target==='chores') entry.item.repeat=rep;
         if(person&&state13.target==='chores') entry.item.person=person;
@@ -3471,7 +3468,7 @@ console.info('Samen Thuis update 13.1 geladen');
     }
   },true);
 
-  formConfig=function formConfigV131(view) {
+  formConfig=function formConfigV17(view) {
     const cfg=baseFormConfig13(view);
     if(!cfg) return cfg;
     cfg.fields=(cfg.fields||[]).map(f=>[...f]);
@@ -3481,6 +3478,7 @@ console.info('Samen Thuis update 13.1 geladen');
       cfg.fields.splice(minIndex>=0?minIndex+1:cfg.fields.length,0,['desired','Gewenste voorraad','number']);
     }
     if(view==='chores') {
+      cfg.fields=cfg.fields.filter(field=>field[0]!=='secondWeekday');
       const r=cfg.fields.find(f=>f[0]==='repeat');
       if(r) r[3]=REPEATS;
       if(!cfg.fields.some(f=>f[0]==='category')) cfg.fields.push(['category','Categorie','text']);
@@ -3503,543 +3501,26 @@ console.info('Samen Thuis update 13.1 geladen');
   });
 
   save({touch:false});
-  toast('Samen Thuis v13.1 geladen');
+  ensureEditor17();
+  setupNav();
+  render();
 })();
 
-;
+/* ================================================================ */
 
-
-/* ===== GEÏNTEGREERD: samen-thuis-update-v14(1).js ===== */
-/* Samen Thuis v14.0 — universele importlaag
-   Eén vast importformaat voor Agenda t/m Reizen.
-   Ondersteunt | ; tab, " / " en " - " als scheidingsteken.
-   Datums zoals 2027-01-08 blijven intact.
-*/
-console.info('Samen Thuis update 14.1 geladen');
-
-(() => {
-  'use strict';
-  if (window.__SAMEN_THUIS_V140__) return;
-  window.__SAMEN_THUIS_V140__ = true;
-
-  const baseRender14 = render;
-
-  const TARGETS14 = {
-    planning:'Agenda', meals:'Weekmenu', groceries:'Boodschappen', chores:'Huishouden',
-    stock:'Voorraad', ideas:'Ideeën', home:'Woning', trips:'Reizen'
-  };
-
-  const ALIASES14 = {
-    agenda:'planning', planning:'planning', kalender:'planning', afspraak:'planning', afspraken:'planning',
-    weekmenu:'meals', menu:'meals', maaltijd:'meals', maaltijden:'meals', eten:'meals',
-    boodschappen:'groceries', boodschap:'groceries', grocery:'groceries', groceries:'groceries',
-    huishouden:'chores', huishoudelijk:'chores', schoonmaak:'chores', taak:'chores', taken:'chores',
-    voorraad:'stock', stock:'stock', inventaris:'stock',
-    idee:'ideas', ideeen:'ideas', ideeenlijst:'ideas', samen_doen:'ideas',
-    woning:'home', huis:'home', onderhoud:'home',
-    reizen:'trips', reis:'trips', vakantie:'trips', travel:'trips'
-  };
-
-  const SCHEMAS14 = {
-    planning:['type','title','startDate','startTime','endDate','endTime','allDay','location','description','repeat'],
-    meals:['type','date','mealType','title','persons','ingredients','note'],
-    groceries:['type','title','amount','unit','category','store','forMeal','done','note'],
-    chores:['type','title','category','repeat','person','startDate','nextDate','priority','done','notes'],
-    stock:['type','title','category','amount','unit','minimum','bestBefore','location','note'],
-    ideas:['type','title','category','description','person','priority','status','date','note'],
-    home:['type','title','category','description','kind','priority','startDate','deadline','status','cost','done','note'],
-    trips:['type','trip','section','title','kind','description','startDate','endDate','deadline','location','cost','priority','checkable','done','note']
-  };
-
-  const state14 = { target:'planning', text:'', filename:'', preview:[], legacy:false };
-
-  const esc14 = value => String(value ?? '')
-    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-    .replace(/"/g,'&quot;').replace(/'/g,'&#039;');
-
-  const norm14 = value => String(value ?? '').toLowerCase().normalize('NFD')
-    .replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,' ').trim();
-
-  const clean14 = value => String(value ?? '').trim().replace(/^\[(.*)\]$/,'$1').trim();
-
-  function bool14(value, fallback=false) {
-    const v=norm14(value);
-    if(['1','ja','yes','true','aan','x','afgevinkt','klaar','gedaan'].includes(v)) return true;
-    if(['0','nee','no','false','uit','open','niet afgevinkt'].includes(v)) return false;
-    return fallback;
-  }
-
-  function priority14(value='') {
-    const v=norm14(value);
-    if(/urgent|belangrijk|high|hoog/.test(v)) return 'hoog';
-    if(/low|laag/.test(v)) return 'laag';
-    if(/normaal|normal|medium|midden/.test(v)) return 'normaal';
-    return value ? String(value).trim() : '';
-  }
-
-  function repeat14(value='') {
-    const v=norm14(String(value).replace(/^frequentie\s*:?\s*/i,''));
-    if(!v) return '';
-    if(/^(dagelijks|elke dag|iedere dag|daily)$/.test(v)) return 'Dagelijks';
-    if(/^(om de dag|elke 2 dagen)$/.test(v)) return 'Om de dag';
-    if(/^(2x per week|2 per week|twee keer per week|twice weekly)$/.test(v)) return '2× per week';
-    if(/^(3x per week|3 per week|drie keer per week)$/.test(v)) return '3× per week';
-    if(/^(wekelijks|iedere week|elke week|weekly)$/.test(v)) return 'Wekelijks';
-    if(/^(elke 2 weken|om de week|tweewekelijks|biweekly)$/.test(v)) return 'Elke 2 weken';
-    if(/^(elke 4 weken|4 wekelijks)$/.test(v)) return 'Elke 4 weken';
-    if(/^(maandelijks|iedere maand|elke maand|monthly)$/.test(v)) return 'Maandelijks';
-    if(/^(elke 2 maanden|2 maandelijks)$/.test(v)) return 'Elke 2 maanden';
-    if(/^(elke 3 maanden|kwartaal|kwartaallijks|quarterly)$/.test(v)) return 'Elke 3 maanden';
-    if(/^(elke 6 maanden|halfjaarlijks|semiannual)$/.test(v)) return 'Elke 6 maanden';
-    if(/^(jaarlijks|ieder jaar|elk jaar|1x per jaar|yearly)$/.test(v)) return 'Jaarlijks';
-    if(/^(na elke was|na iedere was)$/.test(v)) return 'Na elke was';
-    if(/^(wanneer nodig|indien nodig|naar behoefte)$/.test(v)) return 'Wanneer nodig';
-    if(/^(eenmalig|once)$/.test(v)) return 'Eenmalig';
-    return String(value).trim();
-  }
-
-  function iso14(value='') {
-    const s=String(value).trim();
-    let m=s.match(/\b(20\d{2})[-/](\d{1,2})[-/](\d{1,2})\b/);
-    if(m) return `${m[1]}-${String(m[2]).padStart(2,'0')}-${String(m[3]).padStart(2,'0')}`;
-    m=s.match(/\b(\d{1,2})[-/.](\d{1,2})[-/.](20\d{2})\b/);
-    if(m) return `${m[3]}-${String(m[2]).padStart(2,'0')}-${String(m[1]).padStart(2,'0')}`;
-    return s;
-  }
-
-  function number14(value, fallback=0) {
-    const m=String(value ?? '').replace(',','.').match(/-?\d+(?:\.\d+)?/);
-    return m ? Number(m[0]) : fallback;
-  }
-
-  function split14(line='') {
-    const raw=String(line).trim();
-    let parts;
-    if(raw.includes('|')) parts=raw.split('|');
-    else if(raw.includes(';')) parts=raw.split(';');
-    else if(raw.includes('\t')) parts=raw.split(/\t+/);
-    else if(/\s\/\s/.test(raw)) parts=raw.split(/\s+\/\s+/);
-    else if(/\s[-–—]\s/.test(raw)) parts=raw.split(/\s+[-–—]\s+/);
-    else if(/\s{2,}/.test(raw)) parts=raw.split(/\s{2,}/);
-    else return [raw];
-    return parts.map(clean14);
-  }
-
-  function detectTarget14(parts, fallback) {
-    const first=norm14(parts[0]).replace(/\s/g,'_');
-    return ALIASES14[first] || ALIASES14[norm14(parts[0])] || fallback;
-  }
-
-  function mapLine14(line, fallbackTarget) {
-    const parts=split14(line);
-    if(!parts.length || !parts.some(Boolean)) return null;
-    const target=detectTarget14(parts,fallbackTarget);
-    const schema=SCHEMAS14[target];
-    if(!schema) return null;
-
-    const firstTarget=ALIASES14[norm14(parts[0]).replace(/\s/g,'_')] || ALIASES14[norm14(parts[0])];
-    const values=firstTarget ? parts : [TARGETS14[target], ...parts];
-    const record={target};
-    schema.forEach((key,i)=>record[key]=clean14(values[i] ?? ''));
-    return record;
-  }
-
-  function findCalendar14(name='') {
-    const n=norm14(name);
-    return (data.calendars||[]).find(c=>norm14(c.name)===n)?.id || data.calendars?.[0]?.id || 'persoonlijk';
-  }
-
-  function makeItem14(r) {
-    if(r.target==='planning') return {
-      id:id(), title:r.title||'Afspraak',
-      date:iso14(r.startDate), time:r.startTime||'',
-      endDate:iso14(r.endDate||r.startDate), endTime:r.endTime||'',
-      allDay:bool14(r.allDay,false), location:r.location||'',
-      note:r.description||'', repeat:repeat14(r.repeat),
-      person:'Samen', calendarId:findCalendar14('')
-    };
-
-    if(r.target==='meals') return {
-      id:id(), title:r.title||'Maaltijd', date:iso14(r.date),
-      type:r.mealType||'Avondeten', persons:r.persons||'',
-      ingredients:r.ingredients||'', note:r.note||''
-    };
-
-    if(r.target==='groceries') return {
-      id:id(), title:r.title||'Product',
-      amount:number14(r.amount, r.amount?0:1), unit:r.unit||'',
-      category:r.category||'Overig', store:r.store||'',
-      forMeal:r.forMeal||'', done:bool14(r.done,false), note:r.note||''
-    };
-
-    if(r.target==='chores') return {
-      id:id(), title:r.title||'Taak', category:r.category||'',
-      repeat:repeat14(r.repeat), person:r.person||'Samen',
-      due:iso14(r.startDate||r.nextDate), nextDate:iso14(r.nextDate),
-      priority:priority14(r.priority), done:bool14(r.done,false),
-      notes:r.notes||'', secondWeekday:'', completedDates:[]
-    };
-
-    if(r.target==='stock') return {
-      id:id(), title:r.title||'Product', category:r.category||'Overig',
-      amount:number14(r.amount,0), unit:r.unit||'stuks',
-      min:number14(r.minimum,0),
-      desired:Math.max(number14(r.minimum,0),number14(r.amount,0)),
-      bestBefore:iso14(r.bestBefore), location:r.location||'', note:r.note||''
-    };
-
-    if(r.target==='ideas') return {
-      id:id(), title:r.title||'Idee', category:r.category||'Thuis',
-      note:[r.description,r.note].filter(Boolean).join('\n'),
-      person:r.person||'', priority:priority14(r.priority),
-      status:r.status||'', date:iso14(r.date), icon:'♡'
-    };
-
-    if(r.target==='home') return {
-      id:id(), title:r.title||'Woningitem', category:r.category||'Onderhoud',
-      note:[r.description,r.note].filter(Boolean).join('\n'),
-      kind:r.kind||'', priority:priority14(r.priority),
-      startDate:iso14(r.startDate), due:iso14(r.deadline||r.startDate),
-      status:r.status||'', cost:number14(r.cost,0),
-      done:bool14(r.done,false), repeat:''
-    };
-
-    if(r.target==='trips') return makeTrip14(r);
-    return null;
-  }
-
-  function getOrCreateTripFolder14(name='') {
-    data.tripFolders ||= [];
-    const wanted=(name||'Nieuwe reis').trim();
-    let folder=data.tripFolders.find(f=>norm14(f.name)===norm14(wanted));
-    if(!folder) {
-      folder={id:id(),name:wanted,startDate:'',endDate:'',note:'Aangemaakt via universele import'};
-      data.tripFolders.push(folder);
-    }
-    return folder;
-  }
-
-  function getOrCreateTripSection14(folderId,name='') {
-    data.tripSections ||= [];
-    const wanted=(name||'Algemeen').trim();
-    let section=data.tripSections.find(s=>s.tripFolderId===folderId && norm14(s.name)===norm14(wanted));
-    if(!section) {
-      section={id:id(),tripFolderId:folderId,name:wanted};
-      data.tripSections.push(section);
-    }
-    return section;
-  }
-
-  function makeTrip14(r) {
-    const folder=getOrCreateTripFolder14(r.trip);
-    const section=getOrCreateTripSection14(folder.id,r.section);
-    const start=iso14(r.startDate||r.deadline);
-    const end=iso14(r.endDate||start);
-
-    if(start && !folder.startDate) folder.startDate=start;
-    if(end && !folder.endDate) folder.endDate=end;
-
-    const extras=[];
-    if(r.location) extras.push(`Locatie: ${r.location}`);
-    if(r.cost) extras.push(`Kosten: ${r.cost}`);
-    if(r.priority) extras.push(`Prioriteit: ${priority14(r.priority)}`);
-    if(r.note) extras.push(r.note);
-
-    return {
-      id:id(), tripFolderId:folder.id, tripSectionId:section.id,
-      title:r.title||'Reisitem', date:start, startDate:start, endDate:end,
-      type:r.kind||'Notitie',
-      note:[r.description,...extras].filter(Boolean).join('\n'),
-      checkable:bool14(r.checkable,false),
-      important:priority14(r.priority)==='hoog',
-      done:bool14(r.done,false)
-    };
-  }
-
-  function analyse14() {
-    const lines=String(state14.text||'').replace(/\r/g,'').split(/\n+/)
-      .map(x=>x.trim()).filter(Boolean)
-      .filter(x=>!/^#/.test(x));
-
-    const records=lines.map(line=>mapLine14(line,state14.target)).filter(Boolean);
-    state14.preview=records
-      .map(record=>({record,item:makeItem14(record),selected:true}))
-      .filter(x=>x.item);
-
-    render();
-    toast(`${state14.preview.length} items gevonden`);
-  }
-
-  function previewText14(entry) {
-    const r=entry.record;
-    if(r.target==='planning') return `${r.startDate||'geen datum'} ${r.startTime||''}`.trim();
-    if(r.target==='meals') return `${r.date||'geen datum'} · ${r.mealType||'Avondeten'}`;
-    if(r.target==='groceries') return `${r.amount||''} ${r.unit||''} · ${r.category||'Overig'}`.trim();
-    if(r.target==='chores') return `${repeat14(r.repeat)||'geen frequentie'} · ${r.person||'Samen'}`;
-    if(r.target==='stock') return `${r.amount||0} ${r.unit||'stuks'} · min ${r.minimum||0}`;
-    if(r.target==='ideas') return `${r.category||'Thuis'}${r.priority?' · '+priority14(r.priority):''}`;
-    if(r.target==='home') return `${r.category||'Onderhoud'}${r.deadline?' · '+r.deadline:''}`;
-    if(r.target==='trips') return `${r.trip||'Nieuwe reis'} › ${r.section||'Algemeen'}${r.startDate?' · '+r.startDate:''}`;
-    return '';
-  }
-
-  function renderImport14() {
-    return `<div class="import-v13">
-      <section class="card">
-        <div class="card-head">
-          <div><p class="eyebrow">SAMEN THUIS · UNIVERSELE IMPORT</p><h2>Toevoegen & importeren</h2></div>
-          <span class="tag green">v14</span>
-        </div>
-
-        <p>Gebruik <strong>|</strong>, <strong>;</strong>, tabs, <strong> / </strong>, <strong> - </strong> of meerdere spaties. Datums met een koppelteken blijven intact.</p>
-
-        <div class="form-grid">
-          <div class="field">
-            <label>Standaard pagina</label>
-            <select id="v14Target">
-              ${Object.entries(TARGETS14).map(([k,v])=>`<option value="${k}" ${k===state14.target?'selected':''}>${esc14(v)}</option>`).join('')}
-            </select>
-          </div>
-
-          <div class="field">
-            <label>Bestand</label>
-            <input id="v14File" type="file" accept=".pdf,.docx,.xlsx,.xlsm,.xls,.csv,.txt,.md,application/pdf,text/plain">
-          </div>
-
-          <div class="field full">
-            <label>Tekst / lijst</label>
-            <textarea id="v14Text" placeholder="huishouden | Badkamer schoonmaken | Badkamer | wekelijks | Samen ...">${esc14(state14.text)}</textarea>
-          </div>
-        </div>
-
-        ${state14.filename?`<p class="muted">Bron: <strong>${esc14(state14.filename)}</strong></p>`:''}
-
-        <div class="button-row">
-          <button class="primary" data-v14-analyse>Analyseren</button>
-          <button class="secondary" data-v14-clear>Leegmaken</button>
-          <button class="secondary" data-v14-legacy>Oude documentanalyse</button>
-        </div>
-
-        <details>
-          <summary>Vaste volgorde per pagina bekijken</summary>
-          <pre style="white-space:pre-wrap">Agenda: [agenda] | [titel] | [begindatum] | [begintijd] | [einddatum] | [eindtijd] | [hele dag] | [locatie] | [omschrijving] | [herhaling]
-Weekmenu: [weekmenu] | [datum] | [maaltijdmoment] | [gerecht] | [personen] | [ingrediënten] | [notitie]
-Boodschappen: [boodschappen] | [product] | [hoeveelheid] | [eenheid] | [categorie] | [winkel] | [voor weekmenu] | [afgevinkt] | [notitie]
-Huishouden: [huishouden] | [taak] | [ruimte/categorie] | [frequentie] | [toegewezen aan] | [startdatum] | [volgende datum] | [prioriteit] | [afgevinkt] | [omschrijving/subtaken]
-Voorraad: [voorraad] | [product] | [categorie] | [hoeveelheid] | [eenheid] | [minimumvoorraad] | [houdbaar-tot] | [locatie] | [notitie]
-Ideeën: [idee] | [titel] | [categorie] | [omschrijving] | [voor wie] | [prioriteit] | [status] | [datum/deadline] | [link/notitie]
-Woning: [woning] | [titel] | [categorie/ruimte] | [omschrijving] | [type] | [prioriteit] | [startdatum] | [deadline] | [status] | [kosten] | [afgevinkt] | [notitie]
-Reizen: [reizen] | [reis] | [map/onderdeel] | [titel] | [type] | [omschrijving] | [startdatum] | [einddatum] | [deadline] | [locatie] | [kosten] | [prioriteit] | [afvinken] | [afgevinkt] | [notitie/link]</pre>
-        </details>
-      </section>
-
-      ${state14.preview.length?`
-      <section class="card">
-        <div class="card-head">
-          <div><p class="eyebrow">CONTROLE</p><h2>${state14.preview.length} gevonden items</h2></div>
-          <button class="primary" data-v14-commit>Geselecteerde toevoegen</button>
-        </div>
-
-        <div class="v13-preview-list">
-          ${state14.preview.map((entry,i)=>`
-            <article class="v13-card" data-v14-card="${i}">
-              <div class="v13-card-head">
-                <label><input type="checkbox" data-v14-selected ${entry.selected?'checked':''}> Importeren</label>
-              </div>
-              <strong>${esc14(entry.item.title)}</strong><br>
-              <small class="muted">${esc14(TARGETS14[entry.record.target])} · ${esc14(previewText14(entry))}</small>
-            </article>
-          `).join('')}
-        </div>
-      </section>`:
-      '<section class="card"><p class="muted">Nog niets geanalyseerd.</p></section>'}
-    </div>`;
-  }
-
-  async function loadScript14(src,test) {
-    if(test()) return;
-    await new Promise((resolve,reject)=>{
-      const s=document.createElement('script');
-      s.src=src;
-      s.onload=resolve;
-      s.onerror=reject;
-      document.head.appendChild(s);
-    });
-  }
-
-  async function readFile14(file) {
-    const ext=file.name.toLowerCase().split('.').pop();
-
-    if(['txt','md','csv'].includes(ext)) return file.text();
-
-    if(ext==='pdf') return extractPdfText(file);
-
-    if(ext==='docx') {
-      await loadScript14(
-        'https://cdn.jsdelivr.net/npm/mammoth@1.12.2/mammoth.browser.min.js',
-        ()=>Boolean(window.mammoth)
-      );
-      return (await window.mammoth.extractRawText({arrayBuffer:await file.arrayBuffer()})).value||'';
-    }
-
-    if(['xlsx','xlsm','xls'].includes(ext)) {
-      await loadScript14(
-        'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js',
-        ()=>Boolean(window.XLSX)
-      );
-      const wb=window.XLSX.read(await file.arrayBuffer(),{type:'array',cellDates:true});
-      return wb.SheetNames.map(n=>window.XLSX.utils.sheet_to_csv(wb.Sheets[n],{FS:'|'})).join('\n');
-    }
-
-    throw new Error('Bestandstype niet ondersteund');
-  }
-
-  function bind14() {
-    document.querySelector('#v14Target')?.addEventListener('change',e=>{
-      state14.target=e.target.value;
-      state14.preview=[];
-      render();
-    });
-
-    document.querySelector('#v14Text')?.addEventListener('input',e=>{
-      state14.text=e.target.value;
-    });
-
-    document.querySelector('#v14File')?.addEventListener('change',async e=>{
-      const file=e.target.files?.[0];
-      if(!file) return;
-
-      try {
-        state14.filename=file.name;
-        toast('Bestand wordt gelezen…');
-        state14.text=await readFile14(file);
-        analyse14();
-      } catch(err) {
-        console.error(err);
-        toast('Bestand lezen is mislukt');
-      }
-    });
-  }
-
-  function openManualImport14() {
-    state14.legacy=true;
-    render();
-    // De v13-importer staat standaard op handmatig. Als de gebruiker eerder
-    // een andere methode koos, schakelen we expliciet terug naar Handmatig.
-    setTimeout(()=>document.querySelector('[data-v14-method="manual"]')?.click(),0);
-  }
-
-  function bindTopAdd14() {
-    const add=document.querySelector('#addBtn');
-    if(!add || add.dataset.v14Bound==='1') return;
-    add.dataset.v14Bound='1';
-    add.addEventListener('click',e=>{
-      if(current!=='imports') return;
-      e.preventDefault();
-      e.stopImmediatePropagation();
-      openManualImport14();
-    },true);
-  }
-
-  render = function renderV141() {
-    if(current==='imports' && !state14.legacy) {
-      document.querySelector('#view').innerHTML=renderImport14();
-      updateSyncBadge();
-      bind14();
-      bindTopAdd14();
-      return;
-    }
-
-    baseRender14();
-
-    if(current==='imports' && state14.legacy) {
-      const view=document.querySelector('#view');
-      if(view && !view.querySelector('[data-v14-new]')) {
-        view.insertAdjacentHTML('afterbegin',`
-          <div class="button-row" style="margin-bottom:16px">
-            <button class="secondary" data-v14-new>← Terug naar nieuwe import</button>
-          </div>`);
-      }
-      bindTopAdd14();
-    }
-  };
-
-  document.addEventListener('click',e=>{
-    if(e.target.closest('[data-v14-new]')) {
-      state14.legacy=false;
-      render();
-      return;
-    }
-
-    if(e.target.closest('[data-v14-legacy]')) {
-      state14.legacy=true;
-      render();
-      return;
-    }
-
-    if(current!=='imports' || state14.legacy) return;
-
-    if(e.target.closest('[data-v14-analyse]')) {
-      state14.text=document.querySelector('#v14Text')?.value||state14.text;
-      analyse14();
-      return;
-    }
-
-    if(e.target.closest('[data-v14-clear]')) {
-      state14.text='';
-      state14.filename='';
-      state14.preview=[];
-      render();
-      return;
-    }
-
-    if(e.target.closest('[data-v14-commit]')) {
-      document.querySelectorAll('[data-v14-card]').forEach(card=>{
-        const x=state14.preview[Number(card.dataset.v14Card)];
-        if(x) x.selected=Boolean(card.querySelector('[data-v14-selected]')?.checked);
-      });
-
-      const selected=state14.preview.filter(x=>x.selected);
-      if(!selected.length) return toast('Selecteer minimaal één item');
-
-      selected.forEach(({record,item})=>{
-        data[record.target] ||= [];
-        data[record.target].push(item);
-      });
-
-      save();
-
-      const count=selected.length;
-      state14.preview=[];
-      state14.text='';
-      state14.filename='';
-      render();
-      toast(`${count} items toegevoegd`);
-      return;
-    }
-  },true);
-
-  save({touch:false});
-  toast('Samen Thuis v14.1 geladen');
-})();
-
-;
-
-
-/* ===== GEÏNTEGREERD: samen-thuis-update-v15(1).js ===== */
-/* Samen Thuis v15.0
+/* Samen Thuis v17 — bodemprijzen en huishoudverdeling
    - Bodemprijzen / goede-deal database
    - Gierige Gerda lijst 31-08-2026 als startdata
    - Nieuwere bodemprijzen-PDF direct importeerbaar
    - Prijsreferenties zichtbaar bij Boodschappen en Voorraad
    - Aanbevolen huishoudverdeling kan op bestaande taken worden toegepast
 */
-console.info('Samen Thuis update 15.0 geladen');
+console.info('Samen Thuis v17 prijzen en taakverdeling geladen');
 
 (() => {
   'use strict';
-  if (window.__SAMEN_THUIS_V150__) return;
-  window.__SAMEN_THUIS_V150__ = true;
+  if (window.__SAMEN_THUIS_V17_PRICES__) return;
+  window.__SAMEN_THUIS_V17_PRICES__ = true;
 
   const baseRender15 = render;
   const DEFAULT_PRICES = [{"category":"(Fris)drank","product":"Aanmaaklimonade","brand":"Karvam Cevitan","quantity":"liter","floorPrice":3.33,"goodDealPrice":4.15,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"(Fris)drank","product":"Aanmaaklimonade","brand":"Raak","quantity":"liter","floorPrice":1.86,"goodDealPrice":2.0,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"(Fris)drank","product":"Aanmaaklimonade","brand":"Teisseire","quantity":"liter","floorPrice":4.0,"goodDealPrice":4.15,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"(Fris)drank","product":"Cola","brand":"Coca-Cola","quantity":"liter","floorPrice":0.85,"goodDealPrice":1.0,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"(Fris)drank","product":"Cola","brand":"huismerk","quantity":"liter","floorPrice":0.33,"goodDealPrice":0.6,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"(Fris)drank","product":"Cola","brand":"Pepsi","quantity":"liter","floorPrice":0.67,"goodDealPrice":1.0,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"(Fris)drank","product":"Energiedrank","brand":"Red Bull","quantity":"250 ml","floorPrice":0.85,"goodDealPrice":null,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"(Fris)drank","product":"Frisdrank overig","brand":"A-merk","quantity":"liter","floorPrice":1.0,"goodDealPrice":null,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"(Fris)drank","product":"IJsthee","brand":"Lipton","quantity":"liter","floorPrice":0.8,"goodDealPrice":1.0,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"(Fris)drank","product":"Rivella","brand":"","quantity":"liter","floorPrice":0.83,"goodDealPrice":1.0,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"Chips","product":"Popcorn","brand":"Jimmy's","quantity":"100 gram","floorPrice":0.89,"goodDealPrice":1.0,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"Diepvries","product":"IJs","brand":"Ben & Jerry's","quantity":"500 ml","floorPrice":3.21,"goodDealPrice":null,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"Diepvries","product":"IJsstam","brand":"Viennetta","quantity":"600 gram","floorPrice":0.89,"goodDealPrice":1.0,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"Drogisterij","product":"Conditioner","brand":"A-merk","quantity":"300 ml","floorPrice":1.99,"goodDealPrice":3.0,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"Drogisterij","product":"Conditioner","brand":"huismerk","quantity":"500 ml","floorPrice":1.0,"goodDealPrice":1.25,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"Drogisterij","product":"Damesscheermesjes","brand":"A-merk","quantity":"stuk","floorPrice":1.67,"goodDealPrice":2.0,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"Drogisterij","product":"Deodorant roller","brand":"A-merk","quantity":"stuk","floorPrice":0.8,"goodDealPrice":1.0,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"Drogisterij","product":"Deodorant roller","brand":"huismerk","quantity":"stuk","floorPrice":0.8,"goodDealPrice":1.0,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"Drogisterij","product":"Deodorant spuitbus","brand":"A-merk","quantity":"stuk","floorPrice":0.8,"goodDealPrice":1.0,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"Drogisterij","product":"Deodorant spuitbus","brand":"huismerk","quantity":"stuk","floorPrice":0.8,"goodDealPrice":1.0,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"Drogisterij","product":"Douchegel","brand":"Fa","quantity":"250 ml","floorPrice":0.33,"goodDealPrice":null,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"Drogisterij","product":"Handzeep","brand":"A-merk","quantity":"liter","floorPrice":2.0,"goodDealPrice":null,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"Drogisterij","product":"Herenscheermesjes","brand":"A-merk","quantity":"stuk","floorPrice":1.92,"goodDealPrice":2.0,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"Drogisterij","product":"Opzetborstel elektrisch","brand":"A-merk","quantity":"stuk","floorPrice":1.79,"goodDealPrice":2.5,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"Drogisterij","product":"Opzetborstel elektrisch","brand":"huismerk","quantity":"stuk","floorPrice":0.31,"goodDealPrice":null,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"Drogisterij","product":"Shampoo","brand":"A-merk","quantity":"300 ml","floorPrice":1.99,"goodDealPrice":3.0,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"Drogisterij","product":"Shampoo","brand":"huismerk","quantity":"500 ml","floorPrice":1.0,"goodDealPrice":null,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"Drogisterij","product":"Tandenborstel","brand":"A-merk","quantity":"stuk","floorPrice":0.33,"goodDealPrice":0.5,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"Drogisterij","product":"Tandpasta","brand":"A-merk (doosje)","quantity":"75 ml","floorPrice":1.0,"goodDealPrice":2.0,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"Drogisterij","product":"Tandpasta","brand":"A-merk (tube)","quantity":"75 ml","floorPrice":0.5,"goodDealPrice":1.0,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"Drogisterij","product":"Tandpasta","brand":"huismerk","quantity":"75 ml","floorPrice":0.25,"goodDealPrice":0.41,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"Drogisterij","product":"Tandpasta","brand":"Parodontax","quantity":"75 ml","floorPrice":1.67,"goodDealPrice":2.0,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"Drogisterij","product":"Zonnebrandcrème","brand":"A-merk","quantity":"200 ml","floorPrice":5.99,"goodDealPrice":8.99,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"Drogisterij","product":"Zonnebrandcrème","brand":"huismerk","quantity":"200 ml","floorPrice":3.2,"goodDealPrice":4.99,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"Huishouden","product":"Afwasmiddel","brand":"A-merk","quantity":"liter","floorPrice":2.85,"goodDealPrice":null,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"Huishouden","product":"Allesreiniger","brand":"A-merk","quantity":"liter","floorPrice":0.9,"goodDealPrice":1.0,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"Huishouden","product":"Allesreiniger","brand":"huismerk","quantity":"liter","floorPrice":0.75,"goodDealPrice":1.0,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"Huishouden","product":"Allesreiniger doekjes","brand":"huismerk","quantity":"80 stuks","floorPrice":0.49,"goodDealPrice":null,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"Huishouden","product":"Biotex","brand":"","quantity":"100 gram","floorPrice":0.42,"goodDealPrice":null,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"Huishouden","product":"Keukenrol","brand":"2-laags","quantity":"100 vel","floorPrice":0.52,"goodDealPrice":0.75,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"Huishouden","product":"Keukenrol","brand":"3-laags","quantity":"100 vel","floorPrice":0.78,"goodDealPrice":1.0,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"Huishouden","product":"Oxi vlekverwijderaar","brand":"A-merk","quantity":"kilo","floorPrice":6.47,"goodDealPrice":null,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"Huishouden","product":"Toiletblok","brand":"A-merk","quantity":"stuk","floorPrice":0.8,"goodDealPrice":1.0,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"Huishouden","product":"Toiletblok","brand":"huismerk","quantity":"stuk","floorPrice":0.5,"goodDealPrice":null,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"Huishouden","product":"Toiletpapier","brand":"3-laags","quantity":"100 vel","floorPrice":0.13,"goodDealPrice":0.15,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"Huishouden","product":"Vaatwaspoeder","brand":"A-merk","quantity":"wasbeurt","floorPrice":0.05,"goodDealPrice":null,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"Huishouden","product":"Vaatwaspoeder","brand":"huismerk","quantity":"wasbeurt","floorPrice":0.09,"goodDealPrice":null,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"Huishouden","product":"Vaatwastablet","brand":"Dreft","quantity":"wasbeurt","floorPrice":0.17,"goodDealPrice":0.2,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"Huishouden","product":"Vaatwastablet","brand":"huismerk","quantity":"wasbeurt","floorPrice":0.04,"goodDealPrice":0.08,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"Huishouden","product":"Vaatwastablet","brand":"Sun","quantity":"wasbeurt","floorPrice":0.09,"goodDealPrice":null,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"Huishouden","product":"Wasmiddel","brand":"Neutral","quantity":"wasbeurt","floorPrice":0.19,"goodDealPrice":null,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"Huishouden","product":"Wasmiddel pods","brand":"huismerk","quantity":"wasbeurt","floorPrice":0.1,"goodDealPrice":null,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"Huishouden","product":"Wasmiddel pods","brand":"Reus","quantity":"wasbeurt","floorPrice":0.14,"goodDealPrice":null,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"Huishouden","product":"Wasmiddel poeder","brand":"Ariel","quantity":"wasbeurt","floorPrice":0.2,"goodDealPrice":0.23,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"Huishouden","product":"Wasmiddel poeder","brand":"Reus","quantity":"wasbeurt","floorPrice":0.14,"goodDealPrice":null,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"Huishouden","product":"Wasmiddel quickwash","brand":"Robijn","quantity":"wasbeurt","floorPrice":0.22,"goodDealPrice":null,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"Huishouden","product":"Wasmiddel vloeibaar","brand":"Ariel","quantity":"wasbeurt","floorPrice":0.2,"goodDealPrice":0.23,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"Huishouden","product":"Wasmiddel vloeibaar","brand":"Fleuril","quantity":"wasbeurt","floorPrice":0.13,"goodDealPrice":null,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"Huishouden","product":"Wasmiddel vloeibaar","brand":"Omo","quantity":"wasbeurt","floorPrice":0.09,"goodDealPrice":0.11,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"Huishouden","product":"Wasmiddel vloeibaar","brand":"Reus","quantity":"wasbeurt","floorPrice":0.09,"goodDealPrice":0.11,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"Huishouden","product":"Wasmiddel vloeibaar","brand":"Robijn","quantity":"wasbeurt","floorPrice":0.13,"goodDealPrice":0.15,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"Huishouden","product":"Wasmiddeldoekje","brand":"A-merk","quantity":"wasbeurt","floorPrice":0.07,"goodDealPrice":0.15,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"Huishouden","product":"Wasmiddeldoekje","brand":"huismerk","quantity":"wasbeurt","floorPrice":0.1,"goodDealPrice":0.15,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"Huishouden","product":"Wasparfum","brand":"Robijn","quantity":"wasbeurt","floorPrice":0.16,"goodDealPrice":null,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"Huishouden","product":"Wasverzachter","brand":"huismerk","quantity":"wasbeurt","floorPrice":0.02,"goodDealPrice":0.05,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"Huishouden","product":"Zakdoekjes (4-laags)","brand":"huismerk","quantity":"pakje 10 zakdoekjes","floorPrice":0.07,"goodDealPrice":null,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"Koffie en thee","product":"Filterkoffie","brand":"A-merk","quantity":"500 gram","floorPrice":5.29,"goodDealPrice":6.5,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"Koffie en thee","product":"Filterkoffie","brand":"huismerk","quantity":"500 gram","floorPrice":3.0,"goodDealPrice":null,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"Koffie en thee","product":"Koffiebonen","brand":"huismerk","quantity":"kilo","floorPrice":6.66,"goodDealPrice":null,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"Koffie en thee","product":"Koffiecup","brand":"A-merk","quantity":"stuk","floorPrice":0.25,"goodDealPrice":0.3,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"Koffie en thee","product":"Koffiecup","brand":"huismerk","quantity":"stuk","floorPrice":0.09,"goodDealPrice":0.13,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"Koffie en thee","product":"Koffiepads","brand":"A-merk","quantity":"per pad","floorPrice":0.07,"goodDealPrice":null,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"Koffie en thee","product":"Koffiepads","brand":"huismerk","quantity":"per pad","floorPrice":0.05,"goodDealPrice":null,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"Koffie en thee","product":"Thee","brand":"A-merk","quantity":"doosje 20 stuks","floorPrice":1.0,"goodDealPrice":null,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"Koffie en thee","product":"Thee","brand":"Clipper","quantity":"doosje 20 stuks","floorPrice":1.79,"goodDealPrice":1.99,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"Olie","product":"Olijfolie extra vierge","brand":"A-merk","quantity":"liter","floorPrice":4.99,"goodDealPrice":7.99,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"Ontbijt en lunch","product":"Duopasta","brand":"Duo Pennotti","quantity":"kilo","floorPrice":4.36,"goodDealPrice":null,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"Ontbijt en lunch","product":"Hazelnootpasta","brand":"A-merk","quantity":"kilo","floorPrice":5.3,"goodDealPrice":null,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"Ontbijt en lunch","product":"Hazelnootpasta","brand":"huismerk","quantity":"kilo","floorPrice":3.49,"goodDealPrice":null,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"Ontbijt en lunch","product":"Ontbijtgranen","brand":"A-merk","quantity":"kilo","floorPrice":6.5,"goodDealPrice":null,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"Ontbijt en lunch","product":"Pindakaas","brand":"A-merk","quantity":"kilo","floorPrice":3.06,"goodDealPrice":null,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"Ontbijt en lunch","product":"Pindakaas","brand":"huismerk","quantity":"kilo","floorPrice":2.54,"goodDealPrice":null,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"Ontbijt en lunch","product":"Pindakaas 100%","brand":"huismerk","quantity":"kilo","floorPrice":2.86,"goodDealPrice":3.99,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"Pasta en rijst","product":"Farfalle","brand":"huismerk","quantity":"kilo","floorPrice":1.35,"goodDealPrice":null,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"Pasta en rijst","product":"Fusilli","brand":"huismerk","quantity":"kilo","floorPrice":1.39,"goodDealPrice":null,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"Pasta en rijst","product":"Macaroni","brand":"huismerk","quantity":"kilo","floorPrice":0.99,"goodDealPrice":null,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"Pasta en rijst","product":"Noodles","brand":"Indomie","quantity":"zakje","floorPrice":0.3,"goodDealPrice":null,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"Pasta en rijst","product":"Noodles","brand":"Unox","quantity":"pot","floorPrice":0.99,"goodDealPrice":null,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"Pasta en rijst","product":"Noodles","brand":"Unox","quantity":"zakje","floorPrice":0.58,"goodDealPrice":null,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"Pasta en rijst","product":"Penne","brand":"huismerk","quantity":"kilo","floorPrice":1.08,"goodDealPrice":null,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"Pasta en rijst","product":"Rijst","brand":"Lassie","quantity":"kilo","floorPrice":1.74,"goodDealPrice":null,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"Pasta en rijst","product":"Rijst basmati","brand":"huismerk","quantity":"kilo","floorPrice":1.79,"goodDealPrice":null,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"Pasta en rijst","product":"Rijst pandan","brand":"huismerk","quantity":"kilo","floorPrice":1.79,"goodDealPrice":null,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"Pasta en rijst","product":"Rijst zilvervlies","brand":"huismerk","quantity":"kilo","floorPrice":1.4,"goodDealPrice":null,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"Pasta en rijst","product":"Spaghetti","brand":"huismerk","quantity":"kilo","floorPrice":0.66,"goodDealPrice":null,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"Sauzen","product":"Mayonaise","brand":"A-merk","quantity":"liter","floorPrice":2.22,"goodDealPrice":null,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"Snoep","product":"Pepermunt","brand":"Wilhelmina","quantity":"per rol","floorPrice":0.29,"goodDealPrice":null,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"Vlees","product":"Rookworst","brand":"HEMA","quantity":"stuk","floorPrice":2.49,"goodDealPrice":null,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"Vlees","product":"Rookworst","brand":"huismerk","quantity":"stuk","floorPrice":0.99,"goodDealPrice":null,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"Wereldkeuken","product":"Pizza","brand":"Crosta & Mollica","quantity":"stuk","floorPrice":3.0,"goodDealPrice":null,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"Wereldkeuken","product":"Wereldgerechten burritos","brand":"Knorr","quantity":"pak 2-3 personen","floorPrice":1.0,"goodDealPrice":1.35,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"Zuivel","product":"Chocolademelk","brand":"A-merk","quantity":"liter","floorPrice":0.75,"goodDealPrice":1.0,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"Zuivel","product":"Houdbare melk","brand":"A-merk","quantity":"liter","floorPrice":0.79,"goodDealPrice":null,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"Zuivel","product":"Houdbare melk","brand":"huismerk","quantity":"liter","floorPrice":0.66,"goodDealPrice":null,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"Zuivel","product":"Kaas (jong belegen)","brand":"huismerk","quantity":"kilo","floorPrice":5.0,"goodDealPrice":null,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"Zuivel","product":"Roomboter","brand":"huismerk","quantity":"500 gram","floorPrice":2.0,"goodDealPrice":null,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"},{"category":"Zuivel","product":"Smeerkaas","brand":"A-merk","quantity":"100 gram","floorPrice":0.75,"goodDealPrice":null,"source":"Gierige Gerda Media 2026","updatedAt":"2026-08-31"}];
@@ -4286,7 +3767,7 @@ console.info('Samen Thuis update 15.0 geladen');
     render(); toast(`${n} bodemprijzen opgeslagen`);
   }
 
-  render=function renderV150() {
+  render=function renderFeaturesV17() {
     baseRender15();
     injectPriceImport15();
     injectPagePriceCard15();
@@ -4303,14 +3784,11 @@ console.info('Samen Thuis update 15.0 geladen');
   },true);
 
   save({touch:false});
-  toast('Samen Thuis v15 geladen');
 })();
 
-;
+/* ================================================================ */
 
-
-/* ===== GEÏNTEGREERD: samen-thuis-update-v16(1).js ===== */
-/* Samen Thuis v16.0
+/* Samen Thuis v17
    SMART HOUSEHOLD + SCROLL PRESERVATION
    - Geen vaste weekdagen meer voor huishoudtaken.
    - Planning wordt berekend vanaf de echte laatste uitvoering.
@@ -4318,16 +3796,17 @@ console.info('Samen Thuis update 15.0 geladen');
    - completedDates blijft de bronhistorie.
    - Wijzigen/afvinken houdt de scrollpositie vast.
 */
-console.info('Samen Thuis update 16.0 geladen');
+console.info('Samen Thuis v17 slimme huishoudplanning geladen');
 
 (() => {
   'use strict';
-  if (window.__SAMEN_THUIS_V160__) return;
-  window.__SAMEN_THUIS_V160__ = true;
+  if (window.__SAMEN_THUIS_V17_SMART_HOUSEHOLD__) return;
+  window.__SAMEN_THUIS_V17_SMART_HOUSEHOLD__ = true;
 
   const baseRender16 = render;
   const baseOccursOn16 = typeof occursOn === 'function' ? occursOn : null;
   const baseToggle16 = typeof toggleChoreOccurrence === 'function' ? toggleChoreOccurrence : null;
+  const baseRepeatLabel16 = typeof repeatLabel === 'function' ? repeatLabel : null;
 
   const pad16 = n => String(n).padStart(2,'0');
   const iso16 = d => `${d.getFullYear()}-${pad16(d.getMonth()+1)}-${pad16(d.getDate())}`;
@@ -4495,15 +3974,23 @@ console.info('Samen Thuis update 16.0 geladen');
   // Replace fixed-weekday scheduling. The calendar occurrence is now the calculated
   // next deadline only; "soon" tasks are surfaced separately in Today/Household.
   if(baseOccursOn16) {
-    occursOn = function occursOnV16(chore,date) {
+    occursOn = function occursOnV17(chore,date) {
       const due=nextDue16(chore);
       return Boolean(due && date===due);
     };
   }
 
+  // De oude interface toonde bij 2× per week nog vaste weekdagen. V17 plant
+  // uitsluitend vanaf de echte laatste uitvoerdatum.
+  if(baseRepeatLabel16) {
+    repeatLabel = function repeatLabelV17(chore) {
+      return chore.repeat || 'Wekelijks';
+    };
+  }
+
   // Completion is always an actual completion moment, not a recurring weekday.
   if(baseToggle16) {
-    toggleChoreOccurrence = function toggleChoreOccurrenceV16(choreId,date) {
+    toggleChoreOccurrence = function toggleChoreOccurrenceV17(choreId,date) {
       const chore=(data.chores||[]).find(x=>x.id===choreId);
       if(!chore) return;
 
@@ -4662,17 +4149,21 @@ console.info('Samen Thuis update 16.0 geladen');
     });
   }
 
-  render = function renderV160() {
-    const samePage = lastRenderedPage16===current;
-    const y = samePage ? (window.scrollY || document.documentElement.scrollTop || 0) : 0;
+  render = function renderV17() {
     const page=current;
+    const samePage=lastRenderedPage16===page;
+    const captured=savedPage16===page;
+    const y=captured?savedY16:(samePage?(window.scrollY||document.documentElement.scrollTop||0):0);
 
     baseRender16();
     injectSmartHousehold16();
     injectTodaySoon16();
 
     lastRenderedPage16=page;
-    if(samePage && y>0) restoreScroll16(page,y);
+    savedPage16=null;
+    savedY16=0;
+    if((captured||samePage) && y>0) restoreScroll16(page,y);
+    else if(!samePage) restoreScroll16(page,0);
   };
 
   // Capture before interactions that commonly re-render the same page:
@@ -4699,295 +4190,11 @@ console.info('Samen Thuis update 16.0 geladen');
 
   // One initial render is needed so existing screens immediately use the new logic.
   render();
-  toast('Samen Thuis v16 geladen');
-})();
-
-;
-
-/* ===== v18 CLEAN DASHBOARD ===== */
-(() => {
-'use strict';
-if(window.__ST_V18__) return; window.__ST_V18__=true;
-const oldRender18=render, WC='stWeatherV18', LOC={name:'Rotterdam',lat:51.9225,lon:4.47917};
-const wi=c=>({0:'☀️',1:'🌤️',2:'⛅',3:'☁️',45:'🌫️',48:'🌫️',51:'🌦️',53:'🌦️',55:'🌧️',61:'🌦️',63:'🌧️',65:'🌧️',71:'🌨️',73:'🌨️',75:'❄️',77:'❄️',80:'🌦️',81:'🌧️',82:'⛈️',85:'🌨️',86:'🌨️',95:'⛈️',96:'⛈️',99:'⛈️'})[c]||'🌤️';
-function wt(c){if(c===0)return'Zonnig';if(c<=2)return'Licht bewolkt';if(c===3)return'Bewolkt';if(c<=48)return'Mistig';if(c<=57)return'Motregen';if(c<=67)return'Regen';if(c<=77)return'Sneeuw';if(c<=86)return'Buien';return'Onweer'}
-function outfit(w){let f=Math.round(w.current?.apparent_temperature??15),r=+(w.daily?.precipitation_probability_max?.[0]||0),wind=+(w.current?.wind_speed_10m||0),a=f<=5?['Winterjas','warme trui']:f<=11?['Jas','trui of vest']:f<=16?['Lichte jas of vest','lange broek']:f<=22?['T-shirt','lichte broek']:['Luchtige kleding','korte broek'];if(r>=40)a.push('regenjas of paraplu');if(wind>=30)a.push('winddichte laag');if((w.current?.weather_code||99)<=1&&f>=18)a.push('zonnebril');return a}
-function data18(){
- let chores=0;try{chores=occurrencesForDate(todayISO()).filter(({chore})=>!isChoreDone(chore,todayISO())).length}catch(_){chores=(data.chores||[]).filter(x=>!x.done).length}
- const groceries=(data.groceries||[]).filter(x=>!x.done).length;
- const low=(data.stock||[]).filter(x=>{let a=+(x.amount??0),m=+(x.min??x.minimum??0);return m>0&&a<=m}).length;
- const dinner=(data.meals||[]).find(x=>x.date===todayISO()&&/avond/i.test(x.type||x.mealType||''));
- let agenda=[];try{agenda=(data.planning||[]).filter(x=>x.date>=todayISO()).sort(typeof sortPlanning==='function'?sortPlanning:(a,b)=>`${a.date}${a.time||''}`.localeCompare(`${b.date}${b.time||''}`)).slice(0,4)}catch(_){}
- return{chores,groceries,low,dinner,agenda}
-}
-function html18(){
- const s=data18(),date=new Intl.DateTimeFormat('nl-NL',{weekday:'long',day:'numeric',month:'long'}).format(new Date());
- return `<section class="dash18" data-dash18><header class="dh18"><div><p class="eyebrow">Jullie thuis, in één oogopslag</p><h2>Vandaag</h2><p>${date}</p></div><div class="people18"><span>K</span><span>D</span></div></header><div class="dg18">
- <section class="weather18" data-weather18>Weer ophalen…</section>
- <section class="today18"><div class="ct18"><strong>Vandaag</strong><span>${s.chores} taken</span></div><div class="stats18"><button data-view="chores"><b>${s.chores}</b><small>Huishouden</small></button><button data-view="groceries"><b>${s.groceries}</b><small>Boodschappen</small></button><button data-view="stock"><b>${s.low}</b><small>Bijna op</small></button></div><div class="meal18"><small>🍽️ VANAVOND</small><strong>${esc(s.dinner?.title||'Nog geen avondeten gepland')}</strong></div></section>
- <section class="agenda18"><div class="ct18"><strong>Komende afspraken</strong><button class="text-btn" data-view="planning">Alles →</button></div>${s.agenda.length?s.agenda.map(x=>`<div class="ar18"><time>${esc(x.date===todayISO()?(x.time||'Hele dag'):new Intl.DateTimeFormat('nl-NL',{weekday:'short',day:'numeric'}).format(parseDate(x.date)))}</time><div><strong>${esc(x.title)}</strong><small>${esc(x.person||'')}</small></div></div>`).join(''):'<p class="muted">Geen komende afspraken.</p>'}</section>
- <section class="outfit18" data-outfit18><span>👕</span><div><strong>Wat trek je aan?</strong><p>Weeradvies laden…</p></div></section></div></section>`
-}
-async function weather18(force=false){
- const box=document.querySelector('[data-weather18]');if(!box)return;
- try{let w=null;if(!force)try{let c=JSON.parse(localStorage.getItem(WC)||'null');if(c&&Date.now()-c.t<1800000)w=c.w}catch(_){}
- if(!w){let q=new URLSearchParams({latitude:LOC.lat,longitude:LOC.lon,current:'temperature_2m,apparent_temperature,weather_code,precipitation,wind_speed_10m',hourly:'temperature_2m,weather_code,precipitation_probability',daily:'temperature_2m_max,temperature_2m_min,precipitation_probability_max',timezone:'Europe/Amsterdam',forecast_days:'5'});let r=await fetch('https://api.open-meteo.com/v1/forecast?'+q,{cache:'no-store'});if(!r.ok)throw 0;w=await r.json();localStorage.setItem(WC,JSON.stringify({t:Date.now(),w}))}
- let c=w.current,d=w.daily,h=w.hourly,n=new Date(),i=h.time.findIndex(t=>new Date(t)>=new Date(n.getFullYear(),n.getMonth(),n.getDate(),n.getHours()));if(i<0)i=0;let ids=Array.from({length:6},(_,k)=>i+k).filter(k=>k<h.time.length);
- box.innerHTML=`<div class="wm18"><div><small>⌖ ${LOC.name}</small><div class="temp18"><span>${wi(c.weather_code)}</span><strong>${Math.round(c.temperature_2m)}°</strong></div><p>${wt(c.weather_code)} · voelt als ${Math.round(c.apparent_temperature)}°</p></div><div class="wf18"><b>${Math.round(d.temperature_2m_max[0])}° / ${Math.round(d.temperature_2m_min[0])}°</b><span>☂ ${Math.round(d.precipitation_probability_max[0]||0)}%</span><span>↗ ${Math.round(c.wind_speed_10m||0)} km/u</span></div></div><div class="hours18">${ids.map(k=>`<div><small>${h.time[k].slice(11,16)}</small><b>${wi(h.weather_code[k])}</b><strong>${Math.round(h.temperature_2m[k])}°</strong><small>${Math.round(h.precipitation_probability[k]||0)}%</small></div>`).join('')}</div><button class="wr18" data-wr18>↻</button>`;
- let o=document.querySelector('[data-outfit18]');if(o)o.innerHTML=`<span>👕</span><div><strong>Wat trek je aan?</strong><p>${outfit(w).map(esc).join(' · ')}</p><small>Gebaseerd op temperatuur, regen en wind.</small></div>`
- }catch(_){box.innerHTML='<strong>Weer tijdelijk niet beschikbaar</strong><p><button class="text-btn" data-wr18>Opnieuw proberen</button></p>'}
-}
-function enhance18(){if(current!=='today')return;let v=document.querySelector('#view');if(!v||v.querySelector('[data-dash18]'))return;v.insertAdjacentHTML('afterbegin',html18());let w=v.querySelector('.welcome');if(w)w.style.display='none';weather18()}
-render=function(...a){let r=oldRender18(...a);requestAnimationFrame(enhance18);return r};
-document.addEventListener('click',e=>{if(e.target.closest('[data-wr18]'))weather18(true)});
-requestAnimationFrame(enhance18);
-})();
-
-
-/* =========================================================
-   SAMEN THUIS v19 — 12 PAGINA'S + APPARAATGEBONDEN WEERGAVE
-   ========================================================= */
-(() => {
-'use strict';
-if(window.__ST_V19__) return; window.__ST_V19__=true;
-
-const UIKEY19='samenThuisDeviceUiV19';
-const DEFAULTUI19={theme:'system',accent:'bluePurple',density:'comfortable',mobileNav:['today','planning','meals','groceries']};
-function loadUi19(){try{return {...DEFAULTUI19,...JSON.parse(localStorage.getItem(UIKEY19)||'{}')}}catch(_){return {...DEFAULTUI19}}}
-let ui19=loadUi19();
-function saveUi19(){localStorage.setItem(UIKEY19,JSON.stringify(ui19));applyUi19()}
-function applyUi19(){
-  const dark=ui19.theme==='dark'||(ui19.theme==='system'&&matchMedia('(prefers-color-scheme:dark)').matches);
-  document.documentElement.dataset.theme19=dark?'dark':'light';
-  document.documentElement.dataset.accent19=ui19.accent||'bluePurple';
-  document.documentElement.dataset.density19=ui19.density||'comfortable';
-}
-applyUi19();
-try{matchMedia('(prefers-color-scheme:dark)').addEventListener('change',()=>ui19.theme==='system'&&applyUi19())}catch(_){}
-
-const pages19=[
- ['today','Today','⌂'],['planning','Agenda','▦'],['meals','Weekmenu','♨'],['groceries','Boodschappen','✓'],
- ['chores','Huishouden','⌁'],['stock','Voorraad','▤'],['trips','Reizen','✈'],['ideas','Date ideeën','♡'],
- ['home','Woning','⌂'],['budget19','Budget','€'],['extra19','Extra','＋'],['settings','Instellingen','⚙']
-];
-try{
-  sections.today={label:'Today',icon:'⌂'};
-  sections.ideas={label:'Date ideeën',icon:'♡'};
-  sections.budget19={label:'Budget',icon:'€'};
-  sections.extra19={label:'Extra',icon:'＋'};
-}catch(_){}
-
-function go19(view,focusId=''){
-  if(view==='budget19'||view==='extra19'){current=view;render();return}
-  current=view;render();
-  if(focusId)setTimeout(()=>{
-    const el=document.querySelector(`[data-id="${CSS.escape(focusId)}"],[data-edit="${CSS.escape(focusId)}"],#${CSS.escape(focusId)}`);
-    el?.scrollIntoView({behavior:'smooth',block:'center'});
-  },80);
-}
-window.SamenThuisGo=go19;
-
-function nav19(){
-  const desktop=document.querySelector('.sidebar nav,.side-nav,.nav-list');
-  if(desktop){
-    desktop.innerHTML=pages19.map(([id,label,icon])=>`<button class="${current===id?'active':''}" data-v19-go="${id}"><span>${icon}</span>${label}</button>`).join('');
-  }
-  const mobile=document.querySelector('.mobile-nav,.bottom-nav');
-  if(mobile){
-    const direct=(ui19.mobileNav||DEFAULTUI19.mobileNav).slice(0,4);
-    mobile.innerHTML=direct.map(id=>{const p=pages19.find(x=>x[0]===id)||pages19[0];return `<button class="${current===id?'active':''}" data-v19-go="${id}"><span>${p[2]}</span><small>${p[1]}</small></button>`}).join('')+
-      `<button data-v19-more><span>•••</span><small>Meer</small></button>`;
-  }
-}
-function more19(){
-  let old=document.querySelector('[data-v19-moremenu]');if(old){old.remove();return}
-  const direct=new Set(ui19.mobileNav||DEFAULTUI19.mobileNav);
-  document.body.insertAdjacentHTML('beforeend',`<div class="more19" data-v19-moremenu><div class="more19-sheet"><div class="more19-head"><strong>Alle pagina's</strong><button data-v19-more>×</button></div>${pages19.filter(p=>!direct.has(p[0])).map(p=>`<button data-v19-go="${p[0]}"><span>${p[2]}</span><b>${p[1]}</b></button>`).join('')}</div></div>`);
-}
-function budgetPage19(){
-  const b=data.budget||data.budget19||{income:0,expenses:[]};
-  const expenses=Array.isArray(b.expenses)?b.expenses:[];
-  const total=expenses.reduce((s,x)=>s+Number(x.amount||0),0), income=Number(b.income||0);
-  return `<div class="page19"><div class="page19-head"><div><p class="eyebrow">GELD</p><h1>Budget</h1><p>Inkomsten, uitgaven en doelen op één plek.</p></div><button class="primary" data-v19-budget-add>+ Toevoegen</button></div>
-  <div class="budget19-grid"><section class="card"><small>Inkomen</small><h2>€ ${income.toLocaleString('nl-NL')}</h2></section><section class="card"><small>Uitgaven</small><h2>€ ${total.toLocaleString('nl-NL')}</h2></section><section class="card"><small>Resterend</small><h2>€ ${(income-total).toLocaleString('nl-NL')}</h2></section></div>
-  <section class="card"><div class="card-head"><h2>Uitgaven</h2></div>${expenses.length?expenses.map((x,i)=>`<div class="row19"><div><strong>${esc(x.title||x.category||'Uitgave')}</strong><small>${esc(x.category||'')}</small></div><b>€ ${Number(x.amount||0).toLocaleString('nl-NL')}</b><button data-v19-budget-edit="${i}">Bewerk</button></div>`).join(''):'<p class="muted">Nog geen budgetposten. Gebruik + Toevoegen.</p>'}</section></div>`;
-}
-function extraPage19(){
- return `<div class="page19"><div class="page19-head"><div><p class="eyebrow">HANDIGE TOOLS</p><h1>Extra</h1><p>Snelle toegang tot handige onderdelen.</p></div></div><div class="tools19">
- ${[['weather','☀️','Weer','Actueel weer op Today'],['daily','💡','Vraag van de dag','Leer elkaar beter kennen'],['calc','▦','Omrekenen','Valuta, maten en meer'],['floor','🏷️','Bodemprijzen','Boodschappen'],['links','🔗','Links','Handige websites'],['notes','▤','Notities','Snelle notities'],['docs','📁','Documenten',"PDF's en bestanden"],['contacts','👤','Contacten','Belangrijke nummers']].map(x=>`<button data-v19-tool="${x[0]}"><span>${x[1]}</span><strong>${x[2]}</strong><small>${x[3]}</small></button>`).join('')}</div></div>`;
-}
-function settingsPanel19(){
- if(current!=='settings')return;
- const v=document.querySelector('#view');if(!v||v.querySelector('[data-v19-device-settings]'))return;
- v.insertAdjacentHTML('afterbegin',`<section class="card device-settings19" data-v19-device-settings><div class="card-head"><div><p class="eyebrow">DIT APPARAAT</p><h2>Thema & weergave</h2></div><span class="tag">Niet gedeeld</span></div><p class="muted">Deze instellingen blijven alleen op dit apparaat. Daphne kan op haar telefoon dus een ander thema gebruiken.</p>
- <div class="settings-grid19"><label>Thema<select data-v19-theme><option value="system">Systeem</option><option value="light">Licht</option><option value="dark">Donker</option></select></label>
- <label>Accent<select data-v19-accent><option value="bluePurple">Blauw / paars</option><option value="blue">Blauw</option><option value="purple">Paars</option><option value="orange">Oranje</option></select></label>
- <label>Weergave<select data-v19-density><option value="comfortable">Ruim</option><option value="compact">Compact</option></select></label></div></section>`);
- v.querySelector('[data-v19-theme]').value=ui19.theme;v.querySelector('[data-v19-accent]').value=ui19.accent;v.querySelector('[data-v19-density]').value=ui19.density;
-}
-function editBudget19(index=null){
- data.budget ||= {income:0,expenses:[]}; data.budget.expenses ||= [];
- const old=index===null?{}:data.budget.expenses[index];
- const title=prompt('Naam',old.title||'');if(title===null)return;
- const amount=prompt('Bedrag (€)',old.amount??'');if(amount===null)return;
- const category=prompt('Categorie',old.category||'Overig');if(category===null)return;
- const item={...old,id:old.id||uid(),title,amount:Number(String(amount).replace(',','.'))||0,category};
- if(index===null)data.budget.expenses.push(item);else data.budget.expenses[index]=item;save();render();
-}
-function crossLinks19(){
-  if(current!=='today')return;
-  const v=document.querySelector('#view');if(!v)return;
-  // Existing Today content remains source-of-truth; cards receive explicit navigation.
-  v.querySelectorAll('[data-dashboard-v18] .today18,[data-dash18] .today18').forEach(x=>{x.dataset.v19Go='chores'});
-  v.querySelectorAll('[data-dashboard-v18] .agenda18,[data-dash18] .agenda18').forEach(x=>{x.dataset.v19Go='planning'});
-  v.querySelectorAll('[data-outfit18],[data-outfit-v18]').forEach(x=>{x.dataset.v19Tool='weather'});
-}
-const baseRender19=render;
-render=function(...args){
- let r;
- if(current==='budget19'){document.querySelector('#view').innerHTML=budgetPage19();r=undefined}
- else if(current==='extra19'){document.querySelector('#view').innerHTML=extraPage19();r=undefined}
- else r=baseRender19(...args);
- requestAnimationFrame(()=>{nav19();settingsPanel19();crossLinks19();applyUi19()});
- return r;
-};
-document.addEventListener('click',e=>{
- const g=e.target.closest('[data-v19-go]');if(g){e.preventDefault();go19(g.dataset.v19Go);return}
- if(e.target.closest('[data-v19-more]')){e.preventDefault();more19();return}
- if(e.target.closest('[data-v19-budget-add]')){editBudget19();return}
- const be=e.target.closest('[data-v19-budget-edit]');if(be){editBudget19(Number(be.dataset.v19BudgetEdit));return}
- const tool=e.target.closest('[data-v19-tool]');if(tool){
-   const t=tool.dataset.v19Tool;if(t==='weather'){go19('today');return}
-   if(t==='floor'){go19('groceries');return}
-   if(t==='daily'){go19('today');return}
-   toast('Deze tool kan vanuit Extra verder worden uitgebreid.');return;
- }
-});
-document.addEventListener('change',e=>{
- if(e.target.matches('[data-v19-theme]')){ui19.theme=e.target.value;saveUi19()}
- if(e.target.matches('[data-v19-accent]')){ui19.accent=e.target.value;saveUi19()}
- if(e.target.matches('[data-v19-density]')){ui19.density=e.target.value;saveUi19()}
-});
-requestAnimationFrame(()=>{nav19();settingsPanel19();applyUi19()});
-})();
-
-/* =========================================================
-   SAMEN THUIS v20 — GLASS THEME / DEVICE UI
-   Alleen interfacevoorkeuren zijn apparaatgebonden.
-   ========================================================= */
-(() => {
-'use strict';
-if (window.__ST_V20__) return;
-window.__ST_V20__ = true;
-
-const KEY20 = 'samenThuisDeviceUiV20';
-const FALLBACK20 = { theme:'system', accent:'purple', density:'comfortable' };
-
-function get20(){
-  try {
-    const old = JSON.parse(localStorage.getItem('samenThuisDeviceUiV19') || '{}');
-    const now = JSON.parse(localStorage.getItem(KEY20) || '{}');
-    return {...FALLBACK20, ...old, ...now};
-  } catch (_) { return {...FALLBACK20}; }
-}
-let ui20 = get20();
-
-function apply20(){
-  const systemDark = window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches;
-  const dark = ui20.theme === 'dark' || (ui20.theme === 'system' && systemDark);
-  const html = document.documentElement;
-  html.dataset.theme19 = dark ? 'dark' : 'light';
-  html.dataset.theme20 = dark ? 'dark' : 'light';
-  html.dataset.accent19 = ui20.accent || 'purple';
-  html.dataset.accent20 = ui20.accent || 'purple';
-  html.dataset.density19 = ui20.density || 'comfortable';
-  html.dataset.density20 = ui20.density || 'comfortable';
-  html.style.colorScheme = dark ? 'dark' : 'light';
-  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark ? '#081b2d' : '#eef3f9');
-}
-function save20(){
-  localStorage.setItem(KEY20, JSON.stringify(ui20));
-  localStorage.setItem('samenThuisDeviceUiV19', JSON.stringify(ui20));
-  apply20();
-}
-apply20();
-try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => ui20.theme === 'system' && apply20()); } catch(_){}
-
-function beautifySettings20(){
-  if (typeof current === 'undefined' || current !== 'settings') return;
-  const box = document.querySelector('[data-v19-device-settings]');
-  if (!box) return;
-  box.classList.add('glass20');
-  const theme = box.querySelector('[data-v19-theme]');
-  const accent = box.querySelector('[data-v19-accent]');
-  const density = box.querySelector('[data-v19-density]');
-  if(theme){ theme.value=ui20.theme; theme.onchange=()=>{ui20.theme=theme.value;save20()}; }
-  if(accent){ accent.value=ui20.accent; accent.onchange=()=>{ui20.accent=accent.value;save20()}; }
-  if(density){ density.value=ui20.density; density.onchange=()=>{ui20.density=density.value;save20()}; }
-}
-
-function dock20(){
-  const mobile = document.querySelector('.mobile-nav,.bottom-nav');
-  if(!mobile) return;
-  mobile.classList.add('glass-dock20');
-  const buttons = [...mobile.querySelectorAll('button')];
-  buttons.forEach(b => b.classList.add('glass-dock-item20'));
-
-  // Make the middle action a prominent glass + button without changing navigation data.
-  let add = mobile.querySelector('[data-v20-add]');
-  if(!add){
-    add = document.createElement('button');
-    add.type='button';
-    add.dataset.v20Add='';
-    add.className='glass-dock-item20 glass-add20';
-    add.innerHTML='<span>＋</span><small>Toevoegen</small>';
-    const more = mobile.querySelector('[data-v19-more]');
-    mobile.insertBefore(add, more || null);
-  }
-}
-function enhance20(){
-  document.body.classList.add('st-glass20');
-  apply20();
-  beautifySettings20();
-  dock20();
-}
-
-const previousRender20 = typeof render === 'function' ? render : null;
-if(previousRender20){
-  render = function(...args){
-    const result = previousRender20(...args);
-    requestAnimationFrame(enhance20);
-    return result;
+  window.__SAMEN_THUIS_V17__=true;
+  window.SamenThuis={
+    version:APP_VERSION,
+    dataSchema:DATA_SCHEMA_VERSION,
+    features:{travelSync:true,unifiedImporter:true,universalImport:true,priceReferences:true,smartHousehold:true,scrollPreservation:true}
   };
-}
-
-document.addEventListener('click', e => {
-  if(e.target.closest('[data-v20-add]')){
-    const topAdd = [...document.querySelectorAll('button')].find(b =>
-      !b.closest('.mobile-nav,.bottom-nav') && /toevoegen|\+\s*toevoegen/i.test(b.textContent || '')
-    );
-    if(topAdd) topAdd.click();
-    else {
-      const generic = document.querySelector('[data-add],[data-action="add"],.add-btn');
-      generic?.click();
-    }
-  }
-});
-requestAnimationFrame(enhance20);
-})();
-
-/* ===== v21 TRUE GLASS DOCK ===== */
-(()=>{'use strict';if(window.__ST21)return;window.__ST21=1;
-const pages=[['today','⌂','Today'],['planning','▦','Agenda'],['meals','♨','Weekmenu'],['groceries','✓','Boodschappen'],['chores','⌁','Huishouden'],['stock','▤','Voorraad'],['trips','✈','Reizen'],['ideas','♡','Date ideeën'],['home','⌂','Woning'],['budget19','€','Budget'],['extra19','＋','Extra'],['settings','⚙','Instellingen']],direct=['today','planning','meals','groceries'];
-function go(id){if(window.SamenThuisGo)SamenThuisGo(id);else{current=id;render()}}
-function dock(){
- document.querySelectorAll('.mobile-nav,.bottom-nav').forEach(x=>x.classList.add('old21'));
- let n=document.querySelector('#dock21');if(!n){n=document.createElement('nav');n.id='dock21';n.className='dock21';document.body.append(n)}
- n.innerHTML=direct.map(id=>{let p=pages.find(x=>x[0]===id);return`<button data-go21="${id}" class="${current===id?'on':''}"><span>${p[1]}</span><small>${p[2]}</small></button>`}).join('')+`<button data-more21 class="${direct.includes(current)?'':'on'}"><span>•••</span><small>Meer</small></button>`;
- document.querySelectorAll('.sync-info,[class*="info-box"],[class*="sync-info"]').forEach(x=>x.classList.add('surface21'));
-}
-function sheet(){document.querySelector('#sheet21')?.remove();let w=document.createElement('div');w.id='sheet21';w.className='sheetwrap21';w.innerHTML=`<button class="shade21" data-close21></button><section class="sheet21"><header><div><small>SNEL NAAR</small><strong>Alle pagina's</strong></div><button data-close21>×</button></header><div>${pages.filter(p=>!direct.includes(p[0])).map(p=>`<button data-go21="${p[0]}" class="${current===p[0]?'on':''}"><span>${p[1]}</span><b>${p[2]}</b></button>`).join('')}</div></section>`;document.body.append(w)}
-const rr=render;render=function(...a){let x=rr(...a);requestAnimationFrame(dock);return x};
-document.addEventListener('click',e=>{let g=e.target.closest('[data-go21]');if(g){e.preventDefault();document.querySelector('#sheet21')?.remove();go(g.dataset.go21);return}if(e.target.closest('[data-more21]')){e.preventDefault();sheet();return}if(e.target.closest('[data-close21]'))document.querySelector('#sheet21')?.remove()});
-requestAnimationFrame(dock);
+  document.documentElement.dataset.appVersion=APP_VERSION;
 })();
