@@ -8,7 +8,6 @@ body{margin:0;min-height:100vh} button,input,select,textarea{font:inherit} butto
 .app-shell{display:grid;grid-template-columns:245px 1fr;min-height:100vh}
 .sidebar{position:sticky;top:0;height:100vh;background:var(--ink);color:white;padding:28px 18px max(20px,env(safe-area-inset-bottom));display:flex;flex-direction:column}
 .brand{display:flex;align-items:center;gap:12px;padding:0 10px 26px}.brand-mark{display:grid;place-items:center;width:40px;height:40px;border-radius:13px;background:var(--orange);font-weight:800;font-size:1.25rem}.brand strong,.brand small{display:block}.brand small{opacity:.62;margin-top:2px}
-.app-version{font-weight:800;color:#fff;opacity:.9}
 nav{display:grid;gap:5px}.nav-item{width:100%;border:0;background:transparent;color:#dfe8f2;text-align:left;padding:12px 13px;border-radius:11px;display:flex;align-items:center;gap:11px;font-weight:600;font-size:.94rem}.nav-item span{width:22px;text-align:center;font-size:1.1rem}.nav-item.active,.nav-item:hover{background:rgba(255,255,255,.11);color:white}.sidebar-footer{margin-top:auto;border-top:1px solid rgba(255,255,255,.12);padding-top:12px}
 main{min-width:0}.topbar{height:106px;padding:24px clamp(22px,4vw,54px) 15px;display:flex;align-items:center;justify-content:space-between;background:rgba(243,246,248,.94);position:sticky;top:0;z-index:5;backdrop-filter:blur(14px)}
 .topbar p,.eyebrow{margin:0 0 3px;color:var(--muted);font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.09em}.topbar h1{margin:0;font-size:1.85rem;letter-spacing:-.035em}.top-actions{display:flex;align-items:center;gap:12px}.save-state{font-size:.78rem;color:var(--muted)}
@@ -156,8 +155,6 @@ dialog form{padding:clamp(16px,4vw,24px)}
 }
 @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
 
-/* Samen Thuis v17 - samengevoegde vormgeving */
-
 /* Samen Thuis v11 add-on */
 .trip-priority-field[hidden],.preview-priority[hidden]{display:none!important}
 .priority-badge{display:inline-flex;align-items:center;margin-left:8px;padding:3px 8px;border-radius:999px;font-size:.68rem;font-weight:850;letter-spacing:.02em;white-space:nowrap}
@@ -174,8 +171,6 @@ dialog form{padding:clamp(16px,4vw,24px)}
 @media(max-width:950px){.preview-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:650px){.preview-grid{grid-template-columns:1fr}.preview-grid .preview-title,.preview-grid .preview-note{grid-column:auto}.travel-import-preview{margin-left:-2px;margin-right:-2px}.priority-badge{font-size:.64rem}.sync-detail{font-size:.9rem}}
 
-/* Samen Thuis v17 - samengevoegde vormgeving */
-
 .import-v13{display:grid;gap:16px}
 .import-v13 .full{grid-column:1/-1}
 .v13-preview-list{display:grid;gap:12px}
@@ -186,6 +181,294 @@ dialog form{padding:clamp(16px,4vw,24px)}
 .v13-fields .full{grid-column:1/-1}
 .v13-bulk{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:12px;margin:10px 0 14px;border-radius:14px;background:rgba(49,95,134,.06)}
 .tag.warning{background:#fff3cd;color:#7a5a00}
-.import-target-tags{display:flex;align-items:center;justify-content:flex-end;gap:7px;flex-wrap:wrap}
-.version-card code{padding:2px 6px;border-radius:6px;background:var(--blue-soft);color:var(--blue);font-weight:700}
 @media(max-width:700px){.v13-fields{grid-template-columns:1fr}.v13-fields .full{grid-column:auto}.v13-card{padding:12px}}
+
+.dash18{margin-bottom:18px}.dh18{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}.dh18 h2{margin:2px 0;font-size:1.55rem}.dh18>div>p:last-child{margin:3px 0;color:var(--muted);text-transform:capitalize}.people18{display:flex}.people18 span{display:grid;place-items:center;width:38px;height:38px;border:3px solid var(--bg);border-radius:50%;background:var(--blue);color:white;font-weight:800}.people18 span+span{margin-left:-9px;background:var(--orange)}.dg18{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(300px,.65fr);gap:14px}.weather18,.today18,.agenda18,.outfit18{border:1px solid var(--line);border-radius:18px;background:white;padding:18px;box-shadow:0 5px 18px rgba(23,36,58,.035);overflow:hidden}.weather18{position:relative;min-height:245px;border:0;color:white;background:linear-gradient(135deg,#315f86,#4d83ad)}.wm18{display:flex;justify-content:space-between;gap:15px}.temp18{display:flex;align-items:center;gap:8px;margin-top:8px}.temp18 span{font-size:2rem}.temp18 strong{font-size:3rem}.wm18 p{margin:0;opacity:.9}.wf18{display:grid;align-content:start;text-align:right;gap:6px;font-size:.82rem}.hours18{display:grid;grid-template-columns:repeat(6,1fr);gap:5px;margin-top:20px;padding-top:14px;border-top:1px solid rgba(255,255,255,.2)}.hours18 div{display:grid;justify-items:center;gap:3px}.hours18 small{font-size:.69rem;opacity:.8}.wr18{position:absolute;right:9px;bottom:8px;border:0;background:transparent;color:white;font-size:1.1rem}.ct18{display:flex;justify-content:space-between;align-items:center;margin-bottom:13px}.ct18>span{font-size:.74rem;color:var(--muted);background:#eef1f4;padding:5px 8px;border-radius:999px}.stats18{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.stats18 button{border:1px solid var(--line);border-radius:13px;background:#f8fafb;padding:13px 7px;text-align:left}.stats18 b,.stats18 small{display:block}.stats18 b{font-size:1.35rem}.stats18 small{color:var(--muted);font-size:.68rem}.meal18{margin-top:11px;border-radius:13px;background:#fff7ed;padding:13px}.meal18 small,.meal18 strong{display:block}.meal18 small{color:#9b5d36;font-weight:800;margin-bottom:4px}.ar18{display:grid;grid-template-columns:70px 1fr;gap:10px;padding:9px 0;border-bottom:1px solid var(--line)}.ar18 time{font-size:.76rem;font-weight:800;color:var(--muted)}.ar18 strong,.ar18 small{display:block}.ar18 small{color:var(--muted)}.outfit18{display:flex;align-items:center;gap:14px;background:linear-gradient(135deg,#fff,#eef5fa)}.outfit18>span{display:grid;place-items:center;flex:0 0 50px;width:50px;height:50px;border-radius:15px;background:var(--blue-soft);font-size:1.6rem}.outfit18 p{margin:4px 0;font-weight:700}.outfit18 small{color:var(--muted)}
+@media(max-width:900px){.dg18{grid-template-columns:1fr}}@media(max-width:650px){.dh18{align-items:flex-start}.dg18{gap:11px}.weather18,.today18,.agenda18,.outfit18{padding:15px;border-radius:16px}.hours18{overflow-x:auto;grid-template-columns:repeat(6,minmax(48px,1fr))}.temp18 strong{font-size:2.65rem}}
+
+/* ===== v19 device themes + 12 pages ===== */
+:root[data-theme19="dark"]{--bg:#071a2b;--card:#0b2237;--ink:#f4f8ff;--muted:#a9b8cb;--line:#1b3c58;--blue:#3478d4;--blue-soft:#102f50;--orange:#e98248}
+:root[data-theme19="dark"] body{background:var(--bg);color:var(--ink)}
+:root[data-theme19="dark"] .card,:root[data-theme19="dark"] .today18,:root[data-theme19="dark"] .agenda18,:root[data-theme19="dark"] .outfit18{background:#0b2237;color:#f4f8ff;border-color:#1b3c58}
+:root[data-theme19="dark"] input,:root[data-theme19="dark"] select,:root[data-theme19="dark"] textarea{background:#0d2942;color:#f4f8ff;border-color:#234761}
+:root[data-accent19="purple"]{--blue:#7057d9;--blue-soft:#eeeaff}:root[data-accent19="orange"]{--blue:#d56e38;--blue-soft:#fff0e7}:root[data-accent19="blue"]{--blue:#246ca6}
+:root[data-density19="compact"] .card{padding:12px}:root[data-density19="compact"] .task,:root[data-density19="compact"] .row{padding-block:7px}
+.page19{display:grid;gap:16px}.page19-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}.page19-head h1{margin:.1rem 0}.budget19-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.row19{display:grid;grid-template-columns:1fr auto auto;gap:12px;align-items:center;padding:12px 0;border-bottom:1px solid var(--line)}.row19 small{display:block;color:var(--muted)}.tools19{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}.tools19 button{min-height:130px;border:1px solid var(--line);border-radius:18px;background:var(--card,#fff);color:var(--ink);padding:18px;text-align:left}.tools19 span,.tools19 strong,.tools19 small{display:block}.tools19 span{font-size:1.8rem}.tools19 strong{margin-top:12px}.tools19 small{color:var(--muted);margin-top:4px}.settings-grid19{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.settings-grid19 label{display:grid;gap:6px;font-weight:700}.more19{position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.42);display:flex;align-items:flex-end}.more19-sheet{width:100%;max-height:75vh;overflow:auto;background:var(--card,#fff);color:var(--ink);border-radius:24px 24px 0 0;padding:18px;display:grid;grid-template-columns:repeat(2,1fr);gap:10px}.more19-head{grid-column:1/-1;display:flex;justify-content:space-between;align-items:center}.more19-sheet>button{border:1px solid var(--line);background:transparent;color:inherit;border-radius:14px;padding:14px;text-align:left}.more19-sheet>button span{margin-right:10px}[data-v19-go]{cursor:pointer}
+@media(max-width:700px){.budget19-grid,.settings-grid19{grid-template-columns:1fr}.tools19{grid-template-columns:repeat(2,1fr)}.page19-head{align-items:center}.row19{grid-template-columns:1fr auto}.row19 button{grid-column:1/-1}}
+
+/* =========================================================
+   SAMEN THUIS v20 — APPLE-ACHTIGE GLASS UI
+   ========================================================= */
+:root{
+  --glass20:rgba(255,255,255,.64);
+  --glass20-strong:rgba(255,255,255,.82);
+  --glass20-line:rgba(83,112,148,.20);
+  --glass20-shadow:0 18px 50px rgba(21,39,67,.12);
+  --glass20-blur:22px;
+  --dock20:rgba(242,246,252,.72);
+  --dock20-item:rgba(255,255,255,.48);
+  --dock20-active:rgba(104,82,218,.16);
+}
+:root[data-theme20="dark"]{
+  --bg:#071a2b;--card:#0c2237;--ink:#f4f7ff;--muted:#aebbd0;--line:#24425d;
+  --glass20:rgba(14,38,61,.64);
+  --glass20-strong:rgba(15,42,67,.84);
+  --glass20-line:rgba(137,177,221,.22);
+  --glass20-shadow:0 20px 55px rgba(0,0,0,.28);
+  --dock20:rgba(17,38,62,.72);
+  --dock20-item:rgba(255,255,255,.065);
+  --dock20-active:rgba(119,91,238,.25);
+}
+html,body{min-height:100%;background:var(--bg)!important}
+body.st-glass20{
+  background:
+    radial-gradient(circle at 92% 4%,rgba(117,83,225,.15),transparent 27rem),
+    radial-gradient(circle at 10% 38%,rgba(55,128,190,.10),transparent 32rem),
+    var(--bg)!important;
+}
+:root[data-theme20="dark"] body.st-glass20{
+  background:
+    radial-gradient(circle at 88% 3%,rgba(116,83,225,.20),transparent 29rem),
+    radial-gradient(circle at 12% 45%,rgba(33,112,171,.12),transparent 34rem),
+    #071a2b!important;
+}
+
+/* Theme the app chrome too: header/sidebar/top/bottom no longer stay white. */
+.st-glass20 header,.st-glass20 .topbar,.st-glass20 .app-header,.st-glass20 .page-header,
+.st-glass20 .sidebar,.st-glass20 aside{
+  background-color:transparent!important;
+  color:var(--ink)!important;
+}
+.st-glass20 main,.st-glass20 #view,.st-glass20 .content,.st-glass20 .app{
+  background:transparent!important;
+}
+
+/* Cards, settings panels, notices and inputs follow the selected theme. */
+.st-glass20 .card,.st-glass20 .glass20,.st-glass20 .device-settings19,
+.st-glass20 .settings-card,.st-glass20 .panel,.st-glass20 .section-card,
+.st-glass20 .today18,.st-glass20 .agenda18,.st-glass20 .outfit18,
+.st-glass20 .tools19 button,.st-glass20 .more19-sheet{
+  background:var(--glass20)!important;
+  border:1px solid var(--glass20-line)!important;
+  box-shadow:var(--glass20-shadow);
+  -webkit-backdrop-filter:blur(var(--glass20-blur)) saturate(145%);
+  backdrop-filter:blur(var(--glass20-blur)) saturate(145%);
+  color:var(--ink)!important;
+}
+.st-glass20 input,.st-glass20 select,.st-glass20 textarea{
+  background:rgba(255,255,255,.10)!important;
+  border:1px solid var(--glass20-line)!important;
+  color:var(--ink)!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.08);
+}
+:root[data-theme20="light"] .st-glass20 input,
+:root[data-theme20="light"] .st-glass20 select,
+:root[data-theme20="light"] .st-glass20 textarea{background:rgba(255,255,255,.72)!important}
+.st-glass20 .muted,.st-glass20 small,.st-glass20 .helper,.st-glass20 .description{color:var(--muted)!important}
+.st-glass20 .notice,.st-glass20 .info,.st-glass20 .sync-info,.st-glass20 [class*="info-box"]{
+  background:rgba(255,255,255,.055)!important;color:var(--ink)!important;border-color:var(--glass20-line)!important;
+}
+
+/* Accent buttons */
+:root[data-accent20="purple"] .st-glass20 .primary,
+:root[data-accent20="purple"] .st-glass20 button.primary{
+  background:linear-gradient(135deg,#7659e9,#654ed5)!important;color:#fff!important;
+}
+:root[data-accent20="blue"] .st-glass20 .primary{background:linear-gradient(135deg,#3b82d0,#2765a8)!important;color:#fff!important}
+:root[data-accent20="orange"] .st-glass20 .primary{background:linear-gradient(135deg,#ef965c,#db7138)!important;color:#fff!important}
+
+/* Floating iPhone-like glass dock */
+.st-glass20 .glass-dock20{
+  position:fixed!important;
+  left:max(14px,env(safe-area-inset-left))!important;
+  right:max(14px,env(safe-area-inset-right))!important;
+  bottom:max(10px,env(safe-area-inset-bottom))!important;
+  width:auto!important;
+  min-height:72px;
+  padding:8px!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:space-between!important;
+  gap:6px!important;
+  border:1px solid var(--glass20-line)!important;
+  border-radius:28px!important;
+  background:var(--dock20)!important;
+  box-shadow:0 18px 50px rgba(0,0,0,.22),inset 0 1px 0 rgba(255,255,255,.14)!important;
+  -webkit-backdrop-filter:blur(28px) saturate(170%)!important;
+  backdrop-filter:blur(28px) saturate(170%)!important;
+  z-index:9998!important;
+  overflow:visible!important;
+}
+.st-glass20 .glass-dock-item20{
+  flex:1 1 0!important;
+  min-width:0!important;
+  height:58px!important;
+  padding:7px 5px!important;
+  border:0!important;
+  border-radius:20px!important;
+  background:transparent!important;
+  color:var(--muted)!important;
+  display:grid!important;
+  place-items:center!important;
+  align-content:center!important;
+  gap:2px!important;
+  box-shadow:none!important;
+}
+.st-glass20 .glass-dock-item20 span{font-size:1.25rem;line-height:1}
+.st-glass20 .glass-dock-item20 small{font-size:.68rem;white-space:nowrap}
+.st-glass20 .glass-dock-item20.active{
+  color:var(--ink)!important;
+  background:var(--dock20-active)!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.12)!important;
+}
+.st-glass20 .glass-add20{
+  flex:0 0 62px!important;
+  width:62px!important;height:62px!important;
+  margin-top:-24px!important;
+  border-radius:22px!important;
+  color:#fff!important;
+  background:linear-gradient(145deg,#7b5ff0,#6148d4)!important;
+  border:1px solid rgba(255,255,255,.22)!important;
+  box-shadow:0 12px 30px rgba(88,62,200,.38),inset 0 1px 0 rgba(255,255,255,.25)!important;
+}
+.st-glass20 .glass-add20 span{font-size:2rem!important}
+.st-glass20 .glass-add20 small{display:none!important}
+
+/* Content must never disappear behind the dock. */
+@media(max-width:900px){
+  .st-glass20 #view,.st-glass20 main,.st-glass20 .content{padding-bottom:118px!important}
+}
+@media(min-width:901px){
+  .st-glass20 .glass-dock20{display:none!important}
+}
+
+/* Slightly more rounded, premium mobile cards. */
+@media(max-width:650px){
+  .st-glass20 .card,.st-glass20 .device-settings19,.st-glass20 .panel,.st-glass20 .section-card{
+    border-radius:24px!important;
+  }
+}
+
+/* ===== v21 TRUE GLASS DOCK ===== */
+@media(max-width:900px){
+.old21,.glass-dock20{display:none!important}
+body.st-glass20 #view,body.st-glass20 main,body.st-glass20 .content{padding-bottom:118px!important}
+.dock21{position:fixed;z-index:10020;left:50%;transform:translateX(-50%);bottom:max(12px,env(safe-area-inset-bottom));width:min(calc(100vw - 28px),430px);height:76px;padding:8px;display:grid;grid-template-columns:repeat(5,1fr);gap:6px;border:1px solid var(--glass20-line);border-radius:25px;background:var(--dock20);box-shadow:0 18px 50px rgba(0,0,0,.24),inset 0 1px 0 rgba(255,255,255,.15);-webkit-backdrop-filter:blur(28px) saturate(175%);backdrop-filter:blur(28px) saturate(175%)}
+.dock21 button{min-width:0;height:60px;margin:0;padding:6px 2px;border:1px solid transparent;border-radius:18px;background:transparent;color:var(--muted);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;box-shadow:none}
+.dock21 button span{font-size:1.22rem;line-height:1}.dock21 button small{font-size:.62rem;line-height:1;color:inherit!important;white-space:nowrap}.dock21 button.on{color:var(--ink);background:var(--dock20-active);border-color:rgba(255,255,255,.08)}
+}
+.st-glass20 .surface21,.st-glass20 .sync-info,.st-glass20 [class*="info-box"],.st-glass20 [class*="sync-info"]{background:rgba(255,255,255,.055)!important;color:var(--ink)!important;border:1px solid var(--glass20-line)!important;box-shadow:none!important}
+.st-glass20 .surface21 *,.st-glass20 .sync-info *{color:inherit!important}
+:root[data-theme20="light"] .st-glass20 .surface21,:root[data-theme20="light"] .st-glass20 .sync-info{background:rgba(255,255,255,.58)!important}
+.sheetwrap21{position:fixed;inset:0;z-index:10030;display:flex;align-items:flex-end;justify-content:center}.shade21{position:absolute;inset:0;width:100%;height:100%;border:0;background:rgba(0,0,0,.42)}.sheet21{position:relative;width:min(calc(100% - 20px),430px);margin-bottom:max(10px,env(safe-area-inset-bottom));padding:18px;border:1px solid var(--glass20-line);border-radius:28px;background:var(--glass20-strong);color:var(--ink);box-shadow:0 25px 70px rgba(0,0,0,.3);-webkit-backdrop-filter:blur(30px) saturate(175%);backdrop-filter:blur(30px) saturate(175%)}.sheet21 header{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}.sheet21 header div{display:grid}.sheet21 header small{color:var(--muted);font-weight:800;letter-spacing:.12em}.sheet21 header strong{font-size:1.25rem}.sheet21 header>button{width:38px;height:38px;border:1px solid var(--glass20-line);border-radius:14px;background:rgba(255,255,255,.06);color:inherit}.sheet21>div{display:grid;grid-template-columns:repeat(2,1fr);gap:9px}.sheet21>div button{min-height:70px;padding:12px;border:1px solid var(--glass20-line);border-radius:17px;background:rgba(255,255,255,.055);color:inherit;text-align:left}.sheet21>div span,.sheet21>div b{display:block}.sheet21>div span{font-size:1.25rem;margin-bottom:5px}.sheet21>div button.on{background:var(--dock20-active)}
+
+/* =========================================================
+   v21.1 — DARK/LIGHT CONTRAST FIX
+   ========================================================= */
+
+/* Donker thema: alle gewone kaarten en geneste vlakken donker + leesbaar */
+:root[data-theme20="dark"] .st-glass20 .card,
+:root[data-theme20="dark"] .st-glass20 .panel,
+:root[data-theme20="dark"] .st-glass20 .section-card,
+:root[data-theme20="dark"] .st-glass20 .question-card,
+:root[data-theme20="dark"] .st-glass20 .answer-card,
+:root[data-theme20="dark"] .st-glass20 .quote-card,
+:root[data-theme20="dark"] .st-glass20 .settings-card,
+:root[data-theme20="dark"] .st-glass20 [class*="answer"],
+:root[data-theme20="dark"] .st-glass20 [class*="response"]{
+  background:rgba(13,39,62,.82)!important;
+  color:#f5f8ff!important;
+  border-color:rgba(132,174,216,.24)!important;
+}
+
+/* Hardcoded inline witte achtergronden in oudere componenten neutraliseren */
+:root[data-theme20="dark"] .st-glass20 [style*="background: white"],
+:root[data-theme20="dark"] .st-glass20 [style*="background:white"],
+:root[data-theme20="dark"] .st-glass20 [style*="background: #fff"],
+:root[data-theme20="dark"] .st-glass20 [style*="background:#fff"],
+:root[data-theme20="dark"] .st-glass20 [style*="background: rgb(255"]{
+  background:rgba(13,39,62,.82)!important;
+  color:#f5f8ff!important;
+}
+
+/* Tekst in donkere oppervlakken */
+:root[data-theme20="dark"] .st-glass20 .card p,
+:root[data-theme20="dark"] .st-glass20 .card strong,
+:root[data-theme20="dark"] .st-glass20 .card h1,
+:root[data-theme20="dark"] .st-glass20 .card h2,
+:root[data-theme20="dark"] .st-glass20 .card h3,
+:root[data-theme20="dark"] .st-glass20 .answer-card p,
+:root[data-theme20="dark"] .st-glass20 [class*="answer"] p,
+:root[data-theme20="dark"] .st-glass20 [class*="response"] p{
+  color:#f5f8ff!important;
+}
+:root[data-theme20="dark"] .st-glass20 .muted,
+:root[data-theme20="dark"] .st-glass20 .card small,
+:root[data-theme20="dark"] .st-glass20 .helper,
+:root[data-theme20="dark"] .st-glass20 .description{
+  color:#aebdd1!important;
+}
+
+/* Form controls */
+:root[data-theme20="dark"] .st-glass20 input,
+:root[data-theme20="dark"] .st-glass20 textarea,
+:root[data-theme20="dark"] .st-glass20 select{
+  background:#112f4a!important;
+  color:#f7f9ff!important;
+  border-color:#345674!important;
+}
+:root[data-theme20="dark"] .st-glass20 input::placeholder,
+:root[data-theme20="dark"] .st-glass20 textarea::placeholder{color:#8297ae!important}
+
+/* Disabled knoppen: geen wit-op-wit */
+:root[data-theme20="dark"] .st-glass20 button:disabled,
+:root[data-theme20="dark"] .st-glass20 .disabled{
+  background:#263d52!important;
+  color:#9fb0c1!important;
+  border-color:#36516a!important;
+  opacity:.82!important;
+}
+
+/* Vraag van de dag — antwoordvlakken expliciet */
+:root[data-theme20="dark"] .st-glass20 [data-answer],
+:root[data-theme20="dark"] .st-glass20 .daily-answer,
+:root[data-theme20="dark"] .st-glass20 .question-answer{
+  background:#102b44!important;
+  color:#f5f8ff!important;
+  border-color:#31516c!important;
+}
+:root[data-theme20="dark"] .st-glass20 [data-answer] *,
+:root[data-theme20="dark"] .st-glass20 .daily-answer *,
+:root[data-theme20="dark"] .st-glass20 .question-answer *{color:inherit!important}
+
+/* Quote: oude bruine/zwakke tekst vervangen door themacontrast */
+:root[data-theme20="dark"] .st-glass20 .quote,
+:root[data-theme20="dark"] .st-glass20 blockquote,
+:root[data-theme20="dark"] .st-glass20 [class*="quote"] p,
+:root[data-theme20="dark"] .st-glass20 [class*="quote"] strong{
+  color:#eef4ff!important;
+}
+:root[data-theme20="dark"] .st-glass20 [class*="quote"] small{color:#aebdd1!important}
+
+/* Statuskleuren leesbaar houden */
+:root[data-theme20="dark"] .st-glass20 .success,
+:root[data-theme20="dark"] .st-glass20 [class*="success"]{color:#55d49b!important}
+:root[data-theme20="dark"] .st-glass20 .warning,
+:root[data-theme20="dark"] .st-glass20 [class*="warning"]{color:#ffc66d!important}
+:root[data-theme20="dark"] .st-glass20 .danger,
+:root[data-theme20="dark"] .st-glass20 [class*="danger"]{color:#ff8585!important}
+
+/* Licht thema blijft echt licht met donkere tekst */
+:root[data-theme20="light"] .st-glass20 .card,
+:root[data-theme20="light"] .st-glass20 .panel,
+:root[data-theme20="light"] .st-glass20 .section-card{
+  color:#17253a!important;
+}
+:root[data-theme20="light"] .st-glass20 .card p,
+:root[data-theme20="light"] .st-glass20 .card strong,
+:root[data-theme20="light"] .st-glass20 .card h1,
+:root[data-theme20="light"] .st-glass20 .card h2,
+:root[data-theme20="light"] .st-glass20 .card h3{color:#17253a!important}
+
+/* v21 dock expliciet ongemoeid laten */
+.dock21,.dock21 button,.sheet21,.sheet21 button{font-family:inherit}
