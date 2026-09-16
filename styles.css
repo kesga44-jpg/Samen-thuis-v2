@@ -847,3 +847,66 @@ html[data-theme20="light"] body.st-glass20 select {
 :root[data-accent20="blue"]   { --blue:#246ca6; }
 :root[data-accent20="orange"] { --blue:#d56e38; }
 :root[data-accent20="bluePurple"] { --blue:#5f63d8; }
+
+/* =========================================================
+   v21.9 — MOBIELE SCHUIFBALK + CONTRAST + BUDGET
+   ========================================================= */
+#dock21,.dock21{display:none!important}
+.dock219{position:fixed;z-index:10050;left:12px;right:12px;bottom:max(10px,env(safe-area-inset-bottom));height:82px;padding:7px;border:1px solid var(--glass20-line);border-radius:26px;background:var(--dock20);box-shadow:0 18px 50px rgba(0,0,0,.28),inset 0 1px 0 rgba(255,255,255,.14);-webkit-backdrop-filter:blur(28px) saturate(175%);backdrop-filter:blur(28px) saturate(175%)}
+.dock219-scroll{height:100%;display:flex;gap:6px;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch;scrollbar-width:none;overscroll-behavior-x:contain}
+.dock219-scroll::-webkit-scrollbar{display:none}
+.dock219 button{flex:0 0 76px;height:66px;padding:6px 4px;border:1px solid transparent;border-radius:19px;background:transparent;color:var(--muted);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;scroll-snap-align:center;box-shadow:none;font:inherit}
+.dock219 button span{font-size:1.28rem;line-height:1}.dock219 button small{font-size:.66rem;line-height:1;color:inherit!important;white-space:nowrap}
+.dock219 button.on{color:var(--ink);background:var(--dock20-active);border-color:rgba(255,255,255,.10)}
+@media(min-width:901px){.dock219{display:none!important}}
+@media(max-width:900px){body{padding-bottom:112px!important}}
+
+/* Screenshot-fix: slimme huishoudkaarten mogen in dark mode niet lichtgrijs met witte tekst zijn. */
+html[data-theme20="dark"] body.st-glass20 .v16-smart-task{
+ background:#17334d!important;color:#f5f8ff!important;border-color:#31516c!important;
+}
+html[data-theme20="dark"] body.st-glass20 .v16-smart-task strong,
+html[data-theme20="dark"] body.st-glass20 .v16-smart-task .muted,
+html[data-theme20="dark"] body.st-glass20 .v16-smart-task small{
+ color:#e7eef8!important;-webkit-text-fill-color:#e7eef8!important;
+}
+html[data-theme20="light"] body.st-glass20 .v16-smart-task{
+ background:#fff!important;color:#17253a!important;
+}
+html[data-theme20="light"] body.st-glass20 .v16-smart-task .muted,
+html[data-theme20="light"] body.st-glass20 .v16-smart-task small{
+ color:#64748b!important;-webkit-text-fill-color:#64748b!important;
+}
+
+/* Dashboard-statistiekkaarten: leesbaar in beide thema's. */
+html[data-theme20="dark"] body.st-glass20 .today18,
+html[data-theme20="dark"] body.st-glass20 [data-dashboard-v18] .card{
+ background:#17334d!important;color:#f5f8ff!important;
+}
+html[data-theme20="dark"] body.st-glass20 .today18 *,
+html[data-theme20="dark"] body.st-glass20 [data-dashboard-v18] .card *{
+ color:inherit!important;-webkit-text-fill-color:currentColor!important;
+}
+
+/* Budget */
+.budget219{padding-bottom:24px}.budget219-summary{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.budget219-summary .card span,.budget219-goal small{display:block;color:var(--muted);margin-top:4px}
+.budget219-negative h2{color:#b84f58!important}
+.budget219-fields{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.budget219-fields label{display:grid;gap:6px;font-weight:700}.budget219-fields input{width:100%}
+.budget219-personal{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+.budget219-personal>div{padding:14px;border:1px solid var(--line);border-radius:15px;background:rgba(127,127,127,.06)}
+.budget219-personal small,.budget219-personal b{display:block}.budget219-personal b{font-size:1.2rem;margin-top:4px}
+.budget219-row{display:grid;grid-template-columns:1fr auto auto;gap:12px;align-items:center;padding:12px 0;border-bottom:1px solid var(--line)}
+.budget219-row small{display:block;color:var(--muted);margin-top:3px}
+.budget219-goals{display:grid;gap:12px}.budget219-goal{padding:14px;border:1px solid var(--line);border-radius:17px}
+.budget219-progress{height:8px;background:rgba(127,127,127,.16);border-radius:999px;overflow:hidden;margin:12px 0}.budget219-progress span{display:block;height:100%;background:var(--blue)}
+.budget219-goalnums{display:flex;justify-content:space-between;gap:10px;margin-bottom:10px}
+.budget219-breakdown>div:not(.card-head){display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid var(--line)}
+.budget219-breakdown .total{font-size:1.12rem;border-bottom:0!important;padding-top:14px!important}
+@media(max-width:700px){
+ .budget219-summary,.budget219-fields{grid-template-columns:1fr}
+ .budget219-personal{grid-template-columns:1fr 1fr}
+ .budget219-row{grid-template-columns:1fr auto}.budget219-row button{grid-column:1/-1}
+ .budget219-goalnums{flex-direction:column}
+}

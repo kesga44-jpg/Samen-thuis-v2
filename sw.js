@@ -1,4 +1,4 @@
-const CACHE='samen-thuis-v21-8-system-font';
+const CACHE='samen-thuis-v21-9-scroll-budgetsystem-font';
 const ASSETS=['./','./index.html','./styles.css','./app.js','./manifest.webmanifest','./icon.svg'];
 self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS)).then(()=>self.skipWaiting())));
 self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(k=>Promise.all(k.filter(x=>x!==CACHE).map(x=>caches.delete(x)))).then(()=>self.clients.claim())));
@@ -9,3 +9,5 @@ self.addEventListener('fetch',e=>{if(e.request.method!=='GET')return;const u=new
 /* v21.7 fresh build: 2026-09-16 20:58:16 +0000 */
 
 /* v21.8 build 2026-09-16 21:01:28 +0000 */
+
+/* v21.9 build 2026-09-16 21:08:05 +0000 */

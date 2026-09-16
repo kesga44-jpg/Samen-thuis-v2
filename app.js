@@ -4997,3 +4997,169 @@ requestAnimationFrame(dock);
 /* v21.7 fresh build: 2026-09-16 20:58:16 +0000 */
 
 /* v21.8 build 2026-09-16 21:01:28 +0000 */
+
+
+/* =========================================================
+   v21.9 — SCHUIFBARE VASTE NAVIGATIE + UITGEBREID BUDGET
+   ========================================================= */
+(()=>{
+'use strict';
+if(window.__ST219)return; window.__ST219=1;
+
+/* HIER BOUW IK DE VASTE, HORIZONTAAL SCHUIFBARE MOBIELE PAGINABALK.
+   Alle pagina's staan rechtstreeks in de balk; "Meer" is niet meer nodig. */
+const NAV219=[
+ ['today','⌂','Today'],['planning','▦','Agenda'],['meals','♨','Weekmenu'],
+ ['groceries','✓','Boodschappen'],['chores','⌁','Huishouden'],['stock','▤','Voorraad'],
+ ['trips','✈','Reizen'],['ideas','♡','Date ideeën'],['home','⌂','Woning'],
+ ['budget19','€','Budget'],['extra19','＋','Extra'],['settings','⚙','Instellingen']
+];
+function nav219(){
+ document.querySelector('#dock21')?.remove();
+ document.querySelector('.mobile-nav')?.classList.add('old21');
+ document.querySelector('.bottom-nav')?.classList.add('old21');
+ let nav=document.querySelector('#dock219');
+ if(!nav){nav=document.createElement('nav');nav.id='dock219';nav.className='dock219';document.body.append(nav)}
+ nav.innerHTML=`<div class="dock219-scroll">${NAV219.map(p=>`<button data-go219="${p[0]}" class="${current===p[0]?'on':''}"><span>${p[1]}</span><small>${p[2]}</small></button>`).join('')}</div>`;
+ requestAnimationFrame(()=>{
+   const active=nav.querySelector('button.on');
+   if(active) active.scrollIntoView({behavior:'smooth',block:'nearest',inline:'center'});
+ });
+}
+document.addEventListener('click',e=>{
+ const b=e.target.closest('[data-go219]');
+ if(!b)return;
+ e.preventDefault();
+ if(window.SamenThuisGo) window.SamenThuisGo(b.dataset.go219);
+ else {current=b.dataset.go219;render();}
+});
+
+/* HIER ZET IK DE EXCEL-BUDGETSTRUCTUUR OM NAAR BEWERKBARE APP-DATA. */
+const DEFAULT_FIXED219=[
+ ['Huur',1170.11],['Eneco',101],['Evides',20],['Odido',40.52],['Vodafone',22.33],
+ ['Gym',27.99],['Univé',181.19],['Zorgverzekering',184.50],['Scooterverzekering',33.15],
+ ['Netflix',6.30],['Rabobank',5.95],['Parkeervergunning',35.20],
+ ['Wegenbelasting Daphne',62.67],['Wegenbelasting Kees',33]
+];
+function budget219(){
+ data.budget219 ||= {
+   incomes:{Kees:2731,Daphne:3427},
+   contributionPct:75,
+   houseBudget:1000,
+   investing:75,
+   fixed:DEFAULT_FIXED219.map((x,i)=>({id:'fix219-'+i,title:x[0],amount:x[1],period:'maand'})),
+   goals:[
+    {id:'buffer219',title:'Buffer',target:3000,current:1000,monthly:150,deadline:''},
+    {id:'vac219',title:'Vakantie',target:5000,current:0,monthly:416.67,deadline:'Jaarlijks'},
+    {id:'house219',title:'Huis',target:15000,current:0,monthly:1000,deadline:'Eind 2027'},
+    {id:'other219',title:'Overig',target:10000,current:0,monthly:0,deadline:'Geen tijdslimiet'}
+   ]
+ };
+ return data.budget219;
+}
+const euro219=n=>Number(n||0).toLocaleString('nl-NL',{minimumFractionDigits:2,maximumFractionDigits:2});
+const num219=v=>Number(String(v??'').replace(',','.'))||0;
+const monthly219=x=>{
+ const a=num219(x.amount);
+ return x.period==='jaar'?a/12:x.period==='kwartaal'?a/3:a;
+};
+function calc219(){
+ const b=budget219(), k=num219(b.incomes.Kees), d=num219(b.incomes.Daphne), pct=num219(b.contributionPct)/100;
+ const fixed=(b.fixed||[]).reduce((s,x)=>s+monthly219(x),0);
+ const saving=(b.goals||[]).reduce((s,x)=>s+num219(x.monthly),0);
+ const contribution=(k+d)*pct;
+ const needed=fixed+num219(b.houseBudget)+saving+num219(b.investing);
+ return {k,d,pct,fixed,saving,contribution,needed,remainder:contribution-needed,
+   kPersonal:k*(1-pct),dPersonal:d*(1-pct),totalIncome:k+d};
+}
+
+/* HIER MAAK IK HET BUDGETDASHBOARD. Alle bedragen gebruiken dezelfde calc219()
+   zodat 'resterend' niet meer uit twee verschillende formules kan komen. */
+budgetPage19=function(){
+ const b=budget219(),c=calc219();
+ const goals=(b.goals||[]).map((g,i)=>{
+   const pct=Math.max(0,Math.min(100,num219(g.target)?num219(g.current)/num219(g.target)*100:0));
+   return `<article class="budget219-goal">
+    <div><strong>${esc(g.title)}</strong><small>${esc(g.deadline||'')}</small></div>
+    <div class="budget219-progress"><span style="width:${pct}%"></span></div>
+    <div class="budget219-goalnums"><span>€ ${euro219(g.current)} / € ${euro219(g.target)}</span><b>€ ${euro219(g.monthly)}/mnd</b></div>
+    <button class="secondary" data-b219-goal="${i}">Bewerk</button>
+   </article>`;
+ }).join('');
+ const fixed=(b.fixed||[]).map((x,i)=>`<div class="budget219-row">
+   <div><strong>${esc(x.title)}</strong><small>${x.period==='maand'?'per maand':x.period==='kwartaal'?'per kwartaal':'per jaar'} → € ${euro219(monthly219(x))}/mnd</small></div>
+   <b>€ ${euro219(x.amount)}</b><button class="secondary" data-b219-fixed="${i}">Bewerk</button>
+ </div>`).join('');
+ return `<div class="page19 budget219">
+ <div class="page19-head"><div><p class="eyebrow">GELD</p><h1>Budget</h1><p>Dezelfde rekenlogica als in jullie budget-Excel, maar volledig bewerkbaar.</p></div></div>
+ <div class="budget219-summary">
+   <section class="card"><small>Netto inkomen samen</small><h2>€ ${euro219(c.totalIncome)}</h2><span>Kees € ${euro219(c.k)} · Daphne € ${euro219(c.d)}</span></section>
+   <section class="card"><small>Afdracht gezamenlijk</small><h2>${euro219(b.contributionPct)}%</h2><span>€ ${euro219(c.contribution)} per maand</span></section>
+   <section class="card ${c.remainder<0?'budget219-negative':''}"><small>Gezamenlijk resterend</small><h2>€ ${euro219(c.remainder)}</h2><span>Na alle maandbudgetten en doelen</span></section>
+ </div>
+ <section class="card budget219-settings">
+  <div class="card-head"><div><p class="eyebrow">INKOMEN & VERDELING</p><h2>Maandinstellingen</h2></div></div>
+  <div class="budget219-fields">
+   <label>Kees netto / maand<input inputmode="decimal" data-b219-field="incomes.Kees" value="${c.k}"></label>
+   <label>Daphne netto / maand<input inputmode="decimal" data-b219-field="incomes.Daphne" value="${c.d}"></label>
+   <label>Afdracht gezamenlijk (%)<input inputmode="decimal" data-b219-field="contributionPct" value="${b.contributionPct}"></label>
+   <label>Huis / maandbudget<input inputmode="decimal" data-b219-field="houseBudget" value="${b.houseBudget}"></label>
+   <label>Beleggen / maand<input inputmode="decimal" data-b219-field="investing" value="${b.investing}"></label>
+  </div>
+  <div class="budget219-personal"><div><small>Kees persoonlijk over</small><b>€ ${euro219(c.kPersonal)}</b></div><div><small>Daphne persoonlijk over</small><b>€ ${euro219(c.dPersonal)}</b></div></div>
+ </section>
+ <section class="card"><div class="card-head"><div><p class="eyebrow">VASTE LASTEN</p><h2>€ ${euro219(c.fixed)} per maand</h2></div><button class="primary" data-b219-addfixed>+ Last</button></div>${fixed}</section>
+ <section class="card"><div class="card-head"><div><p class="eyebrow">SPAARDOELEN</p><h2>€ ${euro219(c.saving)} per maand</h2></div><button class="primary" data-b219-addgoal>+ Doel</button></div><div class="budget219-goals">${goals}</div></section>
+ <section class="card budget219-breakdown"><div class="card-head"><h2>Maandberekening</h2></div>
+  <div><span>Gezamenlijke afdracht</span><b>€ ${euro219(c.contribution)}</b></div>
+  <div><span>Vaste lasten</span><b>− € ${euro219(c.fixed)}</b></div>
+  <div><span>Huisbudget</span><b>− € ${euro219(b.houseBudget)}</b></div>
+  <div><span>Sparen</span><b>− € ${euro219(c.saving)}</b></div>
+  <div><span>Beleggen</span><b>− € ${euro219(b.investing)}</b></div>
+  <div class="total"><span>Resterend</span><b>€ ${euro219(c.remainder)}</b></div>
+ </section></div>`;
+};
+function setNested219(path,value){
+ const b=budget219(),parts=path.split('.');
+ if(parts.length===2)b[parts[0]][parts[1]]=num219(value); else b[path]=num219(value);
+ save();render();
+}
+function editFixed219(i){
+ const b=budget219(),old=i==null?{title:'',amount:0,period:'maand'}:b.fixed[i];
+ const title=prompt('Naam vaste last',old.title);if(title===null)return;
+ const amount=prompt('Bedrag',old.amount);if(amount===null)return;
+ const period=prompt('Periode: maand, kwartaal of jaar',old.period||'maand');if(period===null)return;
+ const item={...old,id:old.id||uid(),title,amount:num219(amount),period:['maand','kwartaal','jaar'].includes(period.toLowerCase())?period.toLowerCase():'maand'};
+ if(i==null)b.fixed.push(item);else b.fixed[i]=item;save();render();
+}
+function editGoal219(i){
+ const b=budget219(),old=i==null?{title:'Nieuw doel',target:0,current:0,monthly:0,deadline:''}:b.goals[i];
+ const title=prompt('Spaardoel',old.title);if(title===null)return;
+ const target=prompt('Doelbedrag',old.target);if(target===null)return;
+ const current=prompt('Nu gespaard',old.current);if(current===null)return;
+ const monthly=prompt('Maandelijks sparen',old.monthly);if(monthly===null)return;
+ const deadline=prompt('Deadline / toelichting',old.deadline||'');if(deadline===null)return;
+ const item={...old,id:old.id||uid(),title,target:num219(target),current:num219(current),monthly:num219(monthly),deadline};
+ if(i==null)b.goals.push(item);else b.goals[i]=item;save();render();
+}
+document.addEventListener('change',e=>{
+ const f=e.target.closest('[data-b219-field]');if(f){setNested219(f.dataset.b219Field,f.value);return}
+});
+document.addEventListener('click',e=>{
+ if(e.target.closest('[data-b219-addfixed]')){editFixed219(null);return}
+ const f=e.target.closest('[data-b219-fixed]');if(f){editFixed219(Number(f.dataset.b219Fixed));return}
+ if(e.target.closest('[data-b219-addgoal]')){editGoal219(null);return}
+ const g=e.target.closest('[data-b219-goal]');if(g){editGoal219(Number(g.dataset.b219Goal));return}
+});
+
+/* Iedere render houdt de schuifbalk gelijk met de geopende pagina. */
+const renderBefore219=render;
+render=function(...args){
+ const r=renderBefore219(...args);
+ requestAnimationFrame(nav219);
+ return r;
+};
+requestAnimationFrame(nav219);
+})();
+
+/* v21.9 build 2026-09-16 21:08:05 +0000 */
