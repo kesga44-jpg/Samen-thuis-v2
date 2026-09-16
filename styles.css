@@ -537,3 +537,80 @@ body.st-glass20 #view,body.st-glass20 main,body.st-glass20 .content{padding-bott
 .st-glass20 strong,.st-glass20 b{
   opacity:1!important;
 }
+
+
+/* =========================================================
+   v21.3 — DONKERE TEKST OP WITTE / LICHTE BLOKKEN
+   ========================================================= */
+
+/* Antwoordkaarten blijven bewust licht, óók in dark mode. */
+.st-glass20 .daily-answer,
+.st-glass20 .question-answer,
+.st-glass20 [data-answer],
+.st-glass20 .answer-card {
+  background:#ffffff !important;
+  color:#17253a !important;
+  border-color:#d6e0ea !important;
+}
+
+/* Tekst binnen lichte antwoordkaarten krijgt altijd hoog contrast. */
+.st-glass20 .daily-answer *,
+.st-glass20 .question-answer *,
+.st-glass20 [data-answer] *,
+.st-glass20 .answer-card * {
+  color:#17253a !important;
+  opacity:1 !important;
+}
+
+/* Labels/namen blijven als duidelijk blauw accent staan. */
+.st-glass20 .daily-answer h3,
+.st-glass20 .question-answer h3,
+.st-glass20 [data-answer] h3,
+.st-glass20 .answer-card h3,
+.st-glass20 .daily-answer .name,
+.st-glass20 .question-answer .name,
+.st-glass20 .answer-card .name {
+  color:#2474ad !important;
+}
+
+/* Vergrendelde/lichtgrijze knoppen: donkere tekst op licht vlak. */
+.st-glass20 button:disabled,
+.st-glass20 .disabled,
+.st-glass20 [disabled] {
+  background:#edf1f5 !important;
+  color:#566579 !important;
+  border-color:#d5dde6 !important;
+  opacity:1 !important;
+}
+.st-glass20 button:disabled *,
+.st-glass20 .disabled *,
+.st-glass20 [disabled] * {
+  color:#566579 !important;
+  opacity:1 !important;
+}
+
+/* Expliciete lichte kaarten uit oudere onderdelen. */
+:root[data-theme20="dark"] .st-glass20 .light-card,
+:root[data-theme20="dark"] .st-glass20 .white-card {
+  background:#ffffff !important;
+  color:#17253a !important;
+}
+:root[data-theme20="dark"] .st-glass20 .light-card *,
+:root[data-theme20="dark"] .st-glass20 .white-card * {
+  color:#17253a !important;
+  opacity:1 !important;
+}
+
+/* Invoervelden blijven juist donker in dark mode. */
+:root[data-theme20="dark"] .st-glass20 input,
+:root[data-theme20="dark"] .st-glass20 textarea,
+:root[data-theme20="dark"] .st-glass20 select {
+  background:#112f4a !important;
+  color:#f7f9ff !important;
+  border-color:#345674 !important;
+}
+:root[data-theme20="dark"] .st-glass20 input::placeholder,
+:root[data-theme20="dark"] .st-glass20 textarea::placeholder {
+  color:#b7c4d4 !important;
+  opacity:1 !important;
+}
