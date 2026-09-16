@@ -195,3 +195,156 @@ dialog form{padding:clamp(16px,4vw,24px)}
 :root[data-density19="compact"] .card{padding:12px}:root[data-density19="compact"] .task,:root[data-density19="compact"] .row{padding-block:7px}
 .page19{display:grid;gap:16px}.page19-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}.page19-head h1{margin:.1rem 0}.budget19-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.row19{display:grid;grid-template-columns:1fr auto auto;gap:12px;align-items:center;padding:12px 0;border-bottom:1px solid var(--line)}.row19 small{display:block;color:var(--muted)}.tools19{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}.tools19 button{min-height:130px;border:1px solid var(--line);border-radius:18px;background:var(--card,#fff);color:var(--ink);padding:18px;text-align:left}.tools19 span,.tools19 strong,.tools19 small{display:block}.tools19 span{font-size:1.8rem}.tools19 strong{margin-top:12px}.tools19 small{color:var(--muted);margin-top:4px}.settings-grid19{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.settings-grid19 label{display:grid;gap:6px;font-weight:700}.more19{position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.42);display:flex;align-items:flex-end}.more19-sheet{width:100%;max-height:75vh;overflow:auto;background:var(--card,#fff);color:var(--ink);border-radius:24px 24px 0 0;padding:18px;display:grid;grid-template-columns:repeat(2,1fr);gap:10px}.more19-head{grid-column:1/-1;display:flex;justify-content:space-between;align-items:center}.more19-sheet>button{border:1px solid var(--line);background:transparent;color:inherit;border-radius:14px;padding:14px;text-align:left}.more19-sheet>button span{margin-right:10px}[data-v19-go]{cursor:pointer}
 @media(max-width:700px){.budget19-grid,.settings-grid19{grid-template-columns:1fr}.tools19{grid-template-columns:repeat(2,1fr)}.page19-head{align-items:center}.row19{grid-template-columns:1fr auto}.row19 button{grid-column:1/-1}}
+
+/* =========================================================
+   SAMEN THUIS v20 — APPLE-ACHTIGE GLASS UI
+   ========================================================= */
+:root{
+  --glass20:rgba(255,255,255,.64);
+  --glass20-strong:rgba(255,255,255,.82);
+  --glass20-line:rgba(83,112,148,.20);
+  --glass20-shadow:0 18px 50px rgba(21,39,67,.12);
+  --glass20-blur:22px;
+  --dock20:rgba(242,246,252,.72);
+  --dock20-item:rgba(255,255,255,.48);
+  --dock20-active:rgba(104,82,218,.16);
+}
+:root[data-theme20="dark"]{
+  --bg:#071a2b;--card:#0c2237;--ink:#f4f7ff;--muted:#aebbd0;--line:#24425d;
+  --glass20:rgba(14,38,61,.64);
+  --glass20-strong:rgba(15,42,67,.84);
+  --glass20-line:rgba(137,177,221,.22);
+  --glass20-shadow:0 20px 55px rgba(0,0,0,.28);
+  --dock20:rgba(17,38,62,.72);
+  --dock20-item:rgba(255,255,255,.065);
+  --dock20-active:rgba(119,91,238,.25);
+}
+html,body{min-height:100%;background:var(--bg)!important}
+body.st-glass20{
+  background:
+    radial-gradient(circle at 92% 4%,rgba(117,83,225,.15),transparent 27rem),
+    radial-gradient(circle at 10% 38%,rgba(55,128,190,.10),transparent 32rem),
+    var(--bg)!important;
+}
+:root[data-theme20="dark"] body.st-glass20{
+  background:
+    radial-gradient(circle at 88% 3%,rgba(116,83,225,.20),transparent 29rem),
+    radial-gradient(circle at 12% 45%,rgba(33,112,171,.12),transparent 34rem),
+    #071a2b!important;
+}
+
+/* Theme the app chrome too: header/sidebar/top/bottom no longer stay white. */
+.st-glass20 header,.st-glass20 .topbar,.st-glass20 .app-header,.st-glass20 .page-header,
+.st-glass20 .sidebar,.st-glass20 aside{
+  background-color:transparent!important;
+  color:var(--ink)!important;
+}
+.st-glass20 main,.st-glass20 #view,.st-glass20 .content,.st-glass20 .app{
+  background:transparent!important;
+}
+
+/* Cards, settings panels, notices and inputs follow the selected theme. */
+.st-glass20 .card,.st-glass20 .glass20,.st-glass20 .device-settings19,
+.st-glass20 .settings-card,.st-glass20 .panel,.st-glass20 .section-card,
+.st-glass20 .today18,.st-glass20 .agenda18,.st-glass20 .outfit18,
+.st-glass20 .tools19 button,.st-glass20 .more19-sheet{
+  background:var(--glass20)!important;
+  border:1px solid var(--glass20-line)!important;
+  box-shadow:var(--glass20-shadow);
+  -webkit-backdrop-filter:blur(var(--glass20-blur)) saturate(145%);
+  backdrop-filter:blur(var(--glass20-blur)) saturate(145%);
+  color:var(--ink)!important;
+}
+.st-glass20 input,.st-glass20 select,.st-glass20 textarea{
+  background:rgba(255,255,255,.10)!important;
+  border:1px solid var(--glass20-line)!important;
+  color:var(--ink)!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.08);
+}
+:root[data-theme20="light"] .st-glass20 input,
+:root[data-theme20="light"] .st-glass20 select,
+:root[data-theme20="light"] .st-glass20 textarea{background:rgba(255,255,255,.72)!important}
+.st-glass20 .muted,.st-glass20 small,.st-glass20 .helper,.st-glass20 .description{color:var(--muted)!important}
+.st-glass20 .notice,.st-glass20 .info,.st-glass20 .sync-info,.st-glass20 [class*="info-box"]{
+  background:rgba(255,255,255,.055)!important;color:var(--ink)!important;border-color:var(--glass20-line)!important;
+}
+
+/* Accent buttons */
+:root[data-accent20="purple"] .st-glass20 .primary,
+:root[data-accent20="purple"] .st-glass20 button.primary{
+  background:linear-gradient(135deg,#7659e9,#654ed5)!important;color:#fff!important;
+}
+:root[data-accent20="blue"] .st-glass20 .primary{background:linear-gradient(135deg,#3b82d0,#2765a8)!important;color:#fff!important}
+:root[data-accent20="orange"] .st-glass20 .primary{background:linear-gradient(135deg,#ef965c,#db7138)!important;color:#fff!important}
+
+/* Floating iPhone-like glass dock */
+.st-glass20 .glass-dock20{
+  position:fixed!important;
+  left:max(14px,env(safe-area-inset-left))!important;
+  right:max(14px,env(safe-area-inset-right))!important;
+  bottom:max(10px,env(safe-area-inset-bottom))!important;
+  width:auto!important;
+  min-height:72px;
+  padding:8px!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:space-between!important;
+  gap:6px!important;
+  border:1px solid var(--glass20-line)!important;
+  border-radius:28px!important;
+  background:var(--dock20)!important;
+  box-shadow:0 18px 50px rgba(0,0,0,.22),inset 0 1px 0 rgba(255,255,255,.14)!important;
+  -webkit-backdrop-filter:blur(28px) saturate(170%)!important;
+  backdrop-filter:blur(28px) saturate(170%)!important;
+  z-index:9998!important;
+  overflow:visible!important;
+}
+.st-glass20 .glass-dock-item20{
+  flex:1 1 0!important;
+  min-width:0!important;
+  height:58px!important;
+  padding:7px 5px!important;
+  border:0!important;
+  border-radius:20px!important;
+  background:transparent!important;
+  color:var(--muted)!important;
+  display:grid!important;
+  place-items:center!important;
+  align-content:center!important;
+  gap:2px!important;
+  box-shadow:none!important;
+}
+.st-glass20 .glass-dock-item20 span{font-size:1.25rem;line-height:1}
+.st-glass20 .glass-dock-item20 small{font-size:.68rem;white-space:nowrap}
+.st-glass20 .glass-dock-item20.active{
+  color:var(--ink)!important;
+  background:var(--dock20-active)!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.12)!important;
+}
+.st-glass20 .glass-add20{
+  flex:0 0 62px!important;
+  width:62px!important;height:62px!important;
+  margin-top:-24px!important;
+  border-radius:22px!important;
+  color:#fff!important;
+  background:linear-gradient(145deg,#7b5ff0,#6148d4)!important;
+  border:1px solid rgba(255,255,255,.22)!important;
+  box-shadow:0 12px 30px rgba(88,62,200,.38),inset 0 1px 0 rgba(255,255,255,.25)!important;
+}
+.st-glass20 .glass-add20 span{font-size:2rem!important}
+.st-glass20 .glass-add20 small{display:none!important}
+
+/* Content must never disappear behind the dock. */
+@media(max-width:900px){
+  .st-glass20 #view,.st-glass20 main,.st-glass20 .content{padding-bottom:118px!important}
+}
+@media(min-width:901px){
+  .st-glass20 .glass-dock20{display:none!important}
+}
+
+/* Slightly more rounded, premium mobile cards. */
+@media(max-width:650px){
+  .st-glass20 .card,.st-glass20 .device-settings19,.st-glass20 .panel,.st-glass20 .section-card{
+    border-radius:24px!important;
+  }
+}

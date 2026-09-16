@@ -4870,3 +4870,108 @@ document.addEventListener('change',e=>{
 });
 requestAnimationFrame(()=>{nav19();settingsPanel19();applyUi19()});
 })();
+
+/* =========================================================
+   SAMEN THUIS v20 — GLASS THEME / DEVICE UI
+   Alleen interfacevoorkeuren zijn apparaatgebonden.
+   ========================================================= */
+(() => {
+'use strict';
+if (window.__ST_V20__) return;
+window.__ST_V20__ = true;
+
+const KEY20 = 'samenThuisDeviceUiV20';
+const FALLBACK20 = { theme:'system', accent:'purple', density:'comfortable' };
+
+function get20(){
+  try {
+    const old = JSON.parse(localStorage.getItem('samenThuisDeviceUiV19') || '{}');
+    const now = JSON.parse(localStorage.getItem(KEY20) || '{}');
+    return {...FALLBACK20, ...old, ...now};
+  } catch (_) { return {...FALLBACK20}; }
+}
+let ui20 = get20();
+
+function apply20(){
+  const systemDark = window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches;
+  const dark = ui20.theme === 'dark' || (ui20.theme === 'system' && systemDark);
+  const html = document.documentElement;
+  html.dataset.theme19 = dark ? 'dark' : 'light';
+  html.dataset.theme20 = dark ? 'dark' : 'light';
+  html.dataset.accent19 = ui20.accent || 'purple';
+  html.dataset.accent20 = ui20.accent || 'purple';
+  html.dataset.density19 = ui20.density || 'comfortable';
+  html.dataset.density20 = ui20.density || 'comfortable';
+  html.style.colorScheme = dark ? 'dark' : 'light';
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark ? '#081b2d' : '#eef3f9');
+}
+function save20(){
+  localStorage.setItem(KEY20, JSON.stringify(ui20));
+  localStorage.setItem('samenThuisDeviceUiV19', JSON.stringify(ui20));
+  apply20();
+}
+apply20();
+try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => ui20.theme === 'system' && apply20()); } catch(_){}
+
+function beautifySettings20(){
+  if (typeof current === 'undefined' || current !== 'settings') return;
+  const box = document.querySelector('[data-v19-device-settings]');
+  if (!box) return;
+  box.classList.add('glass20');
+  const theme = box.querySelector('[data-v19-theme]');
+  const accent = box.querySelector('[data-v19-accent]');
+  const density = box.querySelector('[data-v19-density]');
+  if(theme){ theme.value=ui20.theme; theme.onchange=()=>{ui20.theme=theme.value;save20()}; }
+  if(accent){ accent.value=ui20.accent; accent.onchange=()=>{ui20.accent=accent.value;save20()}; }
+  if(density){ density.value=ui20.density; density.onchange=()=>{ui20.density=density.value;save20()}; }
+}
+
+function dock20(){
+  const mobile = document.querySelector('.mobile-nav,.bottom-nav');
+  if(!mobile) return;
+  mobile.classList.add('glass-dock20');
+  const buttons = [...mobile.querySelectorAll('button')];
+  buttons.forEach(b => b.classList.add('glass-dock-item20'));
+
+  // Make the middle action a prominent glass + button without changing navigation data.
+  let add = mobile.querySelector('[data-v20-add]');
+  if(!add){
+    add = document.createElement('button');
+    add.type='button';
+    add.dataset.v20Add='';
+    add.className='glass-dock-item20 glass-add20';
+    add.innerHTML='<span>＋</span><small>Toevoegen</small>';
+    const more = mobile.querySelector('[data-v19-more]');
+    mobile.insertBefore(add, more || null);
+  }
+}
+function enhance20(){
+  document.body.classList.add('st-glass20');
+  apply20();
+  beautifySettings20();
+  dock20();
+}
+
+const previousRender20 = typeof render === 'function' ? render : null;
+if(previousRender20){
+  render = function(...args){
+    const result = previousRender20(...args);
+    requestAnimationFrame(enhance20);
+    return result;
+  };
+}
+
+document.addEventListener('click', e => {
+  if(e.target.closest('[data-v20-add]')){
+    const topAdd = [...document.querySelectorAll('button')].find(b =>
+      !b.closest('.mobile-nav,.bottom-nav') && /toevoegen|\+\s*toevoegen/i.test(b.textContent || '')
+    );
+    if(topAdd) topAdd.click();
+    else {
+      const generic = document.querySelector('[data-add],[data-action="add"],.add-btn');
+      generic?.click();
+    }
+  }
+});
+requestAnimationFrame(enhance20);
+})();
