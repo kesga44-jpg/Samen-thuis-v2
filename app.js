@@ -4742,3 +4742,131 @@ render=function(...a){let r=oldRender18(...a);requestAnimationFrame(enhance18);r
 document.addEventListener('click',e=>{if(e.target.closest('[data-wr18]'))weather18(true)});
 requestAnimationFrame(enhance18);
 })();
+
+
+/* =========================================================
+   SAMEN THUIS v19 — 12 PAGINA'S + APPARAATGEBONDEN WEERGAVE
+   ========================================================= */
+(() => {
+'use strict';
+if(window.__ST_V19__) return; window.__ST_V19__=true;
+
+const UIKEY19='samenThuisDeviceUiV19';
+const DEFAULTUI19={theme:'system',accent:'bluePurple',density:'comfortable',mobileNav:['today','planning','meals','groceries']};
+function loadUi19(){try{return {...DEFAULTUI19,...JSON.parse(localStorage.getItem(UIKEY19)||'{}')}}catch(_){return {...DEFAULTUI19}}}
+let ui19=loadUi19();
+function saveUi19(){localStorage.setItem(UIKEY19,JSON.stringify(ui19));applyUi19()}
+function applyUi19(){
+  const dark=ui19.theme==='dark'||(ui19.theme==='system'&&matchMedia('(prefers-color-scheme:dark)').matches);
+  document.documentElement.dataset.theme19=dark?'dark':'light';
+  document.documentElement.dataset.accent19=ui19.accent||'bluePurple';
+  document.documentElement.dataset.density19=ui19.density||'comfortable';
+}
+applyUi19();
+try{matchMedia('(prefers-color-scheme:dark)').addEventListener('change',()=>ui19.theme==='system'&&applyUi19())}catch(_){}
+
+const pages19=[
+ ['today','Today','⌂'],['planning','Agenda','▦'],['meals','Weekmenu','♨'],['groceries','Boodschappen','✓'],
+ ['chores','Huishouden','⌁'],['stock','Voorraad','▤'],['trips','Reizen','✈'],['ideas','Date ideeën','♡'],
+ ['home','Woning','⌂'],['budget19','Budget','€'],['extra19','Extra','＋'],['settings','Instellingen','⚙']
+];
+try{
+  sections.today={label:'Today',icon:'⌂'};
+  sections.ideas={label:'Date ideeën',icon:'♡'};
+  sections.budget19={label:'Budget',icon:'€'};
+  sections.extra19={label:'Extra',icon:'＋'};
+}catch(_){}
+
+function go19(view,focusId=''){
+  if(view==='budget19'||view==='extra19'){current=view;render();return}
+  current=view;render();
+  if(focusId)setTimeout(()=>{
+    const el=document.querySelector(`[data-id="${CSS.escape(focusId)}"],[data-edit="${CSS.escape(focusId)}"],#${CSS.escape(focusId)}`);
+    el?.scrollIntoView({behavior:'smooth',block:'center'});
+  },80);
+}
+window.SamenThuisGo=go19;
+
+function nav19(){
+  const desktop=document.querySelector('.sidebar nav,.side-nav,.nav-list');
+  if(desktop){
+    desktop.innerHTML=pages19.map(([id,label,icon])=>`<button class="${current===id?'active':''}" data-v19-go="${id}"><span>${icon}</span>${label}</button>`).join('');
+  }
+  const mobile=document.querySelector('.mobile-nav,.bottom-nav');
+  if(mobile){
+    const direct=(ui19.mobileNav||DEFAULTUI19.mobileNav).slice(0,4);
+    mobile.innerHTML=direct.map(id=>{const p=pages19.find(x=>x[0]===id)||pages19[0];return `<button class="${current===id?'active':''}" data-v19-go="${id}"><span>${p[2]}</span><small>${p[1]}</small></button>`}).join('')+
+      `<button data-v19-more><span>•••</span><small>Meer</small></button>`;
+  }
+}
+function more19(){
+  let old=document.querySelector('[data-v19-moremenu]');if(old){old.remove();return}
+  const direct=new Set(ui19.mobileNav||DEFAULTUI19.mobileNav);
+  document.body.insertAdjacentHTML('beforeend',`<div class="more19" data-v19-moremenu><div class="more19-sheet"><div class="more19-head"><strong>Alle pagina's</strong><button data-v19-more>×</button></div>${pages19.filter(p=>!direct.has(p[0])).map(p=>`<button data-v19-go="${p[0]}"><span>${p[2]}</span><b>${p[1]}</b></button>`).join('')}</div></div>`);
+}
+function budgetPage19(){
+  const b=data.budget||data.budget19||{income:0,expenses:[]};
+  const expenses=Array.isArray(b.expenses)?b.expenses:[];
+  const total=expenses.reduce((s,x)=>s+Number(x.amount||0),0), income=Number(b.income||0);
+  return `<div class="page19"><div class="page19-head"><div><p class="eyebrow">GELD</p><h1>Budget</h1><p>Inkomsten, uitgaven en doelen op één plek.</p></div><button class="primary" data-v19-budget-add>+ Toevoegen</button></div>
+  <div class="budget19-grid"><section class="card"><small>Inkomen</small><h2>€ ${income.toLocaleString('nl-NL')}</h2></section><section class="card"><small>Uitgaven</small><h2>€ ${total.toLocaleString('nl-NL')}</h2></section><section class="card"><small>Resterend</small><h2>€ ${(income-total).toLocaleString('nl-NL')}</h2></section></div>
+  <section class="card"><div class="card-head"><h2>Uitgaven</h2></div>${expenses.length?expenses.map((x,i)=>`<div class="row19"><div><strong>${esc(x.title||x.category||'Uitgave')}</strong><small>${esc(x.category||'')}</small></div><b>€ ${Number(x.amount||0).toLocaleString('nl-NL')}</b><button data-v19-budget-edit="${i}">Bewerk</button></div>`).join(''):'<p class="muted">Nog geen budgetposten. Gebruik + Toevoegen.</p>'}</section></div>`;
+}
+function extraPage19(){
+ return `<div class="page19"><div class="page19-head"><div><p class="eyebrow">HANDIGE TOOLS</p><h1>Extra</h1><p>Snelle toegang tot handige onderdelen.</p></div></div><div class="tools19">
+ ${[['weather','☀️','Weer','Actueel weer op Today'],['daily','💡','Vraag van de dag','Leer elkaar beter kennen'],['calc','▦','Omrekenen','Valuta, maten en meer'],['floor','🏷️','Bodemprijzen','Boodschappen'],['links','🔗','Links','Handige websites'],['notes','▤','Notities','Snelle notities'],['docs','📁','Documenten',"PDF's en bestanden"],['contacts','👤','Contacten','Belangrijke nummers']].map(x=>`<button data-v19-tool="${x[0]}"><span>${x[1]}</span><strong>${x[2]}</strong><small>${x[3]}</small></button>`).join('')}</div></div>`;
+}
+function settingsPanel19(){
+ if(current!=='settings')return;
+ const v=document.querySelector('#view');if(!v||v.querySelector('[data-v19-device-settings]'))return;
+ v.insertAdjacentHTML('afterbegin',`<section class="card device-settings19" data-v19-device-settings><div class="card-head"><div><p class="eyebrow">DIT APPARAAT</p><h2>Thema & weergave</h2></div><span class="tag">Niet gedeeld</span></div><p class="muted">Deze instellingen blijven alleen op dit apparaat. Daphne kan op haar telefoon dus een ander thema gebruiken.</p>
+ <div class="settings-grid19"><label>Thema<select data-v19-theme><option value="system">Systeem</option><option value="light">Licht</option><option value="dark">Donker</option></select></label>
+ <label>Accent<select data-v19-accent><option value="bluePurple">Blauw / paars</option><option value="blue">Blauw</option><option value="purple">Paars</option><option value="orange">Oranje</option></select></label>
+ <label>Weergave<select data-v19-density><option value="comfortable">Ruim</option><option value="compact">Compact</option></select></label></div></section>`);
+ v.querySelector('[data-v19-theme]').value=ui19.theme;v.querySelector('[data-v19-accent]').value=ui19.accent;v.querySelector('[data-v19-density]').value=ui19.density;
+}
+function editBudget19(index=null){
+ data.budget ||= {income:0,expenses:[]}; data.budget.expenses ||= [];
+ const old=index===null?{}:data.budget.expenses[index];
+ const title=prompt('Naam',old.title||'');if(title===null)return;
+ const amount=prompt('Bedrag (€)',old.amount??'');if(amount===null)return;
+ const category=prompt('Categorie',old.category||'Overig');if(category===null)return;
+ const item={...old,id:old.id||uid(),title,amount:Number(String(amount).replace(',','.'))||0,category};
+ if(index===null)data.budget.expenses.push(item);else data.budget.expenses[index]=item;save();render();
+}
+function crossLinks19(){
+  if(current!=='today')return;
+  const v=document.querySelector('#view');if(!v)return;
+  // Existing Today content remains source-of-truth; cards receive explicit navigation.
+  v.querySelectorAll('[data-dashboard-v18] .today18,[data-dash18] .today18').forEach(x=>{x.dataset.v19Go='chores'});
+  v.querySelectorAll('[data-dashboard-v18] .agenda18,[data-dash18] .agenda18').forEach(x=>{x.dataset.v19Go='planning'});
+  v.querySelectorAll('[data-outfit18],[data-outfit-v18]').forEach(x=>{x.dataset.v19Tool='weather'});
+}
+const baseRender19=render;
+render=function(...args){
+ let r;
+ if(current==='budget19'){document.querySelector('#view').innerHTML=budgetPage19();r=undefined}
+ else if(current==='extra19'){document.querySelector('#view').innerHTML=extraPage19();r=undefined}
+ else r=baseRender19(...args);
+ requestAnimationFrame(()=>{nav19();settingsPanel19();crossLinks19();applyUi19()});
+ return r;
+};
+document.addEventListener('click',e=>{
+ const g=e.target.closest('[data-v19-go]');if(g){e.preventDefault();go19(g.dataset.v19Go);return}
+ if(e.target.closest('[data-v19-more]')){e.preventDefault();more19();return}
+ if(e.target.closest('[data-v19-budget-add]')){editBudget19();return}
+ const be=e.target.closest('[data-v19-budget-edit]');if(be){editBudget19(Number(be.dataset.v19BudgetEdit));return}
+ const tool=e.target.closest('[data-v19-tool]');if(tool){
+   const t=tool.dataset.v19Tool;if(t==='weather'){go19('today');return}
+   if(t==='floor'){go19('groceries');return}
+   if(t==='daily'){go19('today');return}
+   toast('Deze tool kan vanuit Extra verder worden uitgebreid.');return;
+ }
+});
+document.addEventListener('change',e=>{
+ if(e.target.matches('[data-v19-theme]')){ui19.theme=e.target.value;saveUi19()}
+ if(e.target.matches('[data-v19-accent]')){ui19.accent=e.target.value;saveUi19()}
+ if(e.target.matches('[data-v19-density]')){ui19.density=e.target.value;saveUi19()}
+});
+requestAnimationFrame(()=>{nav19();settingsPanel19();applyUi19()});
+})();
