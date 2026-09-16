@@ -1,5 +1,3 @@
-
-/* ===== GEÏNTEGREERD: styles.css ===== */
 :root {
   --ink: #17243a; --muted: #6b7483; --line: #e2e7ed; --paper: #ffffff;
   --bg: #f3f6f8; --blue: #315f86; --blue-soft: #e7f0f6; --orange: #e98248;
@@ -156,46 +154,3 @@ dialog form{padding:clamp(16px,4vw,24px)}
   .toast{bottom:calc(94px + env(safe-area-inset-bottom))}
 }
 @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
-
-
-
-/* ===== GEÏNTEGREERD: upgrade-v11.css ===== */
-/* Samen Thuis v11 add-on */
-.trip-priority-field[hidden],.preview-priority[hidden]{display:none!important}
-.priority-badge{display:inline-flex;align-items:center;margin-left:8px;padding:3px 8px;border-radius:999px;font-size:.68rem;font-weight:850;letter-spacing:.02em;white-space:nowrap}
-.priority-badge.low{background:#eef1f4;color:#59636f}.priority-badge.medium{background:#fff0df;color:#9d5a23}.priority-badge.high{background:#fae7e9;color:#a63f49}
-.travel-title-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
-.travel-row-actions,.travel-edit-actions{display:flex;align-items:center;gap:3px}
-.travel-row-actions .text-btn,.travel-edit-actions .text-btn{padding:5px 7px}
-.sync-detail{margin-top:14px;padding:13px 14px;border:1px solid var(--line);border-radius:13px;background:#f7fafb;line-height:1.5}.sync-detail p{margin:6px 0 0}
-.travel-import-preview{margin:0 0 18px;border-top:5px solid var(--blue)}
-.travel-import-preview .card-head{align-items:flex-start;gap:14px}.travel-import-preview .card-head p{margin:5px 0 0}
-.travel-preview-list{display:grid;gap:12px}.travel-preview-card{border:1px solid var(--line);border-radius:14px;padding:14px;background:#fbfcfd}.preview-select{display:flex;align-items:center;gap:8px;font-weight:800;margin-bottom:12px}.preview-select input{width:20px;height:20px}
-.preview-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}.preview-grid .preview-title,.preview-grid .preview-note{grid-column:span 2}.preview-grid input,.preview-grid select,.preview-grid textarea{width:100%;border:1px solid #ccd4dd;border-radius:10px;padding:9px 10px;background:white;color:var(--ink)}.preview-grid textarea{min-height:70px;resize:vertical}.checkbox-field.compact{padding:9px 10px}.preview-actions{justify-content:flex-end;margin-top:16px}
-#travelEditDialog form{padding:24px}#travelEditDialog .form-grid{max-height:min(70vh,680px);overflow:auto;padding-right:2px}
-@media(max-width:950px){.preview-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media(max-width:650px){.preview-grid{grid-template-columns:1fr}.preview-grid .preview-title,.preview-grid .preview-note{grid-column:auto}.travel-import-preview{margin-left:-2px;margin-right:-2px}.priority-badge{font-size:.64rem}.sync-detail{font-size:.9rem}}
-
-
-
-/* ===== GEÏNTEGREERD: samen-thuis-update-v13.css ===== */
-.import-v13{display:grid;gap:16px}
-.import-v13 .full{grid-column:1/-1}
-.v13-preview-list{display:grid;gap:12px}
-.v13-card{border:1px solid var(--line,#d9dee6);border-radius:16px;padding:14px;background:var(--card,#fff)}
-.v13-card.duplicate{border-style:dashed}
-.v13-card-head{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:12px;flex-wrap:wrap}
-.v13-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-bottom:8px}
-.v13-fields .full{grid-column:1/-1}
-.v13-bulk{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:12px;margin:10px 0 14px;border-radius:14px;background:rgba(49,95,134,.06)}
-.tag.warning{background:#fff3cd;color:#7a5a00}
-@media(max-width:700px){.v13-fields{grid-template-columns:1fr}.v13-fields .full{grid-column:auto}.v13-card{padding:12px}}
-
-
-
-/* ===== Samen Thuis v17 dashboard ===== */
-.dashboard-v17{margin-bottom:18px}.dashboard-head-v17{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}.dashboard-head-v17 h2{margin:2px 0;font-size:1.55rem}.dashboard-head-v17>div>p:last-child{margin:3px 0;color:var(--muted);text-transform:capitalize}.people-v17{display:flex}.people-v17 span{display:grid;place-items:center;width:38px;height:38px;border:3px solid var(--bg);border-radius:50%;background:var(--blue);color:#fff;font-weight:800}.people-v17 span+span{margin-left:-9px;background:var(--orange)}
-.dashboard-grid-v17{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(300px,.65fr);gap:14px}.weather-card-v17,.today-card-v17,.agenda-card-v17,.outfit-card-v17{border:1px solid var(--line);border-radius:18px;background:#fff;padding:18px;box-shadow:0 5px 18px rgba(23,36,58,.035);overflow:hidden}.weather-card-v17{position:relative;min-height:245px;border:0;color:#fff;background:linear-gradient(135deg,#315f86,#4d83ad)}.weather-card-v17:after{content:"";position:absolute;width:220px;height:220px;right:-85px;top:-95px;border-radius:50%;background:rgba(255,255,255,.08)}.weather-main-v17{position:relative;z-index:1;display:flex;justify-content:space-between;gap:20px}.weather-temp-v17{display:flex;align-items:center;gap:8px;margin:8px 0 0;font-size:2rem}.weather-temp-v17 strong{font-size:3rem;letter-spacing:-.06em}.weather-main-v17 p{margin:0;opacity:.9}.weather-facts-v17{display:grid;align-content:start;text-align:right;gap:6px;font-size:.82rem}.weather-hours-v17{position:relative;z-index:1;display:grid;grid-template-columns:repeat(6,1fr);gap:5px;margin-top:20px;padding-top:14px;border-top:1px solid rgba(255,255,255,.18)}.weather-hours-v17 div{display:grid;justify-items:center;gap:3px}.weather-hours-v17 small{font-size:.69rem;opacity:.8}.weather-hours-v17 b{font-size:1.15rem}.weather-refresh-v17{position:absolute;z-index:2;right:9px;bottom:8px;border:0;background:transparent;color:#fff;font-size:1.1rem}.weather-loading-v17{display:grid;place-items:center;min-height:190px}
-.dashboard-title-v17{display:flex;justify-content:space-between;align-items:center;margin-bottom:13px}.dashboard-title-v17>span{font-size:.74rem;color:var(--muted);background:#eef1f4;padding:5px 8px;border-radius:999px}.mini-stats-v17{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.mini-stats-v17 button{border:1px solid var(--line);border-radius:13px;background:#f8fafb;padding:13px 7px;text-align:left;color:var(--ink)}.mini-stats-v17 b,.mini-stats-v17 small{display:block}.mini-stats-v17 b{font-size:1.35rem}.mini-stats-v17 small{margin-top:3px;color:var(--muted);font-size:.68rem}.meal-v17{margin-top:11px;border-radius:13px;background:#fff7ed;padding:13px}.meal-v17 small,.meal-v17 strong{display:block}.meal-v17 small{margin-bottom:4px;color:#9b5d36;font-weight:800}
-.agenda-row-v17{display:grid;grid-template-columns:68px 5px 1fr;gap:9px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line)}.agenda-row-v17:last-child{border-bottom:0}.agenda-row-v17 time{font-size:.76rem;font-weight:800;color:var(--muted)}.agenda-row-v17 i{width:5px;height:34px;border-radius:99px}.agenda-row-v17 strong,.agenda-row-v17 small{display:block}.agenda-row-v17 small{color:var(--muted);font-size:.7rem}.outfit-card-v17{display:flex;align-items:center;gap:14px;background:linear-gradient(135deg,#fff,#eef5fa)}.outfit-icon-v17{display:grid;place-items:center;flex:0 0 50px;width:50px;height:50px;border-radius:15px;background:var(--blue-soft);font-size:1.6rem}.outfit-card-v17 p{margin:4px 0;font-weight:700}.outfit-card-v17 small{color:var(--muted)}
-@media(max-width:900px){.dashboard-grid-v17{grid-template-columns:1fr}}@media(max-width:650px){.dashboard-grid-v17{gap:11px}.weather-card-v17,.today-card-v17,.agenda-card-v17,.outfit-card-v17{padding:15px;border-radius:16px}.weather-hours-v17{overflow-x:auto;grid-template-columns:repeat(6,minmax(48px,1fr))}.dashboard-head-v17{align-items:flex-start}.weather-main-v17{gap:10px}.weather-temp-v17 strong{font-size:2.65rem}}

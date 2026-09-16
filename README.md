@@ -1,31 +1,13 @@
-# Samen Thuis — geïntegreerde v17
+# Samen Thuis v17.1 — stabiele herstelbuild
 
-Dit is de schone testbuild voor `Samen-thuis-v2`.
+Deze versie herstelt de blanco v17-test door de bewezen laadvolgorde van de werkende Samen-thuis hoofdrepository te behouden.
 
-## Upload naar de root
-Vervang/upload alleen:
-- index.html
-- app.js
-- styles.css
-- sw.js
-- manifest.webmanifest
-- icon.svg
-- README.md
+Upload ALLE bestanden uit deze map naar de root van Samen-thuis-v2 en kies vervangen waar GitHub dat vraagt.
 
-## Wat is geïntegreerd
-De code uit app.js, upgrade-v11, update-v4, v13, v14, v15 en v16 staat nu in één app.js.
-De CSS uit styles.css, upgrade-v11.css en update-v13.css staat nu in één styles.css.
-v17 voegt het vernieuwde Vandaag-dashboard toe met weer, kledingadvies, dagstatistieken en komende agenda.
+Belangrijk:
+- Verwijder in Samen-thuis-v2 eerst de mislukte v17 app.js/styles.css/index.html/sw.js of overschrijf ze met deze bestanden.
+- Laat de losse updatebestanden in deze testversie staan.
+- Test eerst navigatie, Vandaag, toevoegen, importer, huishouden en scrollbehoud.
+- Pas nadat deze basis werkt, maken we een tweede gecontroleerde stap naar één geïntegreerde app.js/styles.css.
 
-## Na succesvolle test
-In de echte `Samen-thuis` repository kunnen daarna deze losse bestanden weg:
-- upgrade-v11.js
-- upgrade-v11.css
-- samen-thuis-update-v4.js
-- samen-thuis-update-v13.js
-- samen-thuis-update-v13.css
-- samen-thuis-update-v14.js
-- samen-thuis-update-v15.js
-- samen-thuis-update-v16.js
-
-Vanaf v17 worden wijzigingen rechtstreeks in de hoofdbestanden verwerkt.
+Deze herstelbuild kiest stabiliteit boven opschonen.
