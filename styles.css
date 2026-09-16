@@ -614,3 +614,78 @@ body.st-glass20 #view,body.st-glass20 main,body.st-glass20 .content{padding-bott
   color:#b7c4d4 !important;
   opacity:1 !important;
 }
+
+/* =========================================================
+   v21.4 — LICHTE BLOKKEN BLIJVEN LICHT IN DONKERE MODUS
+   Deze regels staan bewust als laatste in styles.css.
+   ========================================================= */
+
+/* Vraag van de dag: bestaande antwoord-/resultaatblokken */
+html[data-theme20="dark"] body.st-glass20 .daily-answer,
+html[data-theme20="dark"] body.st-glass20 .question-answer,
+html[data-theme20="dark"] body.st-glass20 .answer-card,
+html[data-theme20="dark"] body.st-glass20 [data-answer],
+html[data-theme20="dark"] body.st-glass20 [class*="daily-answer"],
+html[data-theme20="dark"] body.st-glass20 [class*="question-answer"] {
+  background:#ffffff !important;
+  background-color:#ffffff !important;
+  color:#17253a !important;
+  -webkit-text-fill-color:#17253a !important;
+  border-color:#d6e0ea !important;
+}
+
+/* Ook alle tekstkinderen donker houden; eerdere dark-mode * regels mogen dit niet terugdraaien. */
+html[data-theme20="dark"] body.st-glass20 .daily-answer *,
+html[data-theme20="dark"] body.st-glass20 .question-answer *,
+html[data-theme20="dark"] body.st-glass20 .answer-card *,
+html[data-theme20="dark"] body.st-glass20 [data-answer] *,
+html[data-theme20="dark"] body.st-glass20 [class*="daily-answer"] *,
+html[data-theme20="dark"] body.st-glass20 [class*="question-answer"] * {
+  color:#17253a !important;
+  -webkit-text-fill-color:#17253a !important;
+  opacity:1 !important;
+}
+
+/* Kees / Daphne labels als blauw accent. */
+html[data-theme20="dark"] body.st-glass20 .daily-answer h3,
+html[data-theme20="dark"] body.st-glass20 .question-answer h3,
+html[data-theme20="dark"] body.st-glass20 .answer-card h3,
+html[data-theme20="dark"] body.st-glass20 [data-answer] h3,
+html[data-theme20="dark"] body.st-glass20 .daily-answer .name,
+html[data-theme20="dark"] body.st-glass20 .question-answer .name,
+html[data-theme20="dark"] body.st-glass20 .answer-card .name {
+  color:#2474ad !important;
+  -webkit-text-fill-color:#2474ad !important;
+}
+
+/* Vergrendelde antwoordknoppen blijven lichtgrijs met donkere tekst. */
+html[data-theme20="dark"] body.st-glass20 button:disabled,
+html[data-theme20="dark"] body.st-glass20 [disabled],
+html[data-theme20="dark"] body.st-glass20 .disabled {
+  background:#edf1f5 !important;
+  background-color:#edf1f5 !important;
+  color:#566579 !important;
+  -webkit-text-fill-color:#566579 !important;
+  border-color:#d5dde6 !important;
+  opacity:1 !important;
+}
+html[data-theme20="dark"] body.st-glass20 button:disabled *,
+html[data-theme20="dark"] body.st-glass20 [disabled] *,
+html[data-theme20="dark"] body.st-glass20 .disabled * {
+  color:#566579 !important;
+  -webkit-text-fill-color:#566579 !important;
+  opacity:1 !important;
+}
+
+/* Algemeen: expliciet lichte kaarten mogen nooit door dark mode donker worden. */
+html[data-theme20="dark"] body.st-glass20 .light-card,
+html[data-theme20="dark"] body.st-glass20 .white-card {
+  background:#ffffff !important;
+  background-color:#ffffff !important;
+  color:#17253a !important;
+}
+html[data-theme20="dark"] body.st-glass20 .light-card *,
+html[data-theme20="dark"] body.st-glass20 .white-card * {
+  color:#17253a !important;
+  -webkit-text-fill-color:#17253a !important;
+}
