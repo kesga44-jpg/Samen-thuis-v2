@@ -1,3 +1,5 @@
+const APP_VERSION = '17.1';
+const DATA_SCHEMA_VERSION = 3;
 const STORAGE_KEY = 'samenThuisDataV2';
 const LEGACY_STORAGE_KEY = 'samenThuisDataV1';
 const SYNC_KEY = 'samenThuisSyncV1';
@@ -71,7 +73,7 @@ const defaultCalendars = () => [
 ];
 
 const initialData = {
-  meta: { version: 2, updatedAt: new Date().toISOString() },
+  meta: { version: DATA_SCHEMA_VERSION, appVersion: APP_VERSION, updatedAt: new Date().toISOString() },
   planning: [{ id: 'p1', title: 'Samen koken', date: todayISO(), time: '18:30', endTime: '', person: 'Samen', calendarId: 'persoonlijk' }],
   calendars: defaultCalendars(),
   excludedCalendars: [],
@@ -111,7 +113,10 @@ const initialData = {
   trips: [
     { id: 'r2', tripFolderId: 'trip-vietnam', tripSectionId: 'trip-vietnam-voorbereiding', title: 'Paspoorten controleren', date: addDays(todayISO(), 7), type: 'Voorbereiding', note: 'Controleer geldigheid', checkable: true, done: false }
   ],
-  dailyAnswers: {}
+  dailyAnswers: {},
+  priceReferences: [],
+  priceReferenceSource: '',
+  priceReferenceUpdatedAt: ''
 };
 
 const clone = value => structuredClone(value);
@@ -172,6 +177,11 @@ function migrateData(raw) {
     .filter(item => item && typeof item.name === 'string' && !excludedNames.has(calendarNameKey(item.name)))
     .map(item => ({ ...item, person: validCalendarPerson(item.person) || inferCalendarPerson(item.name) }));
   migrated.dailyAnswers = raw.dailyAnswers && typeof raw.dailyAnswers === 'object' ? raw.dailyAnswers : {};
+  migrated.priceReferences = Array.isArray(raw.priceReferences)
+    ? raw.priceReferences.filter(item => item && (item.product || item.title)).map(item => ({ ...item }))
+    : [];
+  migrated.priceReferenceSource = String(raw.priceReferenceSource || '');
+  migrated.priceReferenceUpdatedAt = String(raw.priceReferenceUpdatedAt || '');
   migrated.planning = migrated.planning.map(item => ({
     endTime: '',
     calendarId: 'persoonlijk',
@@ -183,7 +193,8 @@ function migrateData(raw) {
     return { secondWeekday: '', notes: '', ...item, completedDates };
   });
   migrated.meta = {
-    version: 2,
+    version: DATA_SCHEMA_VERSION,
+    appVersion: APP_VERSION,
     updatedAt: raw.meta?.updatedAt || new Date().toISOString()
   };
   return migrated;
@@ -593,6 +604,7 @@ function renderSettings() {
     ${renderCalendarSettings()}
     <section class="card settings-card"><div class="card-head"><div><p class="eyebrow">Gegevens</p><h2>Back-up</h2></div></div><p>Maak een los JSON-bestand of laad een eerdere back-up. De synchronisatiecode en sleutel worden niet in de back-up gezet.</p><div class="button-row"><button class="secondary" data-action="backup">Back-up maken</button><button class="secondary" data-action="restore">Back-up laden</button></div></section>
     <section class="card settings-card"><div class="card-head"><div><p class="eyebrow">Apple Opdracht</p><h2>Eenvoudig tekstformaat</h2></div></div><p>Laat de Opdracht per afspraak één regel maken:</p><pre><code>Agendanaam | 2026-09-04 | 09:00 | Titel</code></pre><p>De persoon volgt uit de agenda. Een vijfde veld met Kees, Daphne of Samen is optioneel en gaat voor de agendakeuze. Een zesde veld mag de eindtijd bevatten. Bij onbekende namen kies je de persoon één keer.</p><p>Dit is een import, geen tweerichtingskoppeling. Verplaatsen of verwijderen in Apple Agenda wordt niet automatisch overgenomen.</p></section>
+    <section class="card settings-card version-card"><div class="card-head"><div><p class="eyebrow">Appversie</p><h2>Samen Thuis v${esc(APP_VERSION)}</h2></div><span class="tag green">Actief</span></div><p>Alle functies uit v4, v11, v13, v14, v15 en v16 zijn verwerkt in één <code>app.js</code> en één <code>styles.css</code>. Er worden geen losse updatebestanden geladen.</p><p class="muted">Gegevensschema ${DATA_SCHEMA_VERSION} · offlinecache v${esc(APP_VERSION)}</p></section>
   </div>`;
 }
 
@@ -708,7 +720,7 @@ function handleSubmit(event) {
     toast('Map toegevoegd');
     return;
   }
-  ['amount', 'min'].forEach(key => { if (key in formData) formData[key] = Number(formData[key]); });
+  ['amount', 'min', 'desired', 'cost'].forEach(key => { if (key in formData) formData[key] = Number(formData[key]); });
   if (current === 'groceries') formData.done = false;
   if (current === 'chores') formData.completedDates = [];
   if (current === 'planning') formData.personSource = 'manual';
@@ -1597,7 +1609,23 @@ document.querySelector('#eyebrow').textContent = new Intl.DateTimeFormat('nl-NL'
 window.addEventListener('online', () => { updateSyncBadge(); syncNow(); });
 window.addEventListener('offline', () => updateSyncBadge());
 
-if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js');
+if ('serviceWorker' in navigator) {
+  let reloadingForUpdate = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (reloadingForUpdate) return;
+    reloadingForUpdate = true;
+    window.location.reload();
+  });
+  window.addEventListener('load', async () => {
+    try {
+      const registration = await navigator.serviceWorker.register(`./sw.js?v=${APP_VERSION.replace(/\D/g, '')}`, { updateViaCache: 'none' });
+      await registration.update();
+      if (registration.waiting) registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+    } catch (error) {
+      console.warn('Service worker kon niet worden bijgewerkt', error);
+    }
+  });
+}
 setupNav();
 render();
 handleInitialAgendaImport();
@@ -2281,7 +2309,8 @@ console.info('Samen Thuis v17 importer geladen');
   }
 
   function boolWord(v) {
-    return /^(1|ja|yes|true|aan|x|✓)$/i.test(String(v||'').trim());
+    const raw=String(v||'').trim();
+    return raw==='✓' || /^(1|ja|yes|true|aan|x|afgevinkt|klaar|gedaan)$/i.test(norm(raw));
   }
 
   function falseWord(v) {
@@ -2323,7 +2352,9 @@ console.info('Samen Thuis v17 importer geladen');
       'titel','taak','product','onderwerp','categorie','frequentie','herhaling','persoon',
       'toegewezen aan','startdatum','einddatum','volgende datum','prioriteit','afgevinkt',
       'omschrijving','notitie','hoeveelheid','eenheid','minimumvoorraad','minimum','gewenst',
-      'datum','begindatum','begintijd','eindtijd','maaltijdmoment','gerecht','reis','map onderdeel'
+      'datum','begindatum','begintijd','eindtijd','maaltijdmoment','gerecht','reis','map onderdeel',
+      'locatie','winkel','voor weekmenu','personen','ingredienten','houdbaar tot','deadline',
+      'status','kosten','afvinken','afgerond','type','soort'
     ]);
     const headerCount=p.filter(x=>headerWords.has(x) || /^\[.+\]$/.test(x)).length;
     if(parts.length>1 && headerCount>=Math.min(2,parts.length-1)) return true;
@@ -2374,13 +2405,17 @@ console.info('Samen Thuis v17 importer geladen');
       category:record.category||'Overig',store:record.store||'',forMeal:record.forMeal||'',
       done:boolWord(record.done),note:record.note||''
     };
-    if(t==='chores') return {
+    if(t==='chores') {
+      const due=isoDateFromText(record.nextDate||record.startDate)||record.nextDate||record.startDate||todayISO();
+      const completed=boolWord(record.done);
+      const completedDate=due && due<=todayISO()?due:todayISO();
+      return {
       id:id(),title:record.title||'Taak',category:record.category||state13.subtype||'Schoonmaak',
       repeat:normaliseRepeat(record.repeat||'Wekelijks'),person:record.person||'Samen',
-      due:isoDateFromText(record.nextDate||record.startDate)||record.nextDate||record.startDate||todayISO(),
-      priority:priority17(record.priority),done:boolWord(record.done),notes:record.notes||'',
-      secondWeekday:'',completedDates:[]
-    };
+      due,priority:priority17(record.priority),notes:record.notes||'',secondWeekday:'',
+      completedDates:completed?[completedDate]:[],lastDoneDate:completed?completedDate:''
+      };
+    }
     if(t==='stock') {
       const amount=num(record.amount,0),minimum=num(record.minimum,0);
       return {
@@ -2414,12 +2449,13 @@ console.info('Samen Thuis v17 importer geladen');
       if(record.cost) notes.push(`Kosten: ${record.cost}`);
       if(record.description) notes.push(record.description);
       if(record.note) notes.push(record.note);
+      const priority=priority17(record.priority);
       return {
         id:id(),tripFolderId:folder?.id||'',tripSectionId:section?.id||'',
         _pendingFolderName:folderName,_pendingSectionName:sectionName,
         title:record.title||'Reisitem',date:start,startDate:start,endDate:end,
         type:record.kind||'Notitie',note:notes.join('\n'),checkable:boolWord(record.checkable),
-        important:['high','hoog'].includes(priority17(record.priority)||norm(record.priority)),done:boolWord(record.done)
+        important:priority==='high',priority:priority||'medium',done:boolWord(record.done)
       };
     }
     return null;
@@ -2429,11 +2465,11 @@ console.info('Samen Thuis v17 importer geladen');
     const entries=String(text||'').replace(/\r/g,'').split(/\n+/)
       .map(x=>x.trim()).filter(Boolean).slice(0,500)
       .map(line=>universalRecord17(line,target)).filter(Boolean)
-      .map(record=>universalItem17(record)).filter(Boolean)
-      .filter(item=>item.title && !isHeader17(item.title,[item.title],target))
-      .map(item=>{
-        const duplicate=duplicateOf(target,item);
-        return {selected:!duplicate,item,duplicate:duplicate?.id||''};
+      .map(record=>({record,item:universalItem17(record)})).filter(entry=>entry.item)
+      .filter(entry=>entry.item.title && !isHeader17(entry.item.title,[entry.item.title],entry.record.target))
+      .map(({record,item})=>{
+        const duplicate=duplicateOf(record.target,item);
+        return {selected:!duplicate,target:record.target,item,duplicate:duplicate?.id||''};
       });
     return entries;
   }
@@ -2449,18 +2485,18 @@ console.info('Samen Thuis v17 importer geladen');
   function normaliseRepeat(raw='') {
     const v=norm(String(raw).replace(/^frequentie\s*:\s*/i,''));
     const map=[
-      [/^dagelijks$/,'Dagelijks'],[/^(om de dag|elke 2 dagen)$/,'Om de dag'],
-      [/^(2x per week|2 per week|twee keer per week)$/,'2× per week'],
+      [/^(dagelijks|elke dag|iedere dag|daily)$/,'Dagelijks'],[/^(om de dag|elke 2 dagen)$/,'Om de dag'],
+      [/^(2x per week|2 per week|twee keer per week|twice weekly)$/,'2× per week'],
       [/^(3x per week|3 per week|drie keer per week)$/,'3× per week'],
-      [/^wekelijks$/,'Wekelijks'],[/^(elke 2 weken|2 wekelijks|tweewekelijks)$/,'Elke 2 weken'],
-      [/^(elke 4 weken|4 wekelijks)$/,'Elke 4 weken'],[/^maandelijks$/,'Maandelijks'],
+      [/^(wekelijks|iedere week|elke week|weekly)$/,'Wekelijks'],[/^(elke 2 weken|2 wekelijks|om de week|tweewekelijks|biweekly)$/,'Elke 2 weken'],
+      [/^(elke 4 weken|4 wekelijks)$/,'Elke 4 weken'],[/^(maandelijks|iedere maand|elke maand|monthly)$/,'Maandelijks'],
       [/^(elke 2 maanden|2 maandelijks)$/,'Elke 2 maanden'],
-      [/^(elke 3 maanden|kwartaal|kwartaallijks)$/,'Elke 3 maanden'],
-      [/^(elke 6 maanden|halfjaarlijks)$/,'Elke 6 maanden'],
-      [/^(jaarlijks|elk jaar|1x per jaar)$/,'Jaarlijks'],
+      [/^(elke 3 maanden|kwartaal|kwartaallijks|quarterly)$/,'Elke 3 maanden'],
+      [/^(elke 6 maanden|halfjaarlijks|semiannual)$/,'Elke 6 maanden'],
+      [/^(jaarlijks|ieder jaar|elk jaar|1x per jaar|yearly)$/,'Jaarlijks'],
       [/^(na elke was|na iedere was)$/,'Na elke was'],
       [/^(wanneer nodig|indien nodig|naar behoefte)$/,'Wanneer nodig'],
-      [/^eenmalig$/,'Eenmalig']
+      [/^(eenmalig|once)$/,'Eenmalig']
     ];
     for(const [rx,label] of map) if(rx.test(v)) return label;
     return REPEATS.includes(raw)?raw:'Wekelijks';
@@ -2630,7 +2666,7 @@ console.info('Samen Thuis v17 importer geladen');
   const META_KEYS=new Set([
     'type','locatie','startdatum','einddatum','datum','deadline','afvinken','afvinkbaar',
     'belangrijk','personen','route','details','notitie','notes','categorie','prijs','bedrag',
-    'status','plaats','person','voor wie','frequentie','herhaling','eenheid'
+    'status','plaats','person','voor wie','frequentie','herhaling','eenheid','prioriteit'
   ]);
 
   function isDocumentNoise(line='') {
@@ -2702,7 +2738,8 @@ console.info('Samen Thuis v17 importer geladen');
     else if(m.afvinkbaar!==undefined) checkable=boolWord(m.afvinkbaar);
     else checkable=/\b(boek|boeken|vastleggen|reserveer|reserveren|regel|regelen|controleer|controleren|download|meenemen|inpakken)\b/i.test(title);
 
-    const important=m.belangrijk!==undefined ? boolWord(m.belangrijk) : false;
+    const priority=priority17(m.prioriteit);
+    const important=m.belangrijk!==undefined ? boolWord(m.belangrijk) : priority==='high';
 
     const notes=[];
     if(m.details) notes.push(m.details);
@@ -2729,6 +2766,7 @@ console.info('Samen Thuis v17 importer geladen');
       note:notes.join('\n'),
       checkable,
       important,
+      priority:priority||'medium',
       done:false,
       _pendingFolderName:folder?'':state13.detectedTripName,
       _pendingSectionName:section?'':sectionName
@@ -2753,6 +2791,7 @@ console.info('Samen Thuis v17 importer geladen');
       note:meta.notitie||meta.notes||'',
       checkable:boolWord(meta.afvinkbaar||meta.afvinken) || /\b(boeken|vastleggen|reserveren|regelen|controleren|afspraak|downloaden|meenemen|inpakken)\b/i.test(itemTitle),
       important:boolWord(meta.belangrijk),
+      priority:priority17(meta.prioriteit)||'medium',
       done:false
     };
   }
@@ -2827,14 +2866,17 @@ console.info('Samen Thuis v17 importer geladen');
   }
 
   function previewEditor(entry) {
-    const x=entry.item,t=state13.target;
+    const x=entry.item,t=entry.target||state13.target;
     if(t==='planning') return `
       ${field('Wat?',`<input data-v13-field="title" value="${esc(x.title)}">`,'full')}
       ${field('Datum',`<input type="date" data-v13-field="date" value="${esc(x.date||'')}">`)}
       ${field('Begintijd',`<input type="time" data-v13-field="time" value="${esc(x.time||'')}">`)}
+      ${field('Einddatum',`<input type="date" data-v13-field="endDate" value="${esc(x.endDate||'')}">`)}
       ${field('Eindtijd',`<input type="time" data-v13-field="endTime" value="${esc(x.endTime||'')}">`)}
       ${field('Voor wie',`<select data-v13-field="person">${optionList(['Samen','Kees','Daphne'],x.person||'Samen')}</select>`)}
       ${field('Locatie',`<input data-v13-field="location" value="${esc(x.location||'')}">`)}
+      ${field('Herhaling',`<select data-v13-field="repeat"><option value="">Geen herhaling</option>${optionList(REPEATS,x.repeat||'')}</select>`)}
+      <label class="checkbox-field"><input type="checkbox" data-v13-field="allDay" ${x.allDay?'checked':''}><span>Hele dag</span></label>
       ${field('Notitie',`<textarea data-v13-field="note">${esc(x.note||'')}</textarea>`,'full')}`;
     if(t==='meals') return `
       ${field('Gerecht',`<input data-v13-field="title" value="${esc(x.title)}">`,'full')}
@@ -2849,6 +2891,7 @@ console.info('Samen Thuis v17 importer geladen');
       ${field('Eenheid',`<input data-v13-field="unit" value="${esc(x.unit||'')}">`)}
       ${field('Categorie',`<select data-v13-field="category">${optionList(GROCERY_CATEGORIES,x.category||'Overig')}</select>`)}
       ${field('Winkel',`<input data-v13-field="store" value="${esc(x.store||'')}">`)}
+      ${field('Voor weekmenu',`<input data-v13-field="forMeal" value="${esc(x.forMeal||'')}">`)}
       <label class="checkbox-field"><input type="checkbox" data-v13-field="done" ${x.done?'checked':''}><span>Al gekocht</span></label>
       ${field('Notitie',`<textarea data-v13-field="note">${esc(x.note||'')}</textarea>`,'full')}`;
     if(t==='stock') return `
@@ -2857,31 +2900,45 @@ console.info('Samen Thuis v17 importer geladen');
       ${field('Huidig',`<input type="number" step="0.01" data-v13-field="amount" value="${x.amount}">`)}
       ${field('Minimum',`<input type="number" step="0.01" data-v13-field="min" value="${x.min}">`)}
       ${field('Gewenst',`<input type="number" step="0.01" data-v13-field="desired" value="${x.desired}">`)}
-      ${field('Eenheid',`<input data-v13-field="unit" value="${esc(x.unit)}">`)}`;
+      ${field('Eenheid',`<input data-v13-field="unit" value="${esc(x.unit)}">`)}
+      ${field('Houdbaar tot',`<input type="date" data-v13-field="bestBefore" value="${esc(x.bestBefore||'')}">`)}
+      ${field('Locatie',`<input data-v13-field="location" value="${esc(x.location||'')}">`)}
+      ${field('Notitie',`<textarea data-v13-field="note">${esc(x.note||'')}</textarea>`,'full')}`;
     if(t==='chores') return `
       ${field('Taak',`<input data-v13-field="title" value="${esc(x.title)}">`,'full')}
       ${field('Frequentie',`<select data-v13-field="repeat">${optionList(REPEATS,x.repeat)}</select>`)}
       ${field('Voor wie',`<select data-v13-field="person">${optionList(['Samen','Kees','Daphne'],x.person)}</select>`)}
       ${field('Categorie',`<input data-v13-field="category" value="${esc(x.category||'')}">`)}
       ${field('Eerste keer',`<input type="date" data-v13-field="due" value="${esc(x.due||'')}">`)}
+      ${field('Prioriteit',`<select data-v13-field="priority"><option value="">Geen</option><option value="low" ${x.priority==='low'?'selected':''}>Laag</option><option value="medium" ${x.priority==='medium'?'selected':''}>Gemiddeld</option><option value="high" ${x.priority==='high'?'selected':''}>Hoog</option></select>`)}
       ${field('Notitie',`<textarea data-v13-field="notes">${esc(x.notes||'')}</textarea>`,'full')}`;
     if(t==='home') return `
       ${field('Onderwerp',`<input data-v13-field="title" value="${esc(x.title)}">`,'full')}
       ${field('Categorie',`<input data-v13-field="category" value="${esc(x.category)}">`)}
+      ${field('Type',`<input data-v13-field="kind" value="${esc(x.kind||'')}">`)}
       ${field('Frequentie',`<select data-v13-field="repeat"><option value="">Geen herhaling</option>${optionList(REPEATS,x.repeat)}</select>`)}
+      ${field('Startdatum',`<input type="date" data-v13-field="startDate" value="${esc(x.startDate||'')}">`)}
       ${field('Datum',`<input type="date" data-v13-field="due" value="${esc(x.due||'')}">`)}
+      ${field('Prioriteit',`<select data-v13-field="priority"><option value="">Geen</option><option value="low" ${x.priority==='low'?'selected':''}>Laag</option><option value="medium" ${x.priority==='medium'?'selected':''}>Gemiddeld</option><option value="high" ${x.priority==='high'?'selected':''}>Hoog</option></select>`)}
+      ${field('Status',`<input data-v13-field="status" value="${esc(x.status||'')}">`)}
+      ${field('Kosten',`<input type="number" step="0.01" data-v13-field="cost" value="${Number(x.cost||0)}">`)}
+      <label class="checkbox-field"><input type="checkbox" data-v13-field="done" ${x.done?'checked':''}><span>Afgerond</span></label>
       ${field('Notitie',`<textarea data-v13-field="note">${esc(x.note||'')}</textarea>`,'full')}`;
     if(t==='trips') return `
       ${field('Onderwerp',`<input data-v13-field="title" value="${esc(x.title)}">`,'full')}
       ${field('Startdatum',`<input type="date" data-v13-field="startDate" value="${esc(x.startDate||x.date||'')}">`)}
       ${field('Einddatum',`<input type="date" data-v13-field="endDate" value="${esc(x.endDate||x.startDate||x.date||'')}">`)}
       ${field('Soort',`<input data-v13-field="type" value="${esc(x.type||'Notitie')}">`)}
+      ${field('Prioriteit',`<select data-v13-field="priority"><option value="low" ${x.priority==='low'?'selected':''}>Laag</option><option value="medium" ${!x.priority||x.priority==='medium'?'selected':''}>Gemiddeld</option><option value="high" ${x.priority==='high'?'selected':''}>Hoog</option></select>`)}
       <label class="checkbox-field"><input type="checkbox" data-v13-field="checkable" ${x.checkable?'checked':''}><span>Afvinkbaar</span></label>
       <label class="checkbox-field"><input type="checkbox" data-v13-field="important" ${x.important?'checked':''}><span>Belangrijk ★</span></label>
       ${field('Notitie',`<textarea data-v13-field="note">${esc(x.note||'')}</textarea>`,'full')}`;
     if(t==='ideas') return `
       ${field('Idee',`<input data-v13-field="title" value="${esc(x.title)}">`,'full')}
       ${field('Categorie',`<input data-v13-field="category" value="${esc(x.category||'Thuis')}">`)}
+      ${field('Voor wie',`<select data-v13-field="person"><option value="">Niet toegewezen</option>${optionList(['Samen','Kees','Daphne'],x.person||'')}</select>`)}
+      ${field('Prioriteit',`<select data-v13-field="priority"><option value="">Geen</option><option value="low" ${x.priority==='low'?'selected':''}>Laag</option><option value="medium" ${x.priority==='medium'?'selected':''}>Gemiddeld</option><option value="high" ${x.priority==='high'?'selected':''}>Hoog</option></select>`)}
+      ${field('Status',`<input data-v13-field="status" value="${esc(x.status||'')}">`)}
       ${field('Datum',`<input type="date" data-v13-field="date" value="${esc(x.date||'')}">`)}
       ${field('Emoji',`<input data-v13-field="icon" value="${esc(x.icon||'♡')}">`)}
       ${field('Notitie',`<textarea data-v13-field="note">${esc(x.note||'')}</textarea>`,'full')}`;
@@ -2941,6 +2998,7 @@ console.info('Samen Thuis v17 importer geladen');
       ${field('Startdatum',`<input type="date" data-v14-manual="startDate">`)}
       ${field('Einddatum',`<input type="date" data-v14-manual="endDate">`)}
       ${field('Soort',`<select data-v14-manual="type">${optionList(['Voorbereiding','Reservering','Vervoer','Verblijf','Activiteit','Eten','Budget','Documenten','Paklijst','Notitie'],'Notitie')}</select>`)}
+      ${field('Prioriteit',`<select data-v14-manual="priority"><option value="low">Laag</option><option value="medium" selected>Gemiddeld</option><option value="high">Hoog</option></select>`)}
       ${field('Notitie',`<textarea data-v14-manual="note"></textarea>`,'full')}
       <label class="checkbox-field"><input type="checkbox" data-v14-manual="checkable"><span>Dit moet afgevinkt worden</span></label>
       <label class="checkbox-field"><input type="checkbox" data-v14-manual="important"><span>Belangrijk ★</span></label>`;
@@ -3005,10 +3063,10 @@ console.info('Samen Thuis v17 importer geladen');
           <article class="v13-card ${entry.duplicate?'duplicate':''}" data-v13-card="${i}">
             <div class="v13-card-head">
               <label><input type="checkbox" data-v13-selected ${entry.selected?'checked':''}> Importeren</label>
-              ${entry.duplicate?'<span class="tag warning">Mogelijk al aanwezig · standaard overgeslagen</span>':''}
+              <div class="import-target-tags"><span class="tag">${esc(TARGETS[entry.target||state13.target]||'Import')}</span>${entry.duplicate?'<span class="tag warning">Mogelijk al aanwezig · standaard overgeslagen</span>':''}</div>
             </div>
             <div class="v13-fields">${previewEditor(entry)}</div>
-            <small class="muted">${esc(previewMeta(entry.item,state13.target))}</small>
+            <small class="muted">${esc(previewMeta(entry.item,entry.target||state13.target))}</small>
           </article>`).join('')}</div>
       </section>`:`<section class="card"><p class="muted">Nog niets geanalyseerd.</p></section>`):''}
     </div>`;
@@ -3033,7 +3091,7 @@ console.info('Samen Thuis v17 importer geladen');
     if(['xlsx','xlsm','xls'].includes(ext)) {
       await loadExternal13('https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js',()=>Boolean(window.XLSX));
       const wb=window.XLSX.read(await file.arrayBuffer(),{type:'array',cellDates:true});
-      return wb.SheetNames.map(n=>window.XLSX.utils.sheet_to_csv(wb.Sheets[n])).join('\n');
+      return wb.SheetNames.map(n=>window.XLSX.utils.sheet_to_csv(wb.Sheets[n],{FS:'|'})).join('\n');
     }
     throw new Error('Bestandstype niet ondersteund');
   }
@@ -3046,7 +3104,7 @@ console.info('Samen Thuis v17 importer geladen');
       card.querySelectorAll('[data-v13-field]').forEach(input=>{
         const k=input.dataset.v13Field;
         let v=input.type==='checkbox'?input.checked:input.value;
-        if(['amount','min','desired'].includes(k)) v=num(v,0);
+        if(['amount','min','desired','cost'].includes(k)) v=num(v,0);
         entry.item[k]=v;
       });
       if(entry.item.startDate) entry.item.date=entry.item.startDate;
@@ -3104,8 +3162,8 @@ console.info('Samen Thuis v17 importer geladen');
       if(!folder) {
         folder={
           id:id(),name:wantedFolder,
-          startDate:state13.detectedTripStart||'',
-          endDate:state13.detectedTripEnd||'',
+          startDate:state13.detectedTripStart||item.startDate||item.date||'',
+          endDate:state13.detectedTripEnd||item.endDate||item.startDate||item.date||'',
           note:'Aangemaakt via centrale invoer'
         };
         data.tripFolders.push(folder);
@@ -3115,8 +3173,8 @@ console.info('Samen Thuis v17 importer geladen');
     if(!folder) return item;
 
     // Periode van de reis aanvullen wanneer die uit het document komt.
-    if(state13.detectedTripStart && !folder.startDate) folder.startDate=state13.detectedTripStart;
-    if(state13.detectedTripEnd && !folder.endDate) folder.endDate=state13.detectedTripEnd;
+    if(!folder.startDate) folder.startDate=state13.detectedTripStart||item.startDate||item.date||'';
+    if(!folder.endDate) folder.endDate=state13.detectedTripEnd||item.endDate||item.startDate||item.date||'';
 
     const wantedSection=item._pendingSectionName || travelSection(item.type,item.title);
     let section=(data.tripSections||[]).find(s=>s.id===item.tripSectionId && s.tripFolderId===folder.id);
@@ -3135,18 +3193,23 @@ console.info('Samen Thuis v17 importer geladen');
 
   function commit13() {
     syncCardEdits();
-    let selected=state13.preview.filter(x=>x.selected).map(x=>x.item);
+    const selected=state13.preview.filter(entry=>entry.selected);
     if(!selected.length) return toast('Selecteer minimaal één item');
-    if(state13.target==='trips') selected=selected.map(resolveTripDestination13);
-
-    data[state13.target] ||= [];
-    data[state13.target].push(...selected);
+    const usedTargets=new Set();
+    selected.forEach(entry=>{
+      const target=entry.target||state13.target;
+      const item=target==='trips'?resolveTripDestination13(entry.item):entry.item;
+      data[target] ||= [];
+      data[target].push(item);
+      usedTargets.add(target);
+    });
     save();
 
     const count=selected.length;
     state13.preview=[];state13.text='';state13.filename='';
     render();
-    toast(`${count} items toegevoegd aan ${TARGETS[state13.target]}`);
+    const destination=usedTargets.size===1?TARGETS[[...usedTargets][0]]:`${usedTargets.size} pagina's`;
+    toast(`${count} items toegevoegd aan ${destination}`);
   }
 
   function manualValue13(name) {
@@ -3170,7 +3233,7 @@ console.info('Samen Thuis v17 importer geladen');
     else if(t==='home') item={id:id(),title,category:manualValue13('category')||'Onderhoud',due:manualValue13('due')||'',repeat:manualValue13('repeat')||'',note:manualValue13('note')||''};
     else if(t==='trips') {
       const startDate=manualValue13('startDate')||'';
-      item={id:id(),title,tripFolderId:manualValue13('tripFolderId'),tripSectionId:manualValue13('tripSectionId'),date:startDate,startDate,endDate:manualValue13('endDate')||startDate,type:manualValue13('type')||'Notitie',note:manualValue13('note')||'',checkable:Boolean(manualValue13('checkable')),important:Boolean(manualValue13('important')),done:false};
+      item={id:id(),title,tripFolderId:manualValue13('tripFolderId'),tripSectionId:manualValue13('tripSectionId'),date:startDate,startDate,endDate:manualValue13('endDate')||startDate,type:manualValue13('type')||'Notitie',priority:manualValue13('priority')||'medium',note:manualValue13('note')||'',checkable:Boolean(manualValue13('checkable')),important:Boolean(manualValue13('important')),done:false};
       item=resolveTripDestination13(item);
     }
     if(!item) return;
@@ -3260,14 +3323,15 @@ console.info('Samen Thuis v17 importer geladen');
   }
 
   function editableSpec17(type) {
+    const priorities=[['','Geen'],['low','Laag'],['medium','Gemiddeld'],['high','Hoog']];
     const specs={
-      planning:[['title','Titel','text'],['date','Datum','date'],['time','Begintijd','time'],['endTime','Eindtijd','time'],['person','Voor wie','select',['Samen','Kees','Daphne']],['location','Locatie','text'],['note','Notitie','textarea']],
+      planning:[['title','Titel','text'],['date','Datum','date'],['time','Begintijd','time'],['endDate','Einddatum','date'],['endTime','Eindtijd','time'],['allDay','Hele dag','checkbox'],['calendarId','Agenda','select',(data.calendars||[]).map(calendar=>[calendar.id,calendar.name])],['person','Voor wie','select',['Samen','Kees','Daphne']],['location','Locatie','text'],['repeat','Herhaling','select',['',...REPEATS]],['note','Notitie','textarea']],
       meals:[['title','Gerecht','text'],['date','Datum','date'],['type','Moment','select',['Ontbijt','Lunch','Avondeten','Snack']],['persons','Personen','text'],['ingredients','Ingrediënten','textarea'],['note','Notitie','textarea']],
-      groceries:[['title','Product','text'],['amount','Aantal','number'],['unit','Eenheid','text'],['category','Categorie','select',GROCERY_CATEGORIES],['store','Winkel','text'],['done','Gekocht','checkbox'],['note','Notitie','textarea']],
-      chores:[['title','Taak','text'],['person','Voor wie','select',['Samen','Kees','Daphne']],['due','Eerste keer','date'],['repeat','Frequentie','select',REPEATS],['category','Categorie','text'],['notes','Notitie','textarea']],
-      stock:[['title','Product','text'],['category','Categorie/plek','text'],['amount','Huidig aantal','number'],['min','Minimum','number'],['desired','Gewenst','number'],['unit','Eenheid','text'],['bestBefore','Houdbaar tot','date'],['note','Notitie','textarea']],
-      ideas:[['title','Idee','text'],['category','Categorie','text'],['date','Datum','date'],['icon','Emoji','text'],['note','Notitie','textarea']],
-      home:[['title','Onderwerp','text'],['category','Categorie','text'],['due','Datum','date'],['repeat','Herhaling','select',['',...REPEATS]],['status','Status','text'],['cost','Kosten','number'],['done','Afgerond','checkbox'],['note','Notitie','textarea']]
+      groceries:[['title','Product','text'],['amount','Aantal','number'],['unit','Eenheid','text'],['category','Categorie','select',GROCERY_CATEGORIES],['store','Winkel','text'],['forMeal','Voor weekmenu','text'],['done','Gekocht','checkbox'],['note','Notitie','textarea']],
+      chores:[['title','Taak','text'],['person','Voor wie','select',['Samen','Kees','Daphne']],['due','Eerste keer','date'],['repeat','Frequentie','select',REPEATS],['category','Categorie','text'],['priority','Prioriteit','select',priorities],['notes','Notitie','textarea']],
+      stock:[['title','Product','text'],['category','Categorie/plek','text'],['amount','Huidig aantal','number'],['min','Minimum','number'],['desired','Gewenst','number'],['unit','Eenheid','text'],['bestBefore','Houdbaar tot','date'],['location','Locatie','text'],['note','Notitie','textarea']],
+      ideas:[['title','Idee','text'],['category','Categorie','text'],['person','Voor wie','select',['','Samen','Kees','Daphne']],['priority','Prioriteit','select',priorities],['status','Status','text'],['date','Datum','date'],['icon','Emoji','text'],['note','Notitie','textarea']],
+      home:[['title','Onderwerp','text'],['category','Categorie','text'],['kind','Type','text'],['priority','Prioriteit','select',priorities],['startDate','Startdatum','date'],['due','Deadline/datum','date'],['repeat','Herhaling','select',['',...REPEATS]],['status','Status','text'],['cost','Kosten','number'],['done','Afgerond','checkbox'],['note','Notitie','textarea']]
     };
     return specs[type]||[];
   }
@@ -3395,7 +3459,7 @@ console.info('Samen Thuis v17 importer geladen');
       const cat=document.querySelector('#v13BulkCategory')?.value.trim();
       const rep=document.querySelector('#v13BulkRepeat')?.value;
       const person=document.querySelector('#v13BulkPerson')?.value;
-      state13.preview.filter(x=>x.selected).forEach(entry=>{
+      state13.preview.filter(entry=>entry.selected && (entry.target||state13.target)===state13.target).forEach(entry=>{
         if(cat) entry.item.category=cat;
         if(rep&&state13.target==='chores') entry.item.repeat=rep;
         if(person&&state13.target==='chores') entry.item.person=person;
@@ -4127,5 +4191,10 @@ console.info('Samen Thuis v17 slimme huishoudplanning geladen');
   // One initial render is needed so existing screens immediately use the new logic.
   render();
   window.__SAMEN_THUIS_V17__=true;
-  document.documentElement.dataset.appVersion='17';
+  window.SamenThuis={
+    version:APP_VERSION,
+    dataSchema:DATA_SCHEMA_VERSION,
+    features:{travelSync:true,unifiedImporter:true,universalImport:true,priceReferences:true,smartHousehold:true,scrollPreservation:true}
+  };
+  document.documentElement.dataset.appVersion=APP_VERSION;
 })();

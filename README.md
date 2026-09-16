@@ -20,6 +20,10 @@ PWA op GitHub Pages en werkt ook offline op iPhone, iPad en laptop.
   kwartaal-, halfjaarlijkse, jaarlijkse en `Wanneer nodig`-taken;
 - één centrale, bewerkbare importer voor Agenda, Weekmenu, Boodschappen,
   Huishouden, Voorraad, Ideeën, Woning en Reizen;
+- universele import met `|`, `;`, tab, ` / `, ` - ` of meerdere spaties,
+  inclusief TXT, CSV, PDF, DOCX en Excel;
+- reisimport met mappen, onderdelen, datums, afvinkstatus en prioriteiten;
+- bodemprijzen en aanbevolen huishoudverdeling;
 - voorraad, ideeën, woninginformatie en reizen;
 - lokale offline opslag, JSON-back-ups en optionele versleutelde synchronisatie.
 
@@ -27,7 +31,7 @@ Bestaande gegevens uit eerdere appversies worden automatisch behouden. Een
 afgeronde huishoudtaak wordt per datum bijgehouden; de volgende termijn wordt
 vanaf die echte uitvoerdatum berekend.
 
-## Bestandsopbouw v17
+## Bestandsopbouw v17.1
 
 De productieversie gebruikt één JavaScriptbestand en één stylesheet:
 
@@ -39,6 +43,11 @@ De productieversie gebruikt één JavaScriptbestand en één stylesheet:
 
 Oudere losse `upgrade-` en `samen-thuis-update-` bestanden zijn vanaf v17 niet
 meer nodig.
+
+Versie 17.1 bevat de geldige functies uit v4, v11, v13, v14, v15 en v16.
+De versie is zichtbaar onder **Instellingen** en naast de naam in de zijbalk.
+Zelf geïmporteerde bodemprijzen en alle aanvullende importvelden blijven bij
+opnieuw laden, synchroniseren en terugzetten van een back-up behouden.
 
 ## Publiceren via GitHub Pages
 

@@ -1,11 +1,13 @@
-const CACHE='samen-thuis-v17-consolidated';
+const APP_VERSION='17.1';
+const CACHE=`samen-thuis-v${APP_VERSION.replace(/\./g,'-')}`;
 const ASSETS=[
   './',
   './index.html',
-  './styles.css?v=170',
-  './app.js?v=170',
-  './manifest.webmanifest',
-  './icon.svg'
+  './?v=171',
+  './styles.css?v=171',
+  './app.js?v=171',
+  './manifest.webmanifest?v=171',
+  './icon.svg?v=171'
 ];
 
 self.addEventListener('install',event=>{
@@ -20,21 +22,31 @@ self.addEventListener('activate',event=>{
   );
 });
 
+self.addEventListener('message',event=>{
+  if(event.data?.type==='SKIP_WAITING') self.skipWaiting();
+});
+
 self.addEventListener('fetch',event=>{
   if(event.request.method!=='GET') return;
   const url=new URL(event.request.url);
   if(url.origin!==location.origin){event.respondWith(fetch(event.request));return;}
+  if(event.request.mode==='navigate') {
+    event.respondWith(
+      fetch(event.request,{cache:'no-store'})
+        .then(response=>{
+          if(response.ok) event.waitUntil(caches.open(CACHE).then(cache=>cache.put('./index.html',response.clone())));
+          return response;
+        })
+        .catch(()=>caches.match('./index.html').then(cached=>cached||Response.error()))
+    );
+    return;
+  }
   event.respondWith(
     fetch(event.request,{cache:'no-store'})
       .then(response=>{
-        if(response.ok){
-          const copy=response.clone();
-          event.waitUntil(caches.open(CACHE).then(cache=>cache.put(event.request,copy)));
-        }
+        if(response.ok) event.waitUntil(caches.open(CACHE).then(cache=>cache.put(event.request,response.clone())));
         return response;
       })
-      .catch(()=>caches.match(event.request).then(cached=>
-        cached||(event.request.mode==='navigate'?caches.match('./index.html'):Response.error())
-      ))
+      .catch(()=>caches.match(event.request).then(cached=>cached||Response.error()))
   );
 });
