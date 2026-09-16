@@ -472,3 +472,68 @@ body.st-glass20 #view,body.st-glass20 main,body.st-glass20 .content{padding-bott
 
 /* v21 dock expliciet ongemoeid laten */
 .dock21,.dock21 button,.sheet21,.sheet21 button{font-family:inherit}
+
+/* ===== v21.2 — donkerder / sterker leesbaar lettertype ===== */
+
+/* Dark mode: grijze tekst minder flets, dichter bij wit */
+:root[data-theme20="dark"]{
+  --muted:#c3cede!important;
+}
+:root[data-theme20="dark"] .st-glass20{
+  color:#f5f8ff!important;
+}
+:root[data-theme20="dark"] .st-glass20 p,
+:root[data-theme20="dark"] .st-glass20 label,
+:root[data-theme20="dark"] .st-glass20 .description,
+:root[data-theme20="dark"] .st-glass20 .helper{
+  color:#d2dbe8!important;
+}
+:root[data-theme20="dark"] .st-glass20 .muted,
+:root[data-theme20="dark"] .st-glass20 small{
+  color:#bdc9d9!important;
+}
+:root[data-theme20="dark"] .st-glass20 input,
+:root[data-theme20="dark"] .st-glass20 textarea,
+:root[data-theme20="dark"] .st-glass20 select{
+  color:#f7f9ff!important;
+}
+:root[data-theme20="dark"] .st-glass20 input::placeholder,
+:root[data-theme20="dark"] .st-glass20 textarea::placeholder{
+  color:#aebdd0!important;
+  opacity:1!important;
+}
+
+/* Light mode: tekst juist donkerder maken */
+:root[data-theme20="light"]{
+  --ink:#142238!important;
+  --muted:#526176!important;
+}
+:root[data-theme20="light"] .st-glass20{
+  color:#142238!important;
+}
+:root[data-theme20="light"] .st-glass20 p,
+:root[data-theme20="light"] .st-glass20 label,
+:root[data-theme20="light"] .st-glass20 .description,
+:root[data-theme20="light"] .st-glass20 .helper{
+  color:#334258!important;
+}
+:root[data-theme20="light"] .st-glass20 .muted,
+:root[data-theme20="light"] .st-glass20 small{
+  color:#526176!important;
+}
+:root[data-theme20="light"] .st-glass20 input,
+:root[data-theme20="light"] .st-glass20 textarea,
+:root[data-theme20="light"] .st-glass20 select{
+  color:#17253a!important;
+}
+:root[data-theme20="light"] .st-glass20 input::placeholder,
+:root[data-theme20="light"] .st-glass20 textarea::placeholder{
+  color:#69778a!important;
+  opacity:1!important;
+}
+
+/* Koppen en belangrijke tekst altijd sterk contrast */
+.st-glass20 h1,.st-glass20 h2,.st-glass20 h3,
+.st-glass20 strong,.st-glass20 b{
+  opacity:1!important;
+}
