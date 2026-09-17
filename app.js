@@ -174,6 +174,13 @@ function migrateData(raw) {
     .filter(item => item && typeof item.name === 'string' && !excludedNames.has(calendarNameKey(item.name)))
     .map(item => ({ ...item, person: validCalendarPerson(item.person) || inferCalendarPerson(item.name) }));
   migrated.dailyAnswers = raw.dailyAnswers && typeof raw.dailyAnswers === 'object' ? raw.dailyAnswers : {};
+  // v23: preserve backward-compatible financial data instead of dropping it during migration.
+  if (raw.budget && typeof raw.budget === 'object') migrated.budget = clone(raw.budget);
+  if (raw.budget19 && typeof raw.budget19 === 'object') migrated.budget19 = clone(raw.budget19);
+  if (raw.budgetV23 && typeof raw.budgetV23 === 'object') migrated.budgetV23 = clone(raw.budgetV23);
+  if (Array.isArray(raw.priceReferences)) migrated.priceReferences = raw.priceReferences;
+  if (raw.priceReferenceSource) migrated.priceReferenceSource = raw.priceReferenceSource;
+  if (raw.priceReferenceUpdatedAt) migrated.priceReferenceUpdatedAt = raw.priceReferenceUpdatedAt;
   migrated.planning = migrated.planning.map(item => ({
     endTime: '',
     calendarId: 'persoonlijk',
@@ -5000,292 +5007,211 @@ requestAnimationFrame(dock);
 
 
 /* =========================================================
-   v21.9 — SCHUIFBARE VASTE NAVIGATIE + UITGEBREID BUDGET
+   SAMEN THUIS v23 — GEÏNTEGREERDE MOBIELE NAVIGATIE + BUDGET
+   Eén implementatie; geen v21.9/v22 render-wrappers.
    ========================================================= */
 (()=>{
 'use strict';
-if(window.__ST219)return; window.__ST219=1;
+if(window.__ST_V23__) return; window.__ST_V23__=true;
 
-/* HIER BOUW IK DE VASTE, HORIZONTAAL SCHUIFBARE MOBIELE PAGINABALK.
-   Alle pagina's staan rechtstreeks in de balk; "Meer" is niet meer nodig. */
-const NAV219=[
+const NAV23=[
  ['today','⌂','Today'],['planning','▦','Agenda'],['meals','♨','Weekmenu'],
  ['groceries','✓','Boodschappen'],['chores','⌁','Huishouden'],['stock','▤','Voorraad'],
  ['trips','✈','Reizen'],['ideas','♡','Date ideeën'],['home','⌂','Woning'],
  ['budget19','€','Budget'],['extra19','＋','Extra'],['settings','⚙','Instellingen']
 ];
-function nav219(){
- document.querySelector('#dock21')?.remove();
- document.querySelector('.mobile-nav')?.classList.add('old21');
- document.querySelector('.bottom-nav')?.classList.add('old21');
- let nav=document.querySelector('#dock219');
- if(!nav){nav=document.createElement('nav');nav.id='dock219';nav.className='dock219';document.body.append(nav)}
- nav.innerHTML=`<div class="dock219-scroll">${NAV219.map(p=>`<button data-go219="${p[0]}" class="${current===p[0]?'on':''}"><span>${p[1]}</span><small>${p[2]}</small></button>`).join('')}</div>`;
- requestAnimationFrame(()=>{
-   const active=nav.querySelector('button.on');
-   if(active) active.scrollIntoView({behavior:'smooth',block:'nearest',inline:'center'});
- });
-}
-document.addEventListener('click',e=>{
- const b=e.target.closest('[data-go219]');
- if(!b)return;
- e.preventDefault();
- if(window.SamenThuisGo) window.SamenThuisGo(b.dataset.go219);
- else {current=b.dataset.go219;render();}
-});
 
-/* HIER ZET IK DE EXCEL-BUDGETSTRUCTUUR OM NAAR BEWERKBARE APP-DATA. */
-const DEFAULT_FIXED219=[
- ['Huur',1170.11],['Eneco',101],['Evides',20],['Odido',40.52],['Vodafone',22.33],
- ['Gym',27.99],['Univé',181.19],['Zorgverzekering',184.50],['Scooterverzekering',33.15],
- ['Netflix',6.30],['Rabobank',5.95],['Parkeervergunning',35.20],
- ['Wegenbelasting Daphne',62.67],['Wegenbelasting Kees',33]
-];
-function budget219(){
- data.budget219 ||= {
-   incomes:{Kees:2731,Daphne:3427},
-   contributionPct:75,
-   houseBudget:1000,
-   investing:75,
-   fixed:DEFAULT_FIXED219.map((x,i)=>({id:'fix219-'+i,title:x[0],amount:x[1],period:'maand'})),
-   goals:[
-    {id:'buffer219',title:'Buffer',target:3000,current:1000,monthly:150,deadline:''},
-    {id:'vac219',title:'Vakantie',target:5000,current:0,monthly:416.67,deadline:'Jaarlijks'},
-    {id:'house219',title:'Huis',target:15000,current:0,monthly:1000,deadline:'Eind 2027'},
-    {id:'other219',title:'Overig',target:10000,current:0,monthly:0,deadline:'Geen tijdslimiet'}
-   ]
- };
- return data.budget219;
-}
-const euro219=n=>Number(n||0).toLocaleString('nl-NL',{minimumFractionDigits:2,maximumFractionDigits:2});
-const num219=v=>Number(String(v??'').replace(',','.'))||0;
-const monthly219=x=>{
- const a=num219(x.amount);
- return x.period==='jaar'?a/12:x.period==='kwartaal'?a/3:a;
+const DEFAULT_BUDGET23={
+ incomes:{Kees:2731,Daphne:3427},
+ contributionPct:75,
+ houseBudget:1000,
+ houseCategories:[
+  {id:'hb-groceries',title:'Boodschappen',amount:650},
+  {id:'hb-household',title:'Huishouden',amount:125},
+  {id:'hb-home',title:'Woning',amount:125},
+  {id:'hb-other',title:'Overig gezamenlijk',amount:100}
+ ],
+ investing:75,
+ fixed:[
+  ['Huur',1170.11,'maand'],['Eneco',101,'maand'],['Evides',20,'maand'],
+  ['Odido',40.52,'maand'],['Vodafone',22.33,'maand'],['Gym',27.99,'maand'],
+  ['Univé',181.19,'maand'],['Zorgverzekering',184.50,'maand'],
+  ['Scooterverzekering',33.15,'maand'],['Netflix',6.30,'maand'],
+  ['Rabobank',5.95,'maand'],['Parkeervergunning',35.20,'maand'],
+  ['Wegenbelasting Daphne',62.67,'maand'],['Wegenbelasting Kees',33,'maand']
+ ].map((x,i)=>({id:`fixed23-${i}`,title:x[0],amount:x[1],period:x[2]})),
+ goals:[
+  {id:'buffer23',title:'Buffer',target:3000,current:1000,monthly:150,deadline:'',recurring:false},
+  {id:'vacation23',title:'Vakantie',target:5000,current:0,monthly:416.67,deadline:'Jaarlijks',recurring:true},
+  {id:'home23',title:'Huis',target:15000,current:0,monthly:1000,deadline:'2027-12-31',recurring:false},
+  {id:'other23',title:'Overig',target:10000,current:0,monthly:0,deadline:'',recurring:false}
+ ]
 };
-function calc219(){
- const b=budget219(), k=num219(b.incomes.Kees), d=num219(b.incomes.Daphne), pct=num219(b.contributionPct)/100;
- const fixed=(b.fixed||[]).reduce((s,x)=>s+monthly219(x),0);
- const saving=(b.goals||[]).reduce((s,x)=>s+num219(x.monthly),0);
- const contribution=(k+d)*pct;
- const needed=fixed+num219(b.houseBudget)+saving+num219(b.investing);
- return {k,d,pct,fixed,saving,contribution,needed,remainder:contribution-needed,
-   kPersonal:k*(1-pct),dPersonal:d*(1-pct),totalIncome:k+d};
+const clone23=x=>JSON.parse(JSON.stringify(x));
+function budget23(){
+ if(!data.budgetV23){
+   const old=data.budget219||data.budgetV22||null;
+   data.budgetV23=clone23(DEFAULT_BUDGET23);
+   if(old){
+    if(old.incomes) data.budgetV23.incomes={...data.budgetV23.incomes,...old.incomes};
+    ['contributionPct','houseBudget','investing'].forEach(k=>{if(old[k]!=null)data.budgetV23[k]=Number(old[k])});
+    if(Array.isArray(old.fixed)&&old.fixed.length)data.budgetV23.fixed=old.fixed.map(x=>({...x}));
+    if(Array.isArray(old.goals)&&old.goals.length)data.budgetV23.goals=old.goals.map(x=>({...x}));
+   }
+   save({touch:false});
+ }
+ const b=data.budgetV23;
+ b.incomes={...DEFAULT_BUDGET23.incomes,...(b.incomes||{})};
+ b.fixed=Array.isArray(b.fixed)?b.fixed:clone23(DEFAULT_BUDGET23.fixed);
+ b.goals=Array.isArray(b.goals)?b.goals:clone23(DEFAULT_BUDGET23.goals);
+ b.houseCategories=Array.isArray(b.houseCategories)&&b.houseCategories.length?b.houseCategories:clone23(DEFAULT_BUDGET23.houseCategories);
+ return b;
 }
-
-/* HIER MAAK IK HET BUDGETDASHBOARD. Alle bedragen gebruiken dezelfde calc219()
-   zodat 'resterend' niet meer uit twee verschillende formules kan komen. */
-budgetPage19=function(){
- const b=budget219(),c=calc219();
- const goals=(b.goals||[]).map((g,i)=>{
-   const pct=Math.max(0,Math.min(100,num219(g.target)?num219(g.current)/num219(g.target)*100:0));
-   return `<article class="budget219-goal">
-    <div><strong>${esc(g.title)}</strong><small>${esc(g.deadline||'')}</small></div>
-    <div class="budget219-progress"><span style="width:${pct}%"></span></div>
-    <div class="budget219-goalnums"><span>€ ${euro219(g.current)} / € ${euro219(g.target)}</span><b>€ ${euro219(g.monthly)}/mnd</b></div>
-    <button class="secondary" data-b219-goal="${i}">Bewerk</button>
-   </article>`;
+const n23=v=>Number(String(v??0).replace(',','.'))||0;
+const eur23=v=>new Intl.NumberFormat('nl-NL',{style:'currency',currency:'EUR'}).format(n23(v));
+const pct23=v=>Math.max(0,Math.min(100,n23(v)));
+const monthlyFixed23=x=>x.period==='jaar'?n23(x.amount)/12:x.period==='kwartaal'?n23(x.amount)/3:n23(x.amount);
+function calcBudget23(){
+ const b=budget23(),K=n23(b.incomes.Kees),D=n23(b.incomes.Daphne),rate=n23(b.contributionPct)/100;
+ const fixed=b.fixed.reduce((s,x)=>s+monthlyFixed23(x),0);
+ const saving=b.goals.reduce((s,x)=>s+n23(x.monthly),0);
+ const investing=n23(b.investing),house=n23(b.houseBudget),income=K+D,contribution=income*rate;
+ const needed=fixed+house+saving+investing,remainder=contribution-needed;
+ const saved=b.goals.reduce((s,x)=>s+n23(x.current),0),targets=b.goals.reduce((s,x)=>s+n23(x.target),0);
+ return {b,K,D,rate,fixed,saving,investing,house,income,contribution,needed,remainder,saved,targets,
+  kContribution:K*rate,dContribution:D*rate,kPersonal:K*(1-rate),dPersonal:D*(1-rate),
+  neededPct:income?needed/income*100:0};
+}
+function deadlineMonths23(deadline){
+ if(!deadline||deadline==='Jaarlijks')return null;
+ const d=new Date(deadline+'T12:00:00'),now=new Date();
+ if(Number.isNaN(d.getTime()))return null;
+ return Math.max(0,Math.ceil((d-now)/(30.4375*86400000)));
+}
+function goalStatus23(g){
+ const left=Math.max(0,n23(g.target)-n23(g.current)),m=n23(g.monthly);
+ const months=m>0?Math.ceil(left/m):null,deadline=deadlineMonths23(g.deadline);
+ return {left,months,deadline,enough:deadline==null||left===0||(m>0&&months<=deadline)};
+}
+function donut23(value,max,label){
+ const p=pct23(max?n23(value)/n23(max)*100:0),r=42,c=2*Math.PI*r,d=c*p/100;
+ return `<div class="donut23"><svg viewBox="0 0 110 110"><circle class="ring-bg23" cx="55" cy="55" r="${r}"/><circle class="ring-value23" cx="55" cy="55" r="${r}" stroke-dasharray="${d} ${c-d}" transform="rotate(-90 55 55)"/></svg><div><b>${Math.round(p)}%</b><small>${esc(label)}</small></div></div>`;
+}
+function bars23(rows,stacked=false){
+ const max=Math.max(1,...rows.flatMap(x=>[Math.abs(n23(x.value)),Math.abs(n23(x.value2))]));
+ return `<div class="chart-bars23">${rows.map(x=>`<div class="chart-row23"><span>${esc(x.label)}</span><div class="chart-track23"><i style="width:${Math.max(x.value?2:0,Math.abs(n23(x.value))/max*100)}%"></i>${x.value2!=null?`<em style="width:${Math.max(x.value2?2:0,Math.abs(n23(x.value2))/max*100)}%"></em>`:''}</div><b>${eur23(x.value)}</b></div>`).join('')}</div>`;
+}
+function projection23(g){
+ const st=goalStatus23(g),points=[],months=Math.min(24,Math.max(12,st.months||12));
+ for(let i=0;i<=months;i+=Math.max(1,Math.ceil(months/8)))points.push({m:i,v:Math.min(n23(g.target),n23(g.current)+n23(g.monthly)*i)});
+ if(points.at(-1)?.m!==months)points.push({m:months,v:Math.min(n23(g.target),n23(g.current)+n23(g.monthly)*months)});
+ const max=Math.max(1,n23(g.target)),w=300,h=100,pad=12;
+ const coords=points.map((p,i)=>`${pad+(w-2*pad)*(p.m/months)},${h-pad-(h-2*pad)*(p.v/max)}`).join(' ');
+ return `<svg class="projection23" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><line x1="${pad}" y1="${h-pad}" x2="${w-pad}" y2="${h-pad}"/><line x1="${pad}" y1="${pad}" x2="${w-pad}" y2="${pad}" class="target23"/><polyline points="${coords}"/></svg>`;
+}
+function renderBudget23(){
+ const c=calcBudget23(),b=c.b;
+ const goals=b.goals.map((g,i)=>{
+  const st=goalStatus23(g);
+  return `<article class="light-surface23 goal-card23">
+   <header><div><small>SPAARDOEL</small><h3>${esc(g.title)}</h3><p>${esc(g.deadline||'Geen deadline')}</p></div><div><button data-budget23-goal="${i}">Bewerk</button><button class="danger23" data-budget23-delgoal="${i}">×</button></div></header>
+   <div class="goal-visual23">${donut23(g.current,g.target,g.title)}<div><b>${eur23(g.current)} / ${eur23(g.target)}</b><span>Nog nodig ${eur23(st.left)}</span><span>${n23(g.monthly)>0?`${eur23(g.monthly)} per maand`:'Geen maandbedrag'}</span><span class="${st.enough?'ok23':'warn23'}">${st.months===0?'Doel bereikt':st.months?`Verwacht over ${st.months} maanden`:'Geen prognose'}${st.deadline!=null?` · ${st.enough?'op schema':'inleg te laag voor deadline'}`:''}</span></div></div>
+   ${projection23(g)}
+  </article>`;
  }).join('');
- const fixed=(b.fixed||[]).map((x,i)=>`<div class="budget219-row">
-   <div><strong>${esc(x.title)}</strong><small>${x.period==='maand'?'per maand':x.period==='kwartaal'?'per kwartaal':'per jaar'} → € ${euro219(monthly219(x))}/mnd</small></div>
-   <b>€ ${euro219(x.amount)}</b><button class="secondary" data-b219-fixed="${i}">Bewerk</button>
- </div>`).join('');
- return `<div class="page19 budget219">
- <div class="page19-head"><div><p class="eyebrow">GELD</p><h1>Budget</h1><p>Dezelfde rekenlogica als in jullie budget-Excel, maar volledig bewerkbaar.</p></div></div>
- <div class="budget219-summary">
-   <section class="card"><small>Netto inkomen samen</small><h2>€ ${euro219(c.totalIncome)}</h2><span>Kees € ${euro219(c.k)} · Daphne € ${euro219(c.d)}</span></section>
-   <section class="card"><small>Afdracht gezamenlijk</small><h2>${euro219(b.contributionPct)}%</h2><span>€ ${euro219(c.contribution)} per maand</span></section>
-   <section class="card ${c.remainder<0?'budget219-negative':''}"><small>Gezamenlijk resterend</small><h2>€ ${euro219(c.remainder)}</h2><span>Na alle maandbudgetten en doelen</span></section>
- </div>
- <section class="card budget219-settings">
-  <div class="card-head"><div><p class="eyebrow">INKOMEN & VERDELING</p><h2>Maandinstellingen</h2></div></div>
-  <div class="budget219-fields">
-   <label>Kees netto / maand<input inputmode="decimal" data-b219-field="incomes.Kees" value="${c.k}"></label>
-   <label>Daphne netto / maand<input inputmode="decimal" data-b219-field="incomes.Daphne" value="${c.d}"></label>
-   <label>Afdracht gezamenlijk (%)<input inputmode="decimal" data-b219-field="contributionPct" value="${b.contributionPct}"></label>
-   <label>Huis / maandbudget<input inputmode="decimal" data-b219-field="houseBudget" value="${b.houseBudget}"></label>
-   <label>Beleggen / maand<input inputmode="decimal" data-b219-field="investing" value="${b.investing}"></label>
-  </div>
-  <div class="budget219-personal"><div><small>Kees persoonlijk over</small><b>€ ${euro219(c.kPersonal)}</b></div><div><small>Daphne persoonlijk over</small><b>€ ${euro219(c.dPersonal)}</b></div></div>
- </section>
- <section class="card"><div class="card-head"><div><p class="eyebrow">VASTE LASTEN</p><h2>€ ${euro219(c.fixed)} per maand</h2></div><button class="primary" data-b219-addfixed>+ Last</button></div>${fixed}</section>
- <section class="card"><div class="card-head"><div><p class="eyebrow">SPAARDOELEN</p><h2>€ ${euro219(c.saving)} per maand</h2></div><button class="primary" data-b219-addgoal>+ Doel</button></div><div class="budget219-goals">${goals}</div></section>
- <section class="card budget219-breakdown"><div class="card-head"><h2>Maandberekening</h2></div>
-  <div><span>Gezamenlijke afdracht</span><b>€ ${euro219(c.contribution)}</b></div>
-  <div><span>Vaste lasten</span><b>− € ${euro219(c.fixed)}</b></div>
-  <div><span>Huisbudget</span><b>− € ${euro219(b.houseBudget)}</b></div>
-  <div><span>Sparen</span><b>− € ${euro219(c.saving)}</b></div>
-  <div><span>Beleggen</span><b>− € ${euro219(b.investing)}</b></div>
-  <div class="total"><span>Resterend</span><b>€ ${euro219(c.remainder)}</b></div>
- </section></div>`;
-};
-function setNested219(path,value){
- const b=budget219(),parts=path.split('.');
- if(parts.length===2)b[parts[0]][parts[1]]=num219(value); else b[path]=num219(value);
+ const fixed=b.fixed.map((x,i)=>`<div class="light-surface23 fixed-row23"><div><b>${esc(x.title)}</b><small>${x.period==='jaar'?'Jaarlijks':x.period==='kwartaal'?'Per kwartaal':'Maandelijks'} · ${eur23(monthlyFixed23(x))}/mnd</small></div><strong>${eur23(x.amount)}</strong><button data-budget23-fixed="${i}">Bewerk</button><button class="danger23" data-budget23-delfixed="${i}">×</button></div>`).join('');
+ const goalBars=b.goals.map(g=>({label:g.title,value:n23(g.current),value2:Math.max(0,n23(g.target)-n23(g.current))}));
+ const money=[{label:'Vaste lasten',value:c.fixed},{label:'Huisbudget',value:c.house},{label:'Sparen',value:c.saving},{label:'Beleggen',value:c.investing},{label:'Resterend',value:Math.max(0,c.remainder)}];
+ const house=b.houseCategories.map((x,i)=>`<label>${esc(x.title)}<input inputmode="decimal" data-budget23-house="${i}" value="${n23(x.amount)}"></label>`).join('');
+ return `<div class="budget23">
+  <header class="budget-title23"><p class="eyebrow">SAMEN THUIS · FINANCIËN</p><h1>Budgetdashboard</h1><p>Één maandberekening voor inkomen, lasten, sparen, beleggen en wat er overblijft.</p></header>
+  <section class="kpis23">
+   <article><small>NETTO INKOMEN</small><b>${eur23(c.income)}</b><span>samen per maand</span></article>
+   <article><small>GEZAMENLIJKE AFDACHT</small><b>${eur23(c.contribution)}</b><span>${n23(b.contributionPct)}%</span></article>
+   <article><small>MAANDELIJKS NODIG</small><b>${eur23(c.needed)}</b><span>benodigd ${c.neededPct.toFixed(1).replace('.',',')}%</span></article>
+   <article class="${c.remainder<0?'negative23':'positive23'}"><small>${c.remainder<0?'TEKORT':'OVER'}</small><b>${eur23(Math.abs(c.remainder))}</b><span>na alle ingestelde posten</span></article>
+   <article><small>SPAARGELD TOTAAL</small><b>${eur23(c.saved)}</b><span>van ${eur23(c.targets)}</span></article>
+   <article><small>BELEGGEN</small><b>${eur23(c.investing)}</b><span>per maand</span></article>
+  </section>
+
+  <section class="budget-grid23">
+   <article class="budget-sheet23"><header><div><small>INKOMEN & VERDELING</small><h2>Kees en Daphne</h2></div></header>
+    <div class="people23"><div><b>Kees</b><strong>${eur23(c.K)}</strong><span>Gezamenlijk ${eur23(c.kContribution)}</span><span>Persoonlijk ${eur23(c.kPersonal)}</span></div><div><b>Daphne</b><strong>${eur23(c.D)}</strong><span>Gezamenlijk ${eur23(c.dContribution)}</span><span>Persoonlijk ${eur23(c.dPersonal)}</span></div></div>
+    <div class="fields23"><label>Kees netto<input data-budget23-field="incomes.Kees" inputmode="decimal" value="${c.K}"></label><label>Daphne netto<input data-budget23-field="incomes.Daphne" inputmode="decimal" value="${c.D}"></label><label>Afdracht %<input data-budget23-field="contributionPct" inputmode="decimal" value="${n23(b.contributionPct)}"></label><label>Huisbudget<input data-budget23-field="houseBudget" inputmode="decimal" value="${c.house}"></label><label>Beleggen<input data-budget23-field="investing" inputmode="decimal" value="${c.investing}"></label></div>
+   </article>
+   <article class="budget-sheet23"><header><div><small>MAANDELIJKSE GELDVERDELING</small><h2>Waar gaat het heen?</h2></div></header>${bars23(money)}
+    <div class="calc23"><span>Gezamenlijke afdracht <b>${eur23(c.contribution)}</b></span><span>Maandbehoefte <b>− ${eur23(c.needed)}</b></span><span class="total23">Resterend <b>${eur23(c.remainder)}</b></span></div>
+   </article>
+  </section>
+
+  <section class="budget-sheet23"><header><div><small>SPAARDOELEN & PROGNOSE</small><h2>Voortgang</h2></div><button class="primary" data-budget23-addgoal>+ Spaardoel</button></header><div class="goals23">${goals}</div></section>
+
+  <section class="budget-grid23">
+   <article class="budget-sheet23"><header><div><small>SPAARGELD PER DOEL</small><h2>Gespaard versus nog nodig</h2></div></header><div class="legend23"><span><i></i>Gespaard</span><span><em></em>Nog nodig</span></div>${bars23(goalBars,true)}</article>
+   <article class="budget-sheet23"><header><div><small>HUISBUDGET</small><h2>${eur23(c.house)} per maand</h2></div></header><div class="fields23 house-fields23">${house}</div><p class="muted">Subcategorieën zijn een verdeling binnen het huisbudget; het totaalbudget blijft leidend in de maandberekening.</p></article>
+  </section>
+
+  <section class="budget-sheet23"><header><div><small>VASTE LASTEN</small><h2>${eur23(c.fixed)} per maand</h2></div><button class="primary" data-budget23-addfixed>+ Vaste last</button></header><div class="fixed-list23">${fixed}</div></section>
+ </div>`;
+}
+function setBudgetField23(path,value){
+ const b=budget23(),p=path.split('.');
+ if(p.length===2)b[p[0]][p[1]]=n23(value);else b[path]=n23(value);
  save();render();
 }
-function editFixed219(i){
- const b=budget219(),old=i==null?{title:'',amount:0,period:'maand'}:b.fixed[i];
- const title=prompt('Naam vaste last',old.title);if(title===null)return;
- const amount=prompt('Bedrag',old.amount);if(amount===null)return;
- const period=prompt('Periode: maand, kwartaal of jaar',old.period||'maand');if(period===null)return;
- const item={...old,id:old.id||uid(),title,amount:num219(amount),period:['maand','kwartaal','jaar'].includes(period.toLowerCase())?period.toLowerCase():'maand'};
+function editFixed23(i){
+ const b=budget23(),x=i==null?{id:id(),title:'Nieuwe vaste last',amount:0,period:'maand'}:b.fixed[i];
+ const title=prompt('Naam vaste last',x.title);if(title===null)return;
+ const amount=prompt('Bedrag',x.amount);if(amount===null)return;
+ const period=prompt('Frequentie: maand, kwartaal of jaar',x.period||'maand');if(period===null)return;
+ const item={...x,title:title.trim()||'Vaste last',amount:n23(amount),period:['maand','kwartaal','jaar'].includes(period.toLowerCase())?period.toLowerCase():'maand'};
  if(i==null)b.fixed.push(item);else b.fixed[i]=item;save();render();
 }
-function editGoal219(i){
- const b=budget219(),old=i==null?{title:'Nieuw doel',target:0,current:0,monthly:0,deadline:''}:b.goals[i];
- const title=prompt('Spaardoel',old.title);if(title===null)return;
- const target=prompt('Doelbedrag',old.target);if(target===null)return;
- const current=prompt('Nu gespaard',old.current);if(current===null)return;
- const monthly=prompt('Maandelijks sparen',old.monthly);if(monthly===null)return;
- const deadline=prompt('Deadline / toelichting',old.deadline||'');if(deadline===null)return;
- const item={...old,id:old.id||uid(),title,target:num219(target),current:num219(current),monthly:num219(monthly),deadline};
+function editGoal23(i){
+ const b=budget23(),g=i==null?{id:id(),title:'Nieuw spaardoel',target:0,current:0,monthly:0,deadline:'',recurring:false}:b.goals[i];
+ const title=prompt('Naam spaardoel',g.title);if(title===null)return;
+ const target=prompt('Doelbedrag',g.target);if(target===null)return;
+ const currentAmount=prompt('Huidig gespaard',g.current);if(currentAmount===null)return;
+ const monthly=prompt('Maandelijkse inleg',g.monthly);if(monthly===null)return;
+ const deadline=prompt('Deadline (YYYY-MM-DD), "Jaarlijks" of leeg',g.deadline||'');if(deadline===null)return;
+ const item={...g,title:title.trim()||'Spaardoel',target:n23(target),current:n23(currentAmount),monthly:n23(monthly),deadline:deadline.trim(),recurring:/jaarlijks/i.test(deadline)};
  if(i==null)b.goals.push(item);else b.goals[i]=item;save();render();
 }
-document.addEventListener('change',e=>{
- const f=e.target.closest('[data-b219-field]');if(f){setNested219(f.dataset.b219Field,f.value);return}
-});
+function mobileNav23(){
+ document.querySelectorAll('#dock21,#dock219,.dock21,.dock219,[data-v19-moremenu]').forEach(x=>x.remove());
+ document.querySelectorAll('.mobile-nav,.bottom-nav').forEach(x=>x.classList.add('legacy-mobile23'));
+ let nav=document.querySelector('#mobileNav23');
+ if(!nav){nav=document.createElement('nav');nav.id='mobileNav23';nav.className='mobile-nav23';nav.setAttribute('aria-label','Pagina navigatie');document.body.append(nav)}
+ nav.innerHTML=`<div class="mobile-nav-scroll23">${NAV23.map(([key,icon,label])=>`<button data-nav23="${key}" class="${current===key?'active':''}"><span>${icon}</span><small>${label}</small></button>`).join('')}</div>`;
+ const active=nav.querySelector('.active');
+ requestAnimationFrame(()=>active?.scrollIntoView({behavior:'smooth',block:'nearest',inline:'center'}));
+}
+function go23(view){
+ current=view;
+ if(view!=='budget19'&&view!=='extra19'&&sections[view]){setupNav();document.querySelector('#pageTitle').textContent=sections[view].label;document.querySelector('#addBtn').style.display=['today','settings'].includes(view)?'none':''}
+ render();
+}
+window.SamenThuisGo=go23;
+
+const baseRender23=render;
+render=function(...args){
+ if(current==='budget19'){document.querySelector('#view').innerHTML=renderBudget23();updateSyncBadge();}
+ else baseRender23(...args);
+ requestAnimationFrame(mobileNav23);
+};
+
 document.addEventListener('click',e=>{
- if(e.target.closest('[data-b219-addfixed]')){editFixed219(null);return}
- const f=e.target.closest('[data-b219-fixed]');if(f){editFixed219(Number(f.dataset.b219Fixed));return}
- if(e.target.closest('[data-b219-addgoal]')){editGoal219(null);return}
- const g=e.target.closest('[data-b219-goal]');if(g){editGoal219(Number(g.dataset.b219Goal));return}
+ const nav=e.target.closest('[data-nav23]');if(nav){e.preventDefault();go23(nav.dataset.nav23);return}
+ if(e.target.closest('[data-budget23-addfixed]')){editFixed23(null);return}
+ const ef=e.target.closest('[data-budget23-fixed]');if(ef){editFixed23(Number(ef.dataset.budget23Fixed));return}
+ const df=e.target.closest('[data-budget23-delfixed]');if(df&&confirm('Deze vaste last verwijderen?')){budget23().fixed.splice(Number(df.dataset.budget23Delfixed),1);save();render();return}
+ if(e.target.closest('[data-budget23-addgoal]')){editGoal23(null);return}
+ const eg=e.target.closest('[data-budget23-goal]');if(eg){editGoal23(Number(eg.dataset.budget23Goal));return}
+ const dg=e.target.closest('[data-budget23-delgoal]');if(dg&&confirm('Dit spaardoel verwijderen?')){budget23().goals.splice(Number(dg.dataset.budget23Delgoal),1);save();render();return}
 });
-
-/* Iedere render houdt de schuifbalk gelijk met de geopende pagina. */
-const renderBefore219=render;
-render=function(...args){
- const r=renderBefore219(...args);
- requestAnimationFrame(nav219);
- return r;
-};
-requestAnimationFrame(nav219);
+document.addEventListener('change',e=>{
+ const f=e.target.closest('[data-budget23-field]');if(f){setBudgetField23(f.dataset.budget23Field,f.value);return}
+ const h=e.target.closest('[data-budget23-house]');if(h){budget23().houseCategories[Number(h.dataset.budget23House)].amount=n23(h.value);save();render();}
+});
+requestAnimationFrame(mobileNav23);
 })();
-
-/* v21.9 build 2026-09-16 21:08:05 +0000 */
-
-
-/* =========================================================
-   v22 — BUDGETDASHBOARD ZOALS EXCEL + VASTE LICHTE KAARTEN
-   ========================================================= */
-(()=>{
-'use strict';
-if(window.__ST220)return; window.__ST220=1;
-
-function B220(){ return budget219(); }
-function C220(){ return calc219(); }
-const E220=n=>Number(n||0).toLocaleString('nl-NL',{minimumFractionDigits:2,maximumFractionDigits:2});
-const P220=n=>Math.max(0,Math.min(100,Number(n)||0));
-
-function donut220(value,max,label,sub){
- const pct=P220(max?value/max*100:0), r=42, circ=2*Math.PI*r, dash=circ*pct/100;
- return `<div class="donut220">
-  <svg viewBox="0 0 110 110" aria-label="${esc(label)} ${Math.round(pct)} procent">
-   <circle class="donut220-bg" cx="55" cy="55" r="${r}"></circle>
-   <circle class="donut220-value" cx="55" cy="55" r="${r}" stroke-dasharray="${dash} ${circ-dash}" transform="rotate(-90 55 55)"></circle>
-  </svg>
-  <div class="donut220-center"><b>${Math.round(pct)}%</b><small>${esc(label)}</small></div>
-  <span>${sub}</span>
- </div>`;
-}
-function bars220(rows){
- const max=Math.max(1,...rows.map(x=>Math.abs(x.value)));
- return `<div class="bars220">${rows.map(x=>`<div class="bar220">
-  <span>${esc(x.label)}</span><div class="bar220-track"><i style="width:${Math.max(2,Math.abs(x.value)/max*100)}%"></i></div><b>€ ${E220(x.value)}</b>
- </div>`).join('')}</div>`;
-}
-function savingsProjection220(goal){
- const cur=Number(goal.current||0), target=Number(goal.target||0), monthly=Number(goal.monthly||0);
- const remaining=Math.max(0,target-cur), months=monthly>0?Math.ceil(remaining/monthly):null;
- return months===0?'Doel bereikt':months?`Nog circa ${months} maanden`:'Geen maandbedrag ingesteld';
-}
-
-/* Volledige Excel-achtige budgetweergave:
-   boven KPI's, daarna verdeling, vaste lasten, doelen, grafieken en detailberekening. */
-window.budgetPage220=function(){
- const b=B220(),c=C220();
- const contributionK=c.k*c.pct, contributionD=c.d*c.pct;
- const requiredPct=c.totalIncome?c.needed/c.totalIncome*100:0;
- const goalCards=(b.goals||[]).map((g,i)=>`<article class="budget220-goal light-fixed220">
-  <div class="budget220-goalhead"><div><small>SPAARDOEL</small><h3>${esc(g.title)}</h3><p>${esc(g.deadline||'Geen deadline')}</p></div><button class="secondary" data-b219-goal="${i}">Bewerk</button></div>
-  ${donut220(Number(g.current||0),Number(g.target||0),g.title,`€ ${E220(g.current)} van € ${E220(g.target)}`)}
-  <div class="budget220-goalmeta"><span>Per maand <b>€ ${E220(g.monthly)}</b></span><span>${savingsProjection220(g)}</span></div>
- </article>`).join('');
-
- const fixed=(b.fixed||[]).map((x,i)=>`<div class="budget220-table-row light-fixed220">
-   <div><b>${esc(x.title)}</b><small>${x.period==='jaar'?'Jaarlijks':x.period==='kwartaal'?'Per kwartaal':'Maandelijks'}</small></div>
-   <span>€ ${E220(x.amount)}</span><strong>€ ${E220(monthly219(x))}/mnd</strong>
-   <button class="secondary" data-b219-fixed="${i}">Bewerk</button>
- </div>`).join('');
-
- const expenseRows=[
-  {label:'Vaste lasten',value:c.fixed},{label:'Huisbudget',value:Number(b.houseBudget||0)},
-  {label:'Spaardoelen',value:c.saving},{label:'Beleggen',value:Number(b.investing||0)}
- ];
- return `<div class="budget220">
-  <header class="budget220-title"><div><p class="eyebrow">SAMEN THUIS · FINANCIËN</p><h1>Budgetdashboard</h1><p>Maandoverzicht, verdeling en voortgang van jullie doelen.</p></div></header>
-
-  <section class="budget220-kpis">
-   <article class="kpi220"><small>NETTO INKOMEN</small><b>€ ${E220(c.totalIncome)}</b><span>per maand samen</span></article>
-   <article class="kpi220"><small>MAANDELIJKS NODIG</small><b>€ ${E220(c.needed)}</b><span>lasten + budget + sparen + beleggen</span></article>
-   <article class="kpi220"><small>GEZAMENLIJKE AFDACHT</small><b>€ ${E220(c.contribution)}</b><span>${E220(b.contributionPct)}% van inkomen</span></article>
-   <article class="kpi220 ${c.remainder<0?'bad220':'good220'}"><small>${c.remainder<0?'TEKORT':'OVERSCHOT'}</small><b>€ ${E220(Math.abs(c.remainder))}</b><span>na alle maandposten</span></article>
-  </section>
-
-  <section class="budget220-grid2">
-   <article class="sheet220">
-    <div class="sheet220-head"><div><small>INKOMEN & AFDACHT</small><h2>Kees en Daphne</h2></div><span>Benodigd: ${E220(requiredPct)}%</span></div>
-    <div class="person220"><div><b>Kees</b><strong>€ ${E220(c.k)}</strong><span>Afdracht € ${E220(contributionK)}</span><span>Persoonlijk € ${E220(c.kPersonal)}</span></div>
-    <div><b>Daphne</b><strong>€ ${E220(c.d)}</strong><span>Afdracht € ${E220(contributionD)}</span><span>Persoonlijk € ${E220(c.dPersonal)}</span></div></div>
-    <div class="budget220-fields">
-     <label>Kees netto<input inputmode="decimal" data-b219-field="incomes.Kees" value="${c.k}"></label>
-     <label>Daphne netto<input inputmode="decimal" data-b219-field="incomes.Daphne" value="${c.d}"></label>
-     <label>Afdracht %<input inputmode="decimal" data-b219-field="contributionPct" value="${b.contributionPct}"></label>
-     <label>Huisbudget<input inputmode="decimal" data-b219-field="houseBudget" value="${b.houseBudget}"></label>
-     <label>Beleggen<input inputmode="decimal" data-b219-field="investing" value="${b.investing}"></label>
-    </div>
-   </article>
-   <article class="sheet220">
-    <div class="sheet220-head"><div><small>MAANDBUDGET</small><h2>Waar gaat het geld heen?</h2></div></div>
-    ${bars220(expenseRows)}
-    <div class="budget220-calc">
-      <span>Beschikbaar via afdracht <b>€ ${E220(c.contribution)}</b></span>
-      <span>Totale maandbehoefte <b>€ ${E220(c.needed)}</b></span>
-      <span class="total">Resterend <b>€ ${E220(c.remainder)}</b></span>
-    </div>
-   </article>
-  </section>
-
-  <section class="sheet220">
-   <div class="sheet220-head"><div><small>SPAARDOELEN</small><h2>Voortgang</h2></div><button class="primary" data-b219-addgoal>+ Spaardoel</button></div>
-   <div class="budget220-goals">${goalCards}</div>
-  </section>
-
-  <section class="budget220-grid2">
-   <article class="sheet220">
-    <div class="sheet220-head"><div><small>VASTE LASTEN</small><h2>€ ${E220(c.fixed)} per maand</h2></div><button class="primary" data-b219-addfixed>+ Vaste last</button></div>
-    <div class="budget220-table">${fixed}</div>
-   </article>
-   <article class="sheet220">
-    <div class="sheet220-head"><div><small>VERDELING</small><h2>Maandelijkse posten</h2></div></div>
-    <div class="pie220-wrap">${donut220(c.fixed,c.needed,'Vaste lasten',`${Math.round(c.fixed/c.needed*100||0)}% van maandbehoefte`)}</div>
-    ${bars220([{label:'Sparen',value:c.saving},{label:'Huis',value:Number(b.houseBudget||0)},{label:'Beleggen',value:Number(b.investing||0)}])}
-   </article>
-  </section>
- </div>`;
-};
-
-/* Render na alle oudere budgetlagen overschrijven zodat v22 daadwerkelijk zichtbaar is. */
-const render220Previous=render;
-render=function(...args){
- if(current==='budget19'){
-   const view=document.querySelector('#view');
-   if(view)view.innerHTML=window.budgetPage220();
-   requestAnimationFrame(()=>{ if(typeof nav219==='function')nav219(); });
-   return;
- }
- return render220Previous(...args);
-};
-})();
-
-/* v22 build 2026-09-16 21:16:30 +0000 */
