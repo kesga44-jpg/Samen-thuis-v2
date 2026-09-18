@@ -1486,3 +1486,27 @@ html[data-theme20="dark"] body.st-glass20 button.primary{
   -webkit-text-fill-color:#ffffff !important;
 }
 
+/* =========================================================
+   BUDGET — Kees & Daphne leesbaar in donkere weergave
+   Alleen de tekst in de twee persoonsblokken wordt aangepast.
+   Achtergronden en overige Budget-opmaak blijven ongewijzigd.
+   ========================================================= */
+html[data-theme20="dark"] body.st-glass20 .budget23 .people23 > div{
+  --ink:var(--darkTextPrimary,#f7f9ff);
+  --muted:var(--darkTextMuted,#c7d8e8);
+}
+
+/* Namen Kees / Daphne */
+html[data-theme20="dark"] body.st-glass20 .budget23 .people23 > div > span{
+  color:var(--darkTextAccent,#9ed8ff)!important;
+  -webkit-text-fill-color:var(--darkTextAccent,#9ed8ff)!important;
+  opacity:1!important;
+}
+
+/* Bedragen/hoofdtekst direct onder de namen */
+html[data-theme20="dark"] body.st-glass20 .budget23 .people23 > div > strong{
+  color:var(--darkTextPrimary,#f7f9ff)!important;
+  -webkit-text-fill-color:var(--darkTextPrimary,#f7f9ff)!important;
+  opacity:1!important;
+}
+
