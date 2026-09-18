@@ -486,11 +486,11 @@ body.st-glass20 #view,body.st-glass20 main,body.st-glass20 .content{padding-bott
 :root[data-theme20="dark"] .st-glass20 label,
 :root[data-theme20="dark"] .st-glass20 .description,
 :root[data-theme20="dark"] .st-glass20 .helper{
-  color:#d2dbe8!important;
+  color:#b0c0d7!important;
 }
 :root[data-theme20="dark"] .st-glass20 .muted,
 :root[data-theme20="dark"] .st-glass20 small{
-  color:#bdc9d9!important;
+  color:#9dafc6!important;
 }
 :root[data-theme20="dark"] .st-glass20 input,
 :root[data-theme20="dark"] .st-glass20 textarea,
