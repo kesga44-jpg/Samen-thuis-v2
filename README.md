@@ -1,13 +1,18 @@
-# Samen Thuis v23.2
+# Samen Thuis v23.3
 
-Build: 2026-09-18 06:17:59 +0000
+Build: 2026-09-18 07:18:05 +0000
 
-Dit is v23.1 DATA-VEILIG met twee gerichte visuele wijzigingen:
-- de mobiele onderbalk is weer uitgevoerd zoals de eerdere v16-stijl: volle breedte, vast onderaan, donker en horizontaal swipebaar door alle pagina's;
-- ieder licht/wit kaartvlak gebruikt in lichte én donkere modus hetzelfde lettertype en dezelfde tekstkleuren (`#17243a` primair, `#6b7483` secundair).
+Deze versie bouwt voort op v23.2 en behoudt dezelfde data-opslag.
 
-De donkere welkomst/hero-kaart blijft licht-op-donker. Accentlinks en knoppen mogen de gekozen accentkleur behouden.
+Wijzigingen:
+- Tekst op witte en lichtgrijze kaarten is in lichte én donkere modus donkerder en beter leesbaar.
+- Primaire tekst op lichte vlakken: `#17243A`.
+- Secundaire tekst op lichte vlakken: `#475363`.
+- Agenda-dagnummers: `#0B1728`.
+- De mobiele onderbalk blijft horizontaal swipebaar.
+- De horizontale positie van de onderbalk wordt bewaard wanneer je op een pagina drukt. De balk springt dus niet meer helemaal terug naar links.
+- De actieve pagina blijft zichtbaar op de positie waar de gebruiker de balk had staan.
+- Opslagkey en bestaande data blijven ongewijzigd.
 
-De bestaande opslagkey `samenThuisDataV2`, safety-backup, Voorraad, Huishouden, Reizen, bodemprijzen, Budget en overige datafunctionaliteit van v23.1 zijn ongewijzigd behouden.
-
-Upload alleen de zeven hoofdbestanden.
+Upload/vervang precies deze zeven bestanden:
+index.html, app.js, styles.css, sw.js, manifest.webmanifest, icon.svg en README.md.

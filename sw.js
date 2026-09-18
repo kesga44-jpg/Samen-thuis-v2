@@ -1,5 +1,5 @@
-const CACHE='samen-thuis-v23-2-v16-nav-light-text';
-const ASSETS=['./','./index.html','./styles.css?v=232','./app.js?v=232','./manifest.webmanifest','./icon.svg'];
+const CACHE='samen-thuis-v23-3-contrast-navpositie';
+const ASSETS=['./','./index.html','./styles.css?v=233','./app.js?v=233','./manifest.webmanifest','./icon.svg'];
 
 self.addEventListener('install',event=>{
   event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS)).then(()=>self.skipWaiting()));
@@ -20,3 +20,5 @@ self.addEventListener('fetch',event=>{
 // v23.1 data-veilige build 2026-09-18 06:00:01 +0000
 
 // v23.2 2026-09-18 06:17:59 +0000
+
+// v23.3 2026-09-18 07:18:05 +0000

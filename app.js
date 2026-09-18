@@ -5243,3 +5243,84 @@ requestAnimationFrame(mobileNav23);
 })();
 
 /* v23.2 visual integration 2026-09-18 06:17:59 +0000 */
+
+
+/* =========================================================
+   v23.3 — mobiele navigatiepositie bewaren
+   ========================================================= */
+(() => {
+  const NAV_POS_KEY = 'samenThuisMobileNavScrollV233';
+  let restoringNav = false;
+
+  function getNavScroller(){
+    return document.querySelector('.mobile-nav-scroll23');
+  }
+
+  function saveNavPosition(){
+    const scroller = getNavScroller();
+    if (!scroller || restoringNav) return;
+    try {
+      sessionStorage.setItem(NAV_POS_KEY, String(scroller.scrollLeft || 0));
+    } catch {}
+  }
+
+  function restoreNavPosition(){
+    const scroller = getNavScroller();
+    if (!scroller) return;
+    let saved = 0;
+    try {
+      saved = Number(sessionStorage.getItem(NAV_POS_KEY) || 0);
+    } catch {}
+    restoringNav = true;
+    requestAnimationFrame(() => {
+      scroller.scrollLeft = saved;
+      requestAnimationFrame(() => {
+        scroller.scrollLeft = saved;
+        restoringNav = false;
+      });
+    });
+  }
+
+  document.addEventListener('scroll', (event) => {
+    if (event.target && event.target.classList &&
+        event.target.classList.contains('mobile-nav-scroll23')) {
+      saveNavPosition();
+    }
+  }, true);
+
+  /* Vóór een navklik positie vastleggen. */
+  document.addEventListener('pointerdown', (event) => {
+    if (event.target.closest && event.target.closest('.mobile-nav23 button')) {
+      saveNavPosition();
+    }
+  }, true);
+
+  /* Na iedere klik/rerender dezelfde positie terugzetten. */
+  document.addEventListener('click', (event) => {
+    if (event.target.closest && event.target.closest('.mobile-nav23 button')) {
+      setTimeout(restoreNavPosition, 0);
+      setTimeout(restoreNavPosition, 60);
+    }
+  }, true);
+
+  /* MutationObserver vangt render() / innerHTML-vervanging van de balk af. */
+  const observer = new MutationObserver(() => {
+    if (getNavScroller()) restoreNavPosition();
+  });
+
+  function start(){
+    observer.observe(document.body, {childList:true, subtree:true});
+    restoreNavPosition();
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', start, {once:true});
+  } else {
+    start();
+  }
+
+  window.addEventListener('pageshow', restoreNavPosition);
+})();
+
+
+/* build v23.3 2026-09-18 07:18:05 +0000 */

@@ -19,7 +19,7 @@ main{min-width:0}.topbar{height:106px;padding:24px clamp(22px,4vw,54px) 15px;dis
 .stat-row{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin:18px 0}.stat{background:white;border:1px solid var(--line);padding:17px;border-radius:15px}.stat strong{display:block;font-size:1.65rem}.stat span{color:var(--muted);font-size:.84rem}
 .list{display:grid;gap:9px}.list-item{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--line)}.list-item:last-child{border:0}.check{width:22px;height:22px;border:2px solid #bec8d3;border-radius:7px;background:white;flex:0 0 auto}.check.done{background:var(--green);border-color:var(--green);color:white}.item-main{min-width:0;flex:1}.item-main strong,.item-main small{display:block}.item-main small{color:var(--muted);margin-top:2px}.done-text{text-decoration:line-through;color:var(--muted)}.tag{padding:5px 9px;border-radius:999px;background:var(--blue-soft);color:var(--blue);font-size:.74rem;font-weight:700;white-space:nowrap}.tag.orange{background:#fff0e6;color:#ad5a2c}.tag.green{background:var(--green-soft);color:var(--green)}.tag.red{background:#faeaeb;color:var(--red)}.delete{border:0;background:transparent;color:#a5adb7;font-size:1.2rem;padding:5px}.delete:hover{color:var(--red)}
 .section-tools{display:flex;gap:10px;margin-bottom:17px;flex-wrap:wrap}.filter{border:1px solid var(--line);background:white;border-radius:10px;padding:9px 12px;color:var(--muted)}.filter.active{background:var(--ink);color:white;border-color:var(--ink)}
-.week{display:grid;grid-template-columns:repeat(7,minmax(145px,1fr));gap:12px;overflow-x:auto;padding-bottom:8px}.day{background:white;border:1px solid var(--line);border-radius:16px;min-height:295px;padding:15px}.day.today{border:2px solid #213f5a}.day-name{text-transform:uppercase;font-size:.76rem;color:#475363;font-weight:800;letter-spacing:.06em}.day-date{font-size:1.4rem;font-weight:800;margin:3px 0 15px;color:#0b1728}.meal{background:var(--blue-soft);border-radius:11px;padding:11px;margin-bottom:9px}.meal small{display:block;color:var(--blue);font-weight:700;margin-bottom:3px}.empty{color:var(--muted);text-align:center;padding:36px 15px;border:1px dashed #ccd3db;border-radius:13px}.progress{height:7px;background:#e8edf0;border-radius:99px;overflow:hidden;margin-top:8px}.progress span{display:block;height:100%;background:var(--green);border-radius:99px}
+.week{display:grid;grid-template-columns:repeat(7,minmax(145px,1fr));gap:12px;overflow-x:auto;padding-bottom:8px}.day{background:white;border:1px solid var(--line);border-radius:16px;min-height:295px;padding:15px}.day.today{border:2px solid var(--blue)}.day-name{text-transform:uppercase;font-size:.76rem;color:var(--muted);font-weight:800;letter-spacing:.06em}.day-date{font-size:1.4rem;font-weight:800;margin:3px 0 15px}.meal{background:var(--blue-soft);border-radius:11px;padding:11px;margin-bottom:9px}.meal small{display:block;color:var(--blue);font-weight:700;margin-bottom:3px}.empty{color:var(--muted);text-align:center;padding:36px 15px;border:1px dashed #ccd3db;border-radius:13px}.progress{height:7px;background:#e8edf0;border-radius:99px;overflow:hidden;margin-top:8px}.progress span{display:block;height:100%;background:var(--green);border-radius:99px}
 .idea-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:13px}.idea{padding:17px;border-radius:15px;background:white;border:1px solid var(--line)}.idea .icon{font-size:1.6rem;margin-bottom:10px}.idea p{color:var(--muted);margin:5px 0 0}.big-choice{padding:34px;text-align:center;background:linear-gradient(135deg,#fff3ea,#fde4d4);border:0}.big-choice .choice{font-size:1.6rem;font-weight:800;margin:16px}
 dialog{border:0;border-radius:20px;padding:0;width:min(570px,calc(100vw - 28px));box-shadow:0 30px 80px rgba(12,22,35,.3)}dialog::backdrop{background:rgba(10,19,30,.54);backdrop-filter:blur(3px)}dialog form{padding:24px}.dialog-head,.dialog-actions{display:flex;align-items:center;justify-content:space-between}.dialog-head h2{margin:0}.icon-btn{border:0;background:#eef1f4;border-radius:50%;width:36px;height:36px;font-size:1.4rem}.form-grid{display:grid;gap:14px;margin:22px 0}.field{display:grid;gap:6px}.field label{font-size:.82rem;font-weight:700;color:var(--muted)}.field input,.field select,.field textarea{width:100%;border:1px solid #ccd4dd;border-radius:10px;padding:11px 12px;background:white;color:var(--ink)}.field textarea{min-height:82px;resize:vertical}.dialog-actions{justify-content:flex-end;gap:10px}
 .toast{position:fixed;left:50%;bottom:28px;transform:translate(-50%,25px);background:var(--ink);color:white;border-radius:11px;padding:11px 16px;opacity:0;pointer-events:none;transition:.22s;z-index:20}.toast.show{opacity:1;transform:translate(-50%,0)}
@@ -31,7 +31,7 @@ dialog{border:0;border-radius:20px;padding:0;width:min(570px,calc(100vw - 28px))
 .sync-state{font-size:.76rem;font-weight:700;color:var(--muted);padding:7px 10px;border:1px solid var(--line);border-radius:999px;background:white;white-space:nowrap}
 .sync-state.connected{color:var(--green);border-color:#bfddd2;background:var(--green-soft)}
 .today-dailies{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(280px,.75fr);gap:18px;margin:18px 0}
-.daily-question{background:linear-gradient(145deg,#fff,#d7e5ee)}
+.daily-question{background:linear-gradient(145deg,#fff,#edf5fa)}
 .daily-question .card-head{align-items:flex-start}.daily-question h2{font-size:1.38rem;line-height:1.3;max-width:720px}
 .daily-icon{display:grid;place-items:center;flex:0 0 42px;width:42px;height:42px;border-radius:50%;background:var(--blue);color:white;font-size:1.25rem;font-weight:800}
 .question-hint,.quote-offline{color:var(--muted);line-height:1.55;margin:8px 0 18px}
@@ -900,22 +900,278 @@ body.st-glass20 .daily-question .answer-grid>article small{color:#66768a!importa
 @media(max-width:1100px){.kpis23{grid-template-columns:repeat(3,1fr)}.fields23{grid-template-columns:repeat(3,1fr)}}
 @media(max-width:700px){.budget-grid23{grid-template-columns:1fr}.kpis23{grid-template-columns:1fr 1fr}.goals23{grid-template-columns:1fr}.fields23{grid-template-columns:1fr 1fr}.budget-sheet23{padding:14px}.fixed-row23{grid-template-columns:1fr auto}.fixed-row23 button{grid-row:2}.chart-row23{grid-template-columns:88px 1fr}.chart-row23>b{grid-column:2;text-align:right}}
 
+/* v23.1 data-veilige build 2026-09-18 06:00:01 +0000 */
 
-/* Gerichte kleurcorrectie: Vraag van de dag + Agenda */
-body.st-glass20 .daily-question{
-  background:linear-gradient(145deg,#ffffff,#d7e5ee)!important;
+/* =========================================================
+   v23.2 — V16-ACHTIGE ONDERBALK + VASTE LICHTE TYPOGRAFIE
+   ========================================================= */
+
+/* Mobiele balk zoals de eerdere v16-opzet:
+   volledig tegen onderzijde, volle breedte, donker vlak.
+   Alle pagina's blijven horizontaal swipebaar. */
+@media(max-width:900px){
+  .mobile-nav23{
+    left:0!important;
+    right:0!important;
+    bottom:0!important;
+    height:calc(92px + env(safe-area-inset-bottom))!important;
+    padding:7px 10px max(8px,env(safe-area-inset-bottom))!important;
+    border:0!important;
+    border-radius:0!important;
+    background:#17243a!important;
+    box-shadow:0 -8px 28px rgba(23,36,58,.13)!important;
+    -webkit-backdrop-filter:none!important;
+    backdrop-filter:none!important;
+  }
+  .mobile-nav-scroll23{
+    gap:4px!important;
+    align-items:stretch!important;
+    scroll-padding-inline:10px;
+  }
+  .mobile-nav23 button{
+    flex:0 0 92px!important;
+    height:76px!important;
+    border-radius:15px!important;
+    color:#dfe8f2!important;
+    background:transparent!important;
+    border:0!important;
+  }
+  .mobile-nav23 button.active{
+    color:#fff!important;
+    background:rgba(255,255,255,.12)!important;
+  }
+  .mobile-nav23 button span{font-size:1.28rem!important}
+  .mobile-nav23 button small{
+    font-size:.70rem!important;
+    font-weight:650!important;
+    color:inherit!important;
+    -webkit-text-fill-color:currentColor!important;
+  }
+  body{padding-bottom:calc(108px + env(safe-area-inset-bottom))!important}
 }
-body.st-glass20 .calendar-week .day .day-name,
-body.st-glass20 .week .day .day-name{
-  color:#475363!important;
-  -webkit-text-fill-color:#475363!important;
+
+/* HOOFDREGEL:
+   ieder wit/licht kaartvlak gebruikt exact dezelfde tekst in light én dark.
+   Dit is bewust gebaseerd op de oorspronkelijke v16-kleuren:
+   ink #17243a en muted #6b7483. */
+body.st-glass20 .card,
+body.st-glass20 .stat,
+body.st-glass20 .list-item.light-surface23,
+body.st-glass20 .light-surface23,
+body.st-glass20 .daily-question .answer-grid>article,
+body.st-glass20 .travel-actions,
+body.st-glass20 .settings-card,
+body.st-glass20 .import-center-v12 .card,
+body.st-glass20 .budget23 .light-surface23{
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Segoe UI",sans-serif!important;
 }
-body.st-glass20 .calendar-week .day .day-date,
-body.st-glass20 .week .day .day-date{
-  color:#0b1728!important;
-  -webkit-text-fill-color:#0b1728!important;
+
+/* Alleen oppervlakken die daadwerkelijk licht/wit zijn krijgen vaste donkere tekst.
+   Donkere hero/welcome-kaarten worden expliciet uitgesloten. */
+body.st-glass20 .card:not(.welcome):not(.dark-card):not(.hero-card),
+body.st-glass20 .stat,
+body.st-glass20 .light-surface23,
+body.st-glass20 .daily-question .answer-grid>article{
+  --ink:#17243a!important;
+  --muted:#6b7483!important;
+  color:#17243a!important;
 }
-body.st-glass20 .calendar-week .day.today,
-body.st-glass20 .week .day.today{
-  border-color:#213f5a!important;
+body.st-glass20 .card:not(.welcome):not(.dark-card):not(.hero-card) h1,
+body.st-glass20 .card:not(.welcome):not(.dark-card):not(.hero-card) h2,
+body.st-glass20 .card:not(.welcome):not(.dark-card):not(.hero-card) h3,
+body.st-glass20 .card:not(.welcome):not(.dark-card):not(.hero-card) strong,
+body.st-glass20 .card:not(.welcome):not(.dark-card):not(.hero-card) b,
+body.st-glass20 .card:not(.welcome):not(.dark-card):not(.hero-card) p:not(.muted):not(.eyebrow),
+body.st-glass20 .card:not(.welcome):not(.dark-card):not(.hero-card) .item-main strong,
+body.st-glass20 .stat strong,
+body.st-glass20 .light-surface23 strong,
+body.st-glass20 .light-surface23 b{
+  color:#17243a!important;
+  -webkit-text-fill-color:#17243a!important;
+}
+body.st-glass20 .card:not(.welcome):not(.dark-card):not(.hero-card) small,
+body.st-glass20 .card:not(.welcome):not(.dark-card):not(.hero-card) .muted,
+body.st-glass20 .card:not(.welcome):not(.dark-card):not(.hero-card) .item-main small,
+body.st-glass20 .stat span,
+body.st-glass20 .light-surface23 small,
+body.st-glass20 .light-surface23 .muted{
+  color:#6b7483!important;
+  -webkit-text-fill-color:#6b7483!important;
+}
+/* Interactieve accenten mogen hun accentkleur houden. */
+body.st-glass20 .card:not(.welcome) .text-btn,
+body.st-glass20 .card:not(.welcome) a,
+body.st-glass20 .light-surface23 .accent{
+  color:var(--blue)!important;
+  -webkit-text-fill-color:var(--blue)!important;
+}
+/* Donkere hero uit v16 blijft bewust licht op donker. */
+body.st-glass20 .welcome,
+body.st-glass20 .welcome *{
+  color:#fff!important;
+  -webkit-text-fill-color:#fff!important;
+}
+body.st-glass20 .welcome p{color:#cedbe7!important;-webkit-text-fill-color:#cedbe7!important}
+
+
+/* =========================================================
+   v23.3 — CONTRASTFIX VOOR ALLE LICHTE / WITTE OPPERVLAKKEN
+   =========================================================
+   Donkere modus mag de tekst in witte kaarten NIET lichter maken.
+   Hoofdtekst: #17243A
+   Secundaire tekst: #475363
+   Zeer secundair: #5D6978
+   ========================================================= */
+
+body.st-glass20 .card:not(.welcome):not(.dark-card):not(.hero-card),
+body.st-glass20 .day,
+body.st-glass20 .idea-card,
+body.st-glass20 .trip-card,
+body.st-glass20 .trip-folder,
+body.st-glass20 .trip-section,
+body.st-glass20 .travel-item,
+body.st-glass20 .event,
+body.st-glass20 .task,
+body.st-glass20 .list-item,
+body.st-glass20 .white-card,
+body.st-glass20 .light-card,
+body.st-glass20 .light-surface23,
+body.st-glass20 .daily-question .answer-grid > article {
+  --ink:#17243a !important;
+  --muted:#475363 !important;
+  color:#17243a !important;
+}
+
+/* Koppen en primaire tekst op lichte vlakken */
+body.st-glass20 .card:not(.welcome):not(.dark-card):not(.hero-card) h1,
+body.st-glass20 .card:not(.welcome):not(.dark-card):not(.hero-card) h2,
+body.st-glass20 .card:not(.welcome):not(.dark-card):not(.hero-card) h3,
+body.st-glass20 .card:not(.welcome):not(.dark-card):not(.hero-card) h4,
+body.st-glass20 .card:not(.welcome):not(.dark-card):not(.hero-card) strong,
+body.st-glass20 .card:not(.welcome):not(.dark-card):not(.hero-card) b,
+body.st-glass20 .day .day-date,
+body.st-glass20 .day strong,
+body.st-glass20 .idea-card h3,
+body.st-glass20 .idea-card strong,
+body.st-glass20 .trip-card h3,
+body.st-glass20 .trip-card strong,
+body.st-glass20 .trip-folder h3,
+body.st-glass20 .trip-section h3,
+body.st-glass20 .travel-item strong,
+body.st-glass20 .event strong,
+body.st-glass20 .task strong,
+body.st-glass20 .list-item strong,
+body.st-glass20 .white-card strong,
+body.st-glass20 .light-card strong,
+body.st-glass20 .light-surface23 strong {
+  color:#17243a !important;
+  -webkit-text-fill-color:#17243a !important;
+  opacity:1 !important;
+}
+
+/* Secundaire tekst op lichte vlakken */
+body.st-glass20 .card:not(.welcome):not(.dark-card):not(.hero-card) p,
+body.st-glass20 .card:not(.welcome):not(.dark-card):not(.hero-card) small,
+body.st-glass20 .card:not(.welcome):not(.dark-card):not(.hero-card) .muted,
+body.st-glass20 .day .day-name,
+body.st-glass20 .day .muted,
+body.st-glass20 .idea-card p,
+body.st-glass20 .idea-card small,
+body.st-glass20 .trip-card p,
+body.st-glass20 .trip-card small,
+body.st-glass20 .trip-folder p,
+body.st-glass20 .trip-section p,
+body.st-glass20 .travel-item p,
+body.st-glass20 .travel-item small,
+body.st-glass20 .event p,
+body.st-glass20 .event small,
+body.st-glass20 .task p,
+body.st-glass20 .task small,
+body.st-glass20 .list-item p,
+body.st-glass20 .list-item small,
+body.st-glass20 .white-card p,
+body.st-glass20 .light-card p,
+body.st-glass20 .light-surface23 p {
+  color:#475363 !important;
+  -webkit-text-fill-color:#475363 !important;
+  opacity:1 !important;
+}
+
+/* Agenda expliciet donker genoeg */
+body.st-glass20 .day .day-name{
+  color:#475363 !important;
+  -webkit-text-fill-color:#475363 !important;
+}
+body.st-glass20 .day .day-date{
+  color:#0b1728 !important;
+  -webkit-text-fill-color:#0b1728 !important;
+}
+body.st-glass20 .event{
+  color:#17243a !important;
+}
+body.st-glass20 .event .muted,
+body.st-glass20 .event small{
+  color:#475363 !important;
+  -webkit-text-fill-color:#475363 !important;
+}
+
+/* Reizen: map, secties en regels in witte vlakken */
+body.st-glass20 .trip-folder,
+body.st-glass20 .trip-section,
+body.st-glass20 .travel-item{
+  color:#17243a !important;
+}
+body.st-glass20 .trip-folder .muted,
+body.st-glass20 .trip-section .muted,
+body.st-glass20 .travel-item .muted{
+  color:#475363 !important;
+  -webkit-text-fill-color:#475363 !important;
+}
+
+/* Date ideeën */
+body.st-glass20 .idea-card .muted{
+  color:#475363 !important;
+  -webkit-text-fill-color:#475363 !important;
+}
+
+/* Lichte knoppen: donkere tekst, blauwe actieknoppen blijven wit */
+body.st-glass20 button:not(.primary):not(.danger):not(.active):not(.nav-btn23),
+body.st-glass20 .btn:not(.primary):not(.danger){
+  color:#17243a;
+}
+body.st-glass20 button.primary,
+body.st-glass20 .primary{
+  color:#fff !important;
+  -webkit-text-fill-color:#fff !important;
+}
+
+/* Donkere panelen blijven licht-op-donker */
+body.st-glass20 .welcome,
+body.st-glass20 .welcome *,
+body.st-glass20 .dark-card,
+body.st-glass20 .dark-card *,
+body.st-glass20 .hero-card,
+body.st-glass20 .hero-card *{
+  -webkit-text-fill-color:currentColor;
+}
+
+/* =========================================================
+   v23.3 — ONDERBALK: POSITIE BEHOUDEN PER PAGINA
+   =========================================================
+   De horizontale scrollpositie wordt door app.js opgeslagen.
+   Geen automatische scroll terug naar het eerste item.
+   ========================================================= */
+@media(max-width:900px){
+  .mobile-nav23{
+    overflow:hidden !important;
+  }
+  .mobile-nav-scroll23{
+    overflow-x:auto !important;
+    overflow-y:hidden !important;
+    scroll-behavior:smooth;
+    -webkit-overflow-scrolling:touch;
+    scrollbar-width:none;
+    overscroll-behavior-x:contain;
+  }
+  .mobile-nav-scroll23::-webkit-scrollbar{display:none}
 }
