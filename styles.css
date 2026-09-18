@@ -427,7 +427,7 @@ body.st-glass20 #view,body.st-glass20 main,body.st-glass20 .content{padding-bott
 :root[data-theme20="dark"] .st-glass20 .settings-card,
 :root[data-theme20="dark"] .st-glass20 [class*="answer"],
 :root[data-theme20="dark"] .st-glass20 [class*="response"]{
-  background:#0d273e!important;
+  background:rgba(13,39,62,.82)!important;
   color:#f5f8ff!important;
   border-color:rgba(132,174,216,.24)!important;
 }
@@ -437,7 +437,7 @@ body.st-glass20 #view,body.st-glass20 main,body.st-glass20 .content{padding-bott
 :root[data-theme20="dark"] .st-glass20 [style*="background: #fff"],
 :root[data-theme20="dark"] .st-glass20 [style*="background:#fff"],
 :root[data-theme20="dark"] .st-glass20 [style*="background: rgb(255"]{
-  background:#0d273e!important;
+  background:rgba(13,39,62,.82)!important;
   color:#f5f8ff!important;
 }
 
@@ -1300,380 +1300,172 @@ body.st-glass20 button.primary{
 }
 
 /* =========================================================
-   DONKERE WEERGAVE — #0D273E KLEURCONTRACT
+   20. STRUCTUREEL DARK-SURFACE KLEURCONTRACT
+   =========================================================
+   BELANGRIJK:
+   Oude componenten gebruiken overal var(--ink), var(--muted) en var(--blue).
+   Daarom worden juist DIE variabelen lokaal aangepast wanneer een vlak
+   in dark mode de achtergrond #0D273E heeft.
+
+   Resultaat:
+   - bestaande itemtitels (ook list-item strong) worden vanzelf licht;
+   - voorraad/boodschappen/reisacties worden vanzelf leesbaar;
+   - subtitels/muted/small worden een lichte themakleur;
+   - lichte geneste kaarten resetten de variabelen terug naar donkere tekst.
    ========================================================= */
 
+/* Lichte accentkleuren voor tekst op #0D273E */
+:root[data-accent20="blue"]{
+  --dark-accent-text:#9ed8ff;
+  --dark-muted-text:#c7d8e8;
+}
+:root[data-accent20="purple"]{
+  --dark-accent-text:#d7b8ff;
+  --dark-muted-text:#e2d5f2;
+}
+:root[data-accent20="orange"]{
+  --dark-accent-text:#ffc58f;
+  --dark-muted-text:#f2d2b7;
+}
+:root[data-accent20="bluePurple"]{
+  --dark-accent-text:#c8c9ff;
+  --dark-muted-text:#d8d9f4;
+}
+/* fallback wanneer nog geen accentattribuut staat */
+:root{
+  --dark-accent-text:#9ed8ff;
+  --dark-muted-text:#c7d8e8;
+}
+
 /*
-   Donkere hoofdvlakken.
-   Alleen deze vlakken krijgen #0D273E als achtergrond.
+   ECHTE DONKERE OPPERVLAKKEN.
+   Hier veranderen we lokaal de bestaande variabelen.
+   Alle bestaande component-CSS die var(--ink)/var(--muted) gebruikt
+   volgt hierdoor automatisch de juiste lichte kleur.
 */
-:root[data-theme20="dark"] body.st-glass20 .card,
-:root[data-theme20="dark"] body.st-glass20 .panel,
-:root[data-theme20="dark"] body.st-glass20 .section-card,
-:root[data-theme20="dark"] body.st-glass20 .daily-question,
-:root[data-theme20="dark"] body.st-glass20 .quote-card,
-:root[data-theme20="dark"] body.st-glass20 .travel-actions,
-:root[data-theme20="dark"] body.st-glass20 .settings-card {
+html[data-theme20="dark"] body.st-glass20 .card,
+html[data-theme20="dark"] body.st-glass20 .panel,
+html[data-theme20="dark"] body.st-glass20 .section-card,
+html[data-theme20="dark"] body.st-glass20 .daily-question,
+html[data-theme20="dark"] body.st-glass20 .travel-actions,
+html[data-theme20="dark"] body.st-glass20 .settings-card{
+  --ink:#f7f9ff;
+  --muted:var(--dark-muted-text);
+  --blue:var(--dark-accent-text);
+  color:#f7f9ff;
+}
+
+/* Alleen kaarten die dark mode daadwerkelijk donker maakt */
+html[data-theme20="dark"] body.st-glass20 .card,
+html[data-theme20="dark"] body.st-glass20 .panel,
+html[data-theme20="dark"] body.st-glass20 .section-card,
+html[data-theme20="dark"] body.st-glass20 .daily-question,
+html[data-theme20="dark"] body.st-glass20 .travel-actions,
+html[data-theme20="dark"] body.st-glass20 .settings-card{
   background:#0d273e !important;
-  border-color:#244761 !important;
-  color:#f4f8ff !important;
-  -webkit-text-fill-color:#f4f8ff !important;
-}
-
-/* Hoofdtekst op #0D273E */
-:root[data-theme20="dark"] body.st-glass20 .card > h1,
-:root[data-theme20="dark"] body.st-glass20 .card > h2,
-:root[data-theme20="dark"] body.st-glass20 .card > h3,
-:root[data-theme20="dark"] body.st-glass20 .card > strong,
-:root[data-theme20="dark"] body.st-glass20 .card .card-head h1,
-:root[data-theme20="dark"] body.st-glass20 .card .card-head h2,
-:root[data-theme20="dark"] body.st-glass20 .card .card-head h3,
-:root[data-theme20="dark"] body.st-glass20 .card .card-head strong,
-:root[data-theme20="dark"] body.st-glass20 .daily-question > h1,
-:root[data-theme20="dark"] body.st-glass20 .daily-question > h2,
-:root[data-theme20="dark"] body.st-glass20 .daily-question > h3,
-:root[data-theme20="dark"] body.st-glass20 .travel-actions h1,
-:root[data-theme20="dark"] body.st-glass20 .travel-actions h2,
-:root[data-theme20="dark"] body.st-glass20 .travel-actions h3,
-:root[data-theme20="dark"] body.st-glass20 .travel-actions strong {
-  color:#ffffff !important;
-  -webkit-text-fill-color:#ffffff !important;
-  opacity:1 !important;
-}
-
-/* Normale tekst direct op #0D273E */
-:root[data-theme20="dark"] body.st-glass20 .card > p,
-:root[data-theme20="dark"] body.st-glass20 .card > label,
-:root[data-theme20="dark"] body.st-glass20 .daily-question > p,
-:root[data-theme20="dark"] body.st-glass20 .travel-actions > p {
-  color:#f4f8ff !important;
-  -webkit-text-fill-color:#f4f8ff !important;
-  opacity:1 !important;
-}
-
-/* Secundaire tekst direct op #0D273E */
-:root[data-theme20="dark"] body.st-glass20 .card > small,
-:root[data-theme20="dark"] body.st-glass20 .card > .muted,
-:root[data-theme20="dark"] body.st-glass20 .card > .description,
-:root[data-theme20="dark"] body.st-glass20 .card > .helper,
-:root[data-theme20="dark"] body.st-glass20 .card .card-head .eyebrow,
-:root[data-theme20="dark"] body.st-glass20 .daily-question .question-hint,
-:root[data-theme20="dark"] body.st-glass20 .travel-actions small,
-:root[data-theme20="dark"] body.st-glass20 .travel-actions .muted {
-  color:#c7d8e8 !important;
-  -webkit-text-fill-color:#c7d8e8 !important;
-  opacity:1 !important;
+  background-color:#0d273e !important;
 }
 
 /*
-   LICHTE KAARTEN BINNEN EEN DONKER #0D273E HOOFDVLAK
-   Deze moeten juist donkere tekst houden.
+   Directe tekst en veelgebruikte componenttekst op het donkere vlak.
+   Dit vangt oude expliciete hex-kleuren op die niet via variabelen lopen.
 */
-:root[data-theme20="dark"] body.st-glass20 .daily-question .answer-grid > article,
-:root[data-theme20="dark"] body.st-glass20 .card .day,
-:root[data-theme20="dark"] body.st-glass20 .card .idea,
-:root[data-theme20="dark"] body.st-glass20 .card .calendar-event,
-:root[data-theme20="dark"] body.st-glass20 .card .trip-subfolder,
-:root[data-theme20="dark"] body.st-glass20 .card .travel-preview-card,
-:root[data-theme20="dark"] body.st-glass20 .card .v13-card,
-:root[data-theme20="dark"] body.st-glass20 .card .chore-chip {
-  background:#ffffff !important;
-  color:#17243a !important;
-  -webkit-text-fill-color:#17243a !important;
-  border-color:#dbe2e8 !important;
-}
-
-/* Hoofdtekst op lichte geneste kaarten */
-:root[data-theme20="dark"] body.st-glass20 .daily-question .answer-grid > article h1,
-:root[data-theme20="dark"] body.st-glass20 .daily-question .answer-grid > article h2,
-:root[data-theme20="dark"] body.st-glass20 .daily-question .answer-grid > article h3,
-:root[data-theme20="dark"] body.st-glass20 .daily-question .answer-grid > article strong,
-:root[data-theme20="dark"] body.st-glass20 .card .day strong,
-:root[data-theme20="dark"] body.st-glass20 .card .idea strong,
-:root[data-theme20="dark"] body.st-glass20 .card .idea h3,
-:root[data-theme20="dark"] body.st-glass20 .card .calendar-event strong,
-:root[data-theme20="dark"] body.st-glass20 .card .trip-subfolder strong,
-:root[data-theme20="dark"] body.st-glass20 .card .travel-preview-card strong,
-:root[data-theme20="dark"] body.st-glass20 .card .v13-card strong,
-:root[data-theme20="dark"] body.st-glass20 .card .chore-chip strong {
-  color:#17243a !important;
-  -webkit-text-fill-color:#17243a !important;
-}
-
-/* Normale en secundaire tekst op lichte geneste kaarten */
-:root[data-theme20="dark"] body.st-glass20 .daily-question .answer-grid > article p,
-:root[data-theme20="dark"] body.st-glass20 .daily-question .answer-grid > article label,
-:root[data-theme20="dark"] body.st-glass20 .card .day p,
-:root[data-theme20="dark"] body.st-glass20 .card .idea p,
-:root[data-theme20="dark"] body.st-glass20 .card .calendar-event span,
-:root[data-theme20="dark"] body.st-glass20 .card .trip-subfolder p,
-:root[data-theme20="dark"] body.st-glass20 .card .travel-preview-card p,
-:root[data-theme20="dark"] body.st-glass20 .card .v13-card p,
-:root[data-theme20="dark"] body.st-glass20 .card .chore-chip small {
-  color:#475363 !important;
-  -webkit-text-fill-color:#475363 !important;
-}
-
-/* Agenda-dagkaart */
-:root[data-theme20="dark"] body.st-glass20 .day {
-  background:#ffffff !important;
-  color:#17243a !important;
-  -webkit-text-fill-color:#17243a !important;
-}
-:root[data-theme20="dark"] body.st-glass20 .day .day-name {
-  color:#475363 !important;
-  -webkit-text-fill-color:#475363 !important;
-}
-:root[data-theme20="dark"] body.st-glass20 .day .day-date {
-  color:#0b1728 !important;
-  -webkit-text-fill-color:#0b1728 !important;
-}
-
-/* Date-idee kaart */
-:root[data-theme20="dark"] body.st-glass20 .idea {
-  background:#ffffff !important;
-  color:#17243a !important;
-  -webkit-text-fill-color:#17243a !important;
-}
-:root[data-theme20="dark"] body.st-glass20 .idea p,
-:root[data-theme20="dark"] body.st-glass20 .idea small {
-  color:#475363 !important;
-  -webkit-text-fill-color:#475363 !important;
-}
-
-/* Knoppen en links behouden hun eigen accentkleur */
-:root[data-theme20="dark"] body.st-glass20 .primary,
-:root[data-theme20="dark"] body.st-glass20 button.primary {
-  color:#ffffff !important;
-  -webkit-text-fill-color:#ffffff !important;
-}
-
-/* Formuliervelden op donkere hoofdvlakken */
-:root[data-theme20="dark"] body.st-glass20 input,
-:root[data-theme20="dark"] body.st-glass20 select,
-:root[data-theme20="dark"] body.st-glass20 textarea {
-  background:#112f4a !important;
+html[data-theme20="dark"] body.st-glass20 .card > h1,
+html[data-theme20="dark"] body.st-glass20 .card > h2,
+html[data-theme20="dark"] body.st-glass20 .card > h3,
+html[data-theme20="dark"] body.st-glass20 .card > p,
+html[data-theme20="dark"] body.st-glass20 .card .card-head h1,
+html[data-theme20="dark"] body.st-glass20 .card .card-head h2,
+html[data-theme20="dark"] body.st-glass20 .card .card-head h3,
+html[data-theme20="dark"] body.st-glass20 .card .item-main strong,
+html[data-theme20="dark"] body.st-glass20 .card .list-item strong,
+html[data-theme20="dark"] body.st-glass20 .card .stock-controls > strong,
+html[data-theme20="dark"] body.st-glass20 .travel-actions .item-main strong,
+html[data-theme20="dark"] body.st-glass20 .daily-question h2{
   color:#f7f9ff !important;
   -webkit-text-fill-color:#f7f9ff !important;
-  border-color:#345674 !important;
+  opacity:1 !important;
 }
 
-/* Placeholdertekst */
-:root[data-theme20="dark"] body.st-glass20 input::placeholder,
-:root[data-theme20="dark"] body.st-glass20 textarea::placeholder {
-  color:#b8c8d8 !important;
-  -webkit-text-fill-color:#b8c8d8 !important;
+/*
+   Secundaire tekst op donker.
+   Dit bevat expliciet de classes die in de huidige app worden gebruikt:
+   .question-hint, .muted, small, voorraad minimum/unit en reisactie-meta.
+*/
+html[data-theme20="dark"] body.st-glass20 .card .muted,
+html[data-theme20="dark"] body.st-glass20 .card small,
+html[data-theme20="dark"] body.st-glass20 .card .item-main small,
+html[data-theme20="dark"] body.st-glass20 .card .stock-controls small,
+html[data-theme20="dark"] body.st-glass20 .card .stock-min,
+html[data-theme20="dark"] body.st-glass20 .daily-question .question-hint,
+html[data-theme20="dark"] body.st-glass20 .travel-actions .item-main small,
+html[data-theme20="dark"] body.st-glass20 .travel-actions .travel-more,
+html[data-theme20="dark"] body.st-glass20 .card .eyebrow{
+  color:var(--dark-muted-text) !important;
+  -webkit-text-fill-color:var(--dark-muted-text) !important;
   opacity:1 !important;
+}
+
+/* Eyebrows/labels mogen duidelijker de gekozen lichte themakleur gebruiken */
+html[data-theme20="dark"] body.st-glass20 .card .eyebrow,
+html[data-theme20="dark"] body.st-glass20 .daily-question .eyebrow,
+html[data-theme20="dark"] body.st-glass20 .travel-actions .eyebrow{
+  color:var(--dark-accent-text) !important;
+  -webkit-text-fill-color:var(--dark-accent-text) !important;
 }
 
 /* =========================================================
-   DEFINITIEF DARK-SURFACE CONTRAST — THEMA-AFHANKELIJK
+   LICHTE OPPERVLAKKEN BINNEN DONKERE KAARTEN
    =========================================================
-   Doel:
-   - Alleen op donkerblauwe #0D273E-vlakken lichte tekst gebruiken.
-   - Primaire tekst = wit/bijna wit.
-   - Secundaire/accenttekst = lichte variant van gekozen thema.
-   - Lichte/witte geneste kaarten houden donkere tekst.
-   ========================================================= */
-
-/* Standaard = blauw thema */
-:root{
-  --dark-surface:#0d273e;
-  --dark-text:#ffffff;
-  --dark-text-soft:#f4f8ff;
-  --dark-accent:#9ed8ff;
-  --dark-muted:#c7d8e8;
-}
-
-/*
-  Thema-accenten.
-  Meerdere attribuutnamen/waarden worden ondersteund zodat dit ook werkt
-  wanneer de app het gekozen accent op html/root/body opslaat.
+   Deze reset is essentieel: een witte kaart binnen een donkere kaart
+   mag NIET de lokaal lichte --ink/--muted erven.
 */
-:root[data-accent="blue"],
-:root[data-accent20="blue"],
-:root[data-color="blue"],
-:root[data-theme-color="blue"],
-body[data-accent="blue"]{
-  --dark-accent:#9ed8ff;
-  --dark-muted:#c7d8e8;
-}
-:root[data-accent="orange"],
-:root[data-accent20="orange"],
-:root[data-color="orange"],
-:root[data-theme-color="orange"],
-body[data-accent="orange"]{
-  --dark-accent:#ffc58f;
-  --dark-muted:#f2d2b7;
-}
-:root[data-accent="purple"],
-:root[data-accent20="purple"],
-:root[data-color="purple"],
-:root[data-theme-color="purple"],
-body[data-accent="purple"]{
-  --dark-accent:#d7b8ff;
-  --dark-muted:#dfd0f2;
+html[data-theme20="dark"] body.st-glass20 .light-surface23,
+html[data-theme20="dark"] body.st-glass20 .daily-question .answer-grid > article,
+html[data-theme20="dark"] body.st-glass20 .stat-card,
+html[data-theme20="dark"] body.st-glass20 .day,
+html[data-theme20="dark"] body.st-glass20 .idea,
+html[data-theme20="dark"] body.st-glass20 .travel-preview-card,
+html[data-theme20="dark"] body.st-glass20 .checkbox-field{
+  --ink:#17253a;
+  --muted:#66768a;
+  --blue:#246ca6;
+  color:#17253a !important;
+  -webkit-text-fill-color:#17253a !important;
 }
 
-/*
-  De donkere hoofdvlakken. De tekstregels hieronder zijn bewust breed
-  binnen DEZE donkere vlakken, zodat o.a. voorraad-, boodschappen- en
-  reisitems niet meer een oude donkere tekstkleur kunnen erven.
-*/
-:root[data-theme20="dark"] body.st-glass20 .card,
-:root[data-theme20="dark"] body.st-glass20 .panel,
-:root[data-theme20="dark"] body.st-glass20 .section-card,
-:root[data-theme20="dark"] body.st-glass20 .daily-question,
-:root[data-theme20="dark"] body.st-glass20 .quote-card,
-:root[data-theme20="dark"] body.st-glass20 .travel-actions,
-:root[data-theme20="dark"] body.st-glass20 .settings-card,
-:root[data-theme20="dark"] body.st-glass20 .surface-dark {
-  background:var(--dark-surface) !important;
-  color:var(--dark-text-soft) !important;
-  -webkit-text-fill-color:var(--dark-text-soft) !important;
+/* Tekst op expliciet lichte geneste vlakken blijft donker */
+html[data-theme20="dark"] body.st-glass20 .light-surface23 *,
+html[data-theme20="dark"] body.st-glass20 .daily-question .answer-grid > article *,
+html[data-theme20="dark"] body.st-glass20 .stat-card *,
+html[data-theme20="dark"] body.st-glass20 .day *,
+html[data-theme20="dark"] body.st-glass20 .idea *,
+html[data-theme20="dark"] body.st-glass20 .travel-preview-card *,
+html[data-theme20="dark"] body.st-glass20 .checkbox-field *{
+  color:var(--ink) !important;
+  -webkit-text-fill-color:var(--ink) !important;
 }
 
-/* ALLE gewone tekst binnen een donker hoofdvlak: nooit donker */
-:root[data-theme20="dark"] body.st-glass20 .card :where(
-  h1,h2,h3,h4,h5,h6,p,span,label,li,strong,b,em,i,time,
-  .title,.name,.text,.task-title,.item-title,.stock-title,.grocery-title,
-  .travel-title,.question-text,.answer-text
-),
-:root[data-theme20="dark"] body.st-glass20 .panel :where(
-  h1,h2,h3,h4,h5,h6,p,span,label,li,strong,b,em,i,time,
-  .title,.name,.text,.task-title,.item-title
-),
-:root[data-theme20="dark"] body.st-glass20 .section-card :where(
-  h1,h2,h3,h4,h5,h6,p,span,label,li,strong,b,em,i,time,
-  .title,.name,.text,.task-title,.item-title
-),
-:root[data-theme20="dark"] body.st-glass20 .daily-question :where(
-  h1,h2,h3,h4,h5,h6,p,span,label,strong,b,.question-text,.answer-text
-),
-:root[data-theme20="dark"] body.st-glass20 .travel-actions :where(
-  h1,h2,h3,h4,h5,h6,p,span,label,li,strong,b,.title,.name,.text,.task-title,.item-title
-),
-:root[data-theme20="dark"] body.st-glass20 .surface-dark :where(
-  h1,h2,h3,h4,h5,h6,p,span,label,li,strong,b,em,i,time,
-  .title,.name,.text,.task-title,.item-title
-){
-  color:var(--dark-text-soft) !important;
-  -webkit-text-fill-color:var(--dark-text-soft) !important;
-  opacity:1 !important;
+/* Secundaire tekst op lichte geneste vlakken */
+html[data-theme20="dark"] body.st-glass20 .light-surface23 :is(small,.muted),
+html[data-theme20="dark"] body.st-glass20 .daily-question .answer-grid > article :is(small,.muted),
+html[data-theme20="dark"] body.st-glass20 .stat-card :is(small,.muted),
+html[data-theme20="dark"] body.st-glass20 .day :is(small,.muted,.day-name),
+html[data-theme20="dark"] body.st-glass20 .idea :is(small,.muted),
+html[data-theme20="dark"] body.st-glass20 .travel-preview-card :is(small,.muted){
+  color:#66768a !important;
+  -webkit-text-fill-color:#66768a !important;
 }
 
-/* Titels/belangrijke tekst: helder wit */
-:root[data-theme20="dark"] body.st-glass20 .card :where(h1,h2,h3,h4,strong,b,.title,.task-title,.item-title,.stock-title,.grocery-title,.travel-title),
-:root[data-theme20="dark"] body.st-glass20 .panel :where(h1,h2,h3,h4,strong,b,.title,.task-title,.item-title),
-:root[data-theme20="dark"] body.st-glass20 .section-card :where(h1,h2,h3,h4,strong,b,.title,.task-title,.item-title),
-:root[data-theme20="dark"] body.st-glass20 .daily-question :where(h1,h2,h3,h4,strong,b,.question-text),
-:root[data-theme20="dark"] body.st-glass20 .travel-actions :where(h1,h2,h3,h4,strong,b,.title,.task-title,.item-title),
-:root[data-theme20="dark"] body.st-glass20 .surface-dark :where(h1,h2,h3,h4,strong,b,.title,.task-title,.item-title){
-  color:var(--dark-text) !important;
-  -webkit-text-fill-color:var(--dark-text) !important;
+/* Antwoordnaam Kees/Daphne op de witte antwoordkaart volgt de normale accentkleur */
+html[data-theme20="dark"] body.st-glass20 .daily-question .answer-grid > article > span{
+  color:#2474ad !important;
+  -webkit-text-fill-color:#2474ad !important;
 }
 
-/*
-  Subtitels, metadata, hints en kleine labels:
-  lichte themakleur i.p.v. donkergrijs.
-  Dit pakt o.a. "Antwoorden blijven verborgen..." mee.
-*/
-:root[data-theme20="dark"] body.st-glass20 .card :where(
-  small,.muted,.subtitle,.sub-title,.description,.helper,.hint,.meta,.eyebrow,
-  .question-hint,.task-meta,.item-meta,.stock-meta,.grocery-meta,.travel-meta
-),
-:root[data-theme20="dark"] body.st-glass20 .panel :where(
-  small,.muted,.subtitle,.sub-title,.description,.helper,.hint,.meta,.eyebrow
-),
-:root[data-theme20="dark"] body.st-glass20 .section-card :where(
-  small,.muted,.subtitle,.sub-title,.description,.helper,.hint,.meta,.eyebrow
-),
-:root[data-theme20="dark"] body.st-glass20 .daily-question :where(
-  small,.muted,.subtitle,.sub-title,.description,.helper,.hint,.meta,.eyebrow,.question-hint
-),
-:root[data-theme20="dark"] body.st-glass20 .travel-actions :where(
-  small,.muted,.subtitle,.sub-title,.description,.helper,.hint,.meta,.eyebrow,.task-meta,.item-meta
-),
-:root[data-theme20="dark"] body.st-glass20 .surface-dark :where(
-  small,.muted,.subtitle,.sub-title,.description,.helper,.hint,.meta,.eyebrow,.task-meta,.item-meta
-){
-  color:var(--dark-accent) !important;
-  -webkit-text-fill-color:var(--dark-accent) !important;
-  opacity:1 !important;
-}
-
-/* Links/accenttekst op donkere achtergrond volgen eveneens de lichte themakleur */
-:root[data-theme20="dark"] body.st-glass20 .card a:not(.primary),
-:root[data-theme20="dark"] body.st-glass20 .panel a:not(.primary),
-:root[data-theme20="dark"] body.st-glass20 .section-card a:not(.primary),
-:root[data-theme20="dark"] body.st-glass20 .daily-question a:not(.primary),
-:root[data-theme20="dark"] body.st-glass20 .travel-actions a:not(.primary),
-:root[data-theme20="dark"] body.st-glass20 .surface-dark a:not(.primary){
-  color:var(--dark-accent) !important;
-  -webkit-text-fill-color:var(--dark-accent) !important;
-}
-
-/* =========================================================
-   UITZONDERING: LICHTE KAARTEN BINNEN DONKERE HOOFDVLAKKEN
-   =========================================================
-   Deze kaarten zijn wit/licht en moeten dus donkere tekst houden.
-*/
-:root[data-theme20="dark"] body.st-glass20 :is(
-  .answer-grid > article,
-  .day,
-  .idea,
-  .calendar-event,
-  .trip-subfolder,
-  .travel-preview-card,
-  .v13-card,
-  .chore-chip,
-  .white-card,
-  .light-card,
-  .light-surface23
-){
-  color:#17243a !important;
-  -webkit-text-fill-color:#17243a !important;
-}
-
-/* Reset alle kinderen van lichte geneste kaarten terug naar donkere tekst */
-:root[data-theme20="dark"] body.st-glass20 :is(
-  .answer-grid > article,
-  .day,
-  .idea,
-  .calendar-event,
-  .trip-subfolder,
-  .travel-preview-card,
-  .v13-card,
-  .chore-chip,
-  .white-card,
-  .light-card,
-  .light-surface23
-) :where(h1,h2,h3,h4,h5,h6,p,span,label,li,strong,b,em,i,time,.title,.name,.text,.task-title,.item-title){
-  color:#17243a !important;
-  -webkit-text-fill-color:#17243a !important;
-}
-
-/* Secundaire tekst op lichte geneste kaarten blijft donkergrijs */
-:root[data-theme20="dark"] body.st-glass20 :is(
-  .answer-grid > article,
-  .day,
-  .idea,
-  .calendar-event,
-  .trip-subfolder,
-  .travel-preview-card,
-  .v13-card,
-  .chore-chip,
-  .white-card,
-  .light-card,
-  .light-surface23
-) :where(small,.muted,.subtitle,.sub-title,.description,.helper,.hint,.meta,.eyebrow,.question-hint,.task-meta,.item-meta){
-  color:#475363 !important;
-  -webkit-text-fill-color:#475363 !important;
-}
-
-/* Knoppen behouden leesbaar contrast */
-:root[data-theme20="dark"] body.st-glass20 button.primary,
-:root[data-theme20="dark"] body.st-glass20 .primary{
+/* Buttons: voorkom dat lokale --ink de knoptekst verkeerd maakt */
+html[data-theme20="dark"] body.st-glass20 .primary,
+html[data-theme20="dark"] body.st-glass20 button.primary{
   color:#ffffff !important;
   -webkit-text-fill-color:#ffffff !important;
 }
