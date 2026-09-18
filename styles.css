@@ -941,33 +941,48 @@ body.st-glass20 .budget23 .light-surface23{
   font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Segoe UI",sans-serif!important;
 }
 
-body.st-glass20 .card:not(.welcome):not(.dark-card):not(.hero-card),
-body.st-glass20 .stat,
-body.st-glass20 .light-surface23,
-body.st-glass20 .daily-question .answer-grid>article{
+/* -----------------------------------------------------------------------
+   FIX (root cause van het #0D273E-leesbaarheidsprobleem):
+   Onderstaande twee blokken waren de ECHTE bron van de onleesbare tekst op
+   donkere kaarten (o.a. "Paspoorten controleren", Voorraad- en
+   Boodschappen-items, subtitels). Ze zetten --ink/--muted/color naar een
+   donkere kleur met !important, EN met hogere specificity dan de latere
+   dark-mode-fixes verderop in dit bestand (secties "KLEURCONTRACT" en
+   "STRUCTUREEL DARK-SURFACE KLEURCONTRACT") -- en ze waren nooit aan een
+   thema gekoppeld. Daardoor wonnen ze altijd, ook wanneer een kaart in
+   dark mode een #0d273e-achtergrond kreeg.
+   Oplossing: dezelfde regels nu expliciet alleen laten gelden buiten dark
+   mode (html:not([data-theme20="dark"])). In licht thema verandert er
+   hierdoor niets; in dark mode bepalen voortaan uitsluitend de daarvoor
+   bedoelde, thema-bewuste regels verderop de tekstkleur.
+   ----------------------------------------------------------------------- */
+html:not([data-theme20="dark"]) body.st-glass20 .card:not(.welcome):not(.dark-card):not(.hero-card),
+html:not([data-theme20="dark"]) body.st-glass20 .stat,
+html:not([data-theme20="dark"]) body.st-glass20 .light-surface23,
+html:not([data-theme20="dark"]) body.st-glass20 .daily-question .answer-grid>article{
   --ink:#17243a!important;
   --muted:#6b7483!important;
   color:#17243a!important;
 }
-body.st-glass20 .card:not(.welcome):not(.dark-card):not(.hero-card) h1,
-body.st-glass20 .card:not(.welcome):not(.dark-card):not(.hero-card) h2,
-body.st-glass20 .card:not(.welcome):not(.dark-card):not(.hero-card) h3,
-body.st-glass20 .card:not(.welcome):not(.dark-card):not(.hero-card) strong,
-body.st-glass20 .card:not(.welcome):not(.dark-card):not(.hero-card) b,
-body.st-glass20 .card:not(.welcome):not(.dark-card):not(.hero-card) p:not(.muted):not(.eyebrow),
-body.st-glass20 .card:not(.welcome):not(.dark-card):not(.hero-card) .item-main strong,
-body.st-glass20 .stat strong,
-body.st-glass20 .light-surface23 strong,
-body.st-glass20 .light-surface23 b{
+html:not([data-theme20="dark"]) body.st-glass20 .card:not(.welcome):not(.dark-card):not(.hero-card) h1,
+html:not([data-theme20="dark"]) body.st-glass20 .card:not(.welcome):not(.dark-card):not(.hero-card) h2,
+html:not([data-theme20="dark"]) body.st-glass20 .card:not(.welcome):not(.dark-card):not(.hero-card) h3,
+html:not([data-theme20="dark"]) body.st-glass20 .card:not(.welcome):not(.dark-card):not(.hero-card) strong,
+html:not([data-theme20="dark"]) body.st-glass20 .card:not(.welcome):not(.dark-card):not(.hero-card) b,
+html:not([data-theme20="dark"]) body.st-glass20 .card:not(.welcome):not(.dark-card):not(.hero-card) p:not(.muted):not(.eyebrow),
+html:not([data-theme20="dark"]) body.st-glass20 .card:not(.welcome):not(.dark-card):not(.hero-card) .item-main strong,
+html:not([data-theme20="dark"]) body.st-glass20 .stat strong,
+html:not([data-theme20="dark"]) body.st-glass20 .light-surface23 strong,
+html:not([data-theme20="dark"]) body.st-glass20 .light-surface23 b{
   color:#17243a!important;
   -webkit-text-fill-color:#17243a!important;
 }
-body.st-glass20 .card:not(.welcome):not(.dark-card):not(.hero-card) small,
-body.st-glass20 .card:not(.welcome):not(.dark-card):not(.hero-card) .muted,
-body.st-glass20 .card:not(.welcome):not(.dark-card):not(.hero-card) .item-main small,
-body.st-glass20 .stat span,
-body.st-glass20 .light-surface23 small,
-body.st-glass20 .light-surface23 .muted{
+html:not([data-theme20="dark"]) body.st-glass20 .card:not(.welcome):not(.dark-card):not(.hero-card) small,
+html:not([data-theme20="dark"]) body.st-glass20 .card:not(.welcome):not(.dark-card):not(.hero-card) .muted,
+html:not([data-theme20="dark"]) body.st-glass20 .card:not(.welcome):not(.dark-card):not(.hero-card) .item-main small,
+html:not([data-theme20="dark"]) body.st-glass20 .stat span,
+html:not([data-theme20="dark"]) body.st-glass20 .light-surface23 small,
+html:not([data-theme20="dark"]) body.st-glass20 .light-surface23 .muted{
   color:#6b7483!important;
   -webkit-text-fill-color:#6b7483!important;
 }
@@ -986,111 +1001,112 @@ body.st-glass20 .welcome *{
 }
 body.st-glass20 .welcome p{color:#cedbe7!important;-webkit-text-fill-color:#cedbe7!important}
 
-body.st-glass20 .card:not(.welcome):not(.dark-card):not(.hero-card),
-body.st-glass20 .day,
-body.st-glass20 .idea-card,
-body.st-glass20 .trip-card,
-body.st-glass20 .trip-folder,
-body.st-glass20 .trip-section,
-body.st-glass20 .travel-item,
-body.st-glass20 .event,
-body.st-glass20 .task,
-body.st-glass20 .list-item,
-body.st-glass20 .white-card,
-body.st-glass20 .light-card,
-body.st-glass20 .light-surface23,
-body.st-glass20 .daily-question .answer-grid > article {
+html:not([data-theme20="dark"]) body.st-glass20 .card:not(.welcome):not(.dark-card):not(.hero-card),
+html:not([data-theme20="dark"]) body.st-glass20 .day,
+html:not([data-theme20="dark"]) body.st-glass20 .idea-card,
+html:not([data-theme20="dark"]) body.st-glass20 .trip-card,
+html:not([data-theme20="dark"]) body.st-glass20 .trip-folder,
+html:not([data-theme20="dark"]) body.st-glass20 .trip-section,
+html:not([data-theme20="dark"]) body.st-glass20 .travel-item,
+html:not([data-theme20="dark"]) body.st-glass20 .event,
+html:not([data-theme20="dark"]) body.st-glass20 .task,
+html:not([data-theme20="dark"]) body.st-glass20 .list-item,
+html:not([data-theme20="dark"]) body.st-glass20 .white-card,
+html:not([data-theme20="dark"]) body.st-glass20 .light-card,
+html:not([data-theme20="dark"]) body.st-glass20 .light-surface23,
+html:not([data-theme20="dark"]) body.st-glass20 .daily-question .answer-grid > article {
   --ink:#17243a !important;
   --muted:#475363 !important;
   color:#17243a !important;
 }
 
-body.st-glass20 .card:not(.welcome):not(.dark-card):not(.hero-card) h1,
-body.st-glass20 .card:not(.welcome):not(.dark-card):not(.hero-card) h2,
-body.st-glass20 .card:not(.welcome):not(.dark-card):not(.hero-card) h3,
-body.st-glass20 .card:not(.welcome):not(.dark-card):not(.hero-card) h4,
-body.st-glass20 .card:not(.welcome):not(.dark-card):not(.hero-card) strong,
-body.st-glass20 .card:not(.welcome):not(.dark-card):not(.hero-card) b,
-body.st-glass20 .day .day-date,
-body.st-glass20 .day strong,
-body.st-glass20 .idea-card h3,
-body.st-glass20 .idea-card strong,
-body.st-glass20 .trip-card h3,
-body.st-glass20 .trip-card strong,
-body.st-glass20 .trip-folder h3,
-body.st-glass20 .trip-section h3,
-body.st-glass20 .travel-item strong,
-body.st-glass20 .event strong,
-body.st-glass20 .task strong,
-body.st-glass20 .list-item strong,
-body.st-glass20 .white-card strong,
-body.st-glass20 .light-card strong,
-body.st-glass20 .light-surface23 strong {
+html:not([data-theme20="dark"]) body.st-glass20 .card:not(.welcome):not(.dark-card):not(.hero-card) h1,
+html:not([data-theme20="dark"]) body.st-glass20 .card:not(.welcome):not(.dark-card):not(.hero-card) h2,
+html:not([data-theme20="dark"]) body.st-glass20 .card:not(.welcome):not(.dark-card):not(.hero-card) h3,
+html:not([data-theme20="dark"]) body.st-glass20 .card:not(.welcome):not(.dark-card):not(.hero-card) h4,
+html:not([data-theme20="dark"]) body.st-glass20 .card:not(.welcome):not(.dark-card):not(.hero-card) strong,
+html:not([data-theme20="dark"]) body.st-glass20 .card:not(.welcome):not(.dark-card):not(.hero-card) b,
+html:not([data-theme20="dark"]) body.st-glass20 .day .day-date,
+html:not([data-theme20="dark"]) body.st-glass20 .day strong,
+html:not([data-theme20="dark"]) body.st-glass20 .idea-card h3,
+html:not([data-theme20="dark"]) body.st-glass20 .idea-card strong,
+html:not([data-theme20="dark"]) body.st-glass20 .trip-card h3,
+html:not([data-theme20="dark"]) body.st-glass20 .trip-card strong,
+html:not([data-theme20="dark"]) body.st-glass20 .trip-folder h3,
+html:not([data-theme20="dark"]) body.st-glass20 .trip-section h3,
+html:not([data-theme20="dark"]) body.st-glass20 .travel-item strong,
+html:not([data-theme20="dark"]) body.st-glass20 .event strong,
+html:not([data-theme20="dark"]) body.st-glass20 .task strong,
+html:not([data-theme20="dark"]) body.st-glass20 .list-item strong,
+html:not([data-theme20="dark"]) body.st-glass20 .white-card strong,
+html:not([data-theme20="dark"]) body.st-glass20 .light-card strong,
+html:not([data-theme20="dark"]) body.st-glass20 .light-surface23 strong {
   color:#17243a !important;
   -webkit-text-fill-color:#17243a !important;
   opacity:1 !important;
 }
 
-body.st-glass20 .card:not(.welcome):not(.dark-card):not(.hero-card) p,
-body.st-glass20 .card:not(.welcome):not(.dark-card):not(.hero-card) small,
-body.st-glass20 .card:not(.welcome):not(.dark-card):not(.hero-card) .muted,
-body.st-glass20 .day .day-name,
-body.st-glass20 .day .muted,
-body.st-glass20 .idea-card p,
-body.st-glass20 .idea-card small,
-body.st-glass20 .trip-card p,
-body.st-glass20 .trip-card small,
-body.st-glass20 .trip-folder p,
-body.st-glass20 .trip-section p,
-body.st-glass20 .travel-item p,
-body.st-glass20 .travel-item small,
-body.st-glass20 .event p,
-body.st-glass20 .event small,
-body.st-glass20 .task p,
-body.st-glass20 .task small,
-body.st-glass20 .list-item p,
-body.st-glass20 .list-item small,
-body.st-glass20 .white-card p,
-body.st-glass20 .light-card p,
-body.st-glass20 .light-surface23 p {
+html:not([data-theme20="dark"]) body.st-glass20 .card:not(.welcome):not(.dark-card):not(.hero-card) p,
+html:not([data-theme20="dark"]) body.st-glass20 .card:not(.welcome):not(.dark-card):not(.hero-card) small,
+html:not([data-theme20="dark"]) body.st-glass20 .card:not(.welcome):not(.dark-card):not(.hero-card) .muted,
+html:not([data-theme20="dark"]) body.st-glass20 .day .day-name,
+html:not([data-theme20="dark"]) body.st-glass20 .day .muted,
+html:not([data-theme20="dark"]) body.st-glass20 .idea-card p,
+html:not([data-theme20="dark"]) body.st-glass20 .idea-card small,
+html:not([data-theme20="dark"]) body.st-glass20 .trip-card p,
+html:not([data-theme20="dark"]) body.st-glass20 .trip-card small,
+html:not([data-theme20="dark"]) body.st-glass20 .trip-folder p,
+html:not([data-theme20="dark"]) body.st-glass20 .trip-section p,
+html:not([data-theme20="dark"]) body.st-glass20 .travel-item p,
+html:not([data-theme20="dark"]) body.st-glass20 .travel-item small,
+html:not([data-theme20="dark"]) body.st-glass20 .event p,
+html:not([data-theme20="dark"]) body.st-glass20 .event small,
+html:not([data-theme20="dark"]) body.st-glass20 .task p,
+html:not([data-theme20="dark"]) body.st-glass20 .task small,
+html:not([data-theme20="dark"]) body.st-glass20 .list-item p,
+html:not([data-theme20="dark"]) body.st-glass20 .list-item small,
+html:not([data-theme20="dark"]) body.st-glass20 .white-card p,
+html:not([data-theme20="dark"]) body.st-glass20 .light-card p,
+html:not([data-theme20="dark"]) body.st-glass20 .light-surface23 p {
   color:#475363 !important;
   -webkit-text-fill-color:#475363 !important;
   opacity:1 !important;
 }
 
-body.st-glass20 .day .day-name{
+html:not([data-theme20="dark"]) body.st-glass20 .day .day-name{
   color:#475363 !important;
   -webkit-text-fill-color:#475363 !important;
 }
-body.st-glass20 .day .day-date{
+html:not([data-theme20="dark"]) body.st-glass20 .day .day-date{
   color:#0b1728 !important;
   -webkit-text-fill-color:#0b1728 !important;
 }
-body.st-glass20 .event{
+html:not([data-theme20="dark"]) body.st-glass20 .event{
   color:#17243a !important;
 }
-body.st-glass20 .event .muted,
-body.st-glass20 .event small{
+html:not([data-theme20="dark"]) body.st-glass20 .event .muted,
+html:not([data-theme20="dark"]) body.st-glass20 .event small{
   color:#475363 !important;
   -webkit-text-fill-color:#475363 !important;
 }
 
-body.st-glass20 .trip-folder,
-body.st-glass20 .trip-section,
-body.st-glass20 .travel-item{
+html:not([data-theme20="dark"]) body.st-glass20 .trip-folder,
+html:not([data-theme20="dark"]) body.st-glass20 .trip-section,
+html:not([data-theme20="dark"]) body.st-glass20 .travel-item{
   color:#17243a !important;
 }
-body.st-glass20 .trip-folder .muted,
-body.st-glass20 .trip-section .muted,
-body.st-glass20 .travel-item .muted{
+html:not([data-theme20="dark"]) body.st-glass20 .trip-folder .muted,
+html:not([data-theme20="dark"]) body.st-glass20 .trip-section .muted,
+html:not([data-theme20="dark"]) body.st-glass20 .travel-item .muted{
   color:#475363 !important;
   -webkit-text-fill-color:#475363 !important;
 }
 
-body.st-glass20 .idea-card .muted{
+html:not([data-theme20="dark"]) body.st-glass20 .idea-card .muted{
   color:#475363 !important;
   -webkit-text-fill-color:#475363 !important;
 }
+/* Einde van de aan licht-thema gekoppelde regels hierboven. */
 
 body.st-glass20 button:not(.primary):not(.danger):not(.active):not(.nav-btn23),
 body.st-glass20 .btn:not(.primary):not(.danger){
