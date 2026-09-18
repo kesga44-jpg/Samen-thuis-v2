@@ -1,5 +1,5 @@
-const CACHE='samen-thuis-v23-integrated-budget-nav';
-const ASSETS=['./','./index.html','./styles.css?v=230','./app.js?v=230','./manifest.webmanifest','./icon.svg'];
+const CACHE='samen-thuis-v23-2-v16-nav-light-text';
+const ASSETS=['./','./index.html','./styles.css?v=232','./app.js?v=232','./manifest.webmanifest','./icon.svg'];
 
 self.addEventListener('install',event=>{
   event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS)).then(()=>self.skipWaiting()));
@@ -16,3 +16,7 @@ self.addEventListener('fetch',event=>{
     return response;
   }).catch(()=>caches.match(event.request).then(cached=>cached||(event.request.mode==='navigate'?caches.match('./index.html'):Response.error()))));
 });
+
+// v23.1 data-veilige build 2026-09-18 06:00:01 +0000
+
+// v23.2 2026-09-18 06:17:59 +0000

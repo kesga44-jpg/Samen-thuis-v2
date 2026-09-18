@@ -129,6 +129,14 @@ const groupBy = (items, keyFn) => items.reduce((groups, item) => {
 function migrateData(raw) {
   if (!raw || typeof raw !== 'object') return clone(initialData);
   const migrated = clone(initialData);
+  // v23.1 DATA-VEILIG: behoud ook velden die door latere/oude modules zijn toegevoegd.
+  // Bekende structuren worden hieronder nog genormaliseerd, onbekende structuren
+  // worden één-op-één meegenomen zodat een update ze niet stilzwijgend verwijdert.
+  Object.keys(raw).forEach(key => {
+    if (!(key in migrated)) {
+      try { migrated[key] = clone(raw[key]); } catch { migrated[key] = raw[key]; }
+    }
+  });
   ['planning', 'meals', 'groceries', 'chores', 'stock', 'ideas', 'home', 'trips'].forEach(key => {
     if (Array.isArray(raw[key])) migrated[key] = raw[key];
   });
@@ -201,8 +209,26 @@ function migrateData(raw) {
 function loadData() {
   try {
     const stored = localStorage.getItem(STORAGE_KEY) || localStorage.getItem(LEGACY_STORAGE_KEY);
-    return stored ? migrateData(JSON.parse(stored)) : clone(initialData);
+    if (!stored) return clone(initialData);
+
+    // v23.1 DATA-VEILIG: maak vóór migratie automatisch een ongewijzigde snapshot.
+    // De normale opslagkey blijft samenThuisDataV2, dus bestaande Voorraad,
+    // Boodschappen, Huishouden, Reizen enz. blijven op dezelfde plek staan.
+    try {
+      if (!localStorage.getItem('samenThuisPreV23Backup')) {
+        localStorage.setItem('samenThuisPreV23Backup', stored);
+        localStorage.setItem('samenThuisPreV23BackupAt', new Date().toISOString());
+      }
+    } catch {}
+
+    return migrateData(JSON.parse(stored));
   } catch {
+    // Bij een parse/migratiefout proberen we de safety snapshot terug te lezen
+    // in plaats van direct met voorbeelddata te starten.
+    try {
+      const backup = localStorage.getItem('samenThuisPreV23Backup');
+      if (backup) return migrateData(JSON.parse(backup));
+    } catch {}
     return clone(initialData);
   }
 }
@@ -5215,3 +5241,5 @@ document.addEventListener('change',e=>{
 });
 requestAnimationFrame(mobileNav23);
 })();
+
+/* v23.2 visual integration 2026-09-18 06:17:59 +0000 */
