@@ -1,5 +1,5 @@
-const CACHE='samen-thuis-v23-3-contrast-navpositie';
-const ASSETS=['./','./index.html','./styles.css?v=233','./app.js?v=233','./manifest.webmanifest','./icon.svg'];
+const CACHE='samen-thuis-css-structured';
+const ASSETS=['./','./index.html','./styles.css?v=234','./app.js?v=234','./manifest.webmanifest','./icon.svg'];
 
 self.addEventListener('install',event=>{
   event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS)).then(()=>self.skipWaiting()));
