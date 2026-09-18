@@ -1,5 +1,5 @@
 :root {
-  --ink: #17243a; --muted: #6b7483; --line: #e2e7ed; --paper: #ffffff;
+  --ink: #17243a; --muted: #494f59; --line: #e2e7ed; --paper: #ffffff;
   --bg: #f3f6f8; --blue: #315f86; --blue-soft: #e7f0f6; --orange: #e98248;
   --green: #2e7d67; --green-soft: #e4f2ed; --red: #b84f58; --shadow: 0 12px 35px rgba(23,36,58,.08);
 }
@@ -953,7 +953,7 @@ body.st-glass20 .daily-question .answer-grid>article small{color:#66768a!importa
 /* HOOFDREGEL:
    ieder wit/licht kaartvlak gebruikt exact dezelfde tekst in light én dark.
    Dit is bewust gebaseerd op de oorspronkelijke v16-kleuren:
-   ink #17243a en muted #6b7483. */
+   ink #17243a en muted #494f59. */
 body.st-glass20 .card,
 body.st-glass20 .stat,
 body.st-glass20 .list-item.light-surface23,
@@ -973,7 +973,7 @@ body.st-glass20 .stat,
 body.st-glass20 .light-surface23,
 body.st-glass20 .daily-question .answer-grid>article{
   --ink:#17243a!important;
-  --muted:#6b7483!important;
+  --muted:#494f59!important;
   color:#17243a!important;
 }
 body.st-glass20 .card:not(.welcome):not(.dark-card):not(.hero-card) h1,
@@ -995,8 +995,8 @@ body.st-glass20 .card:not(.welcome):not(.dark-card):not(.hero-card) .item-main s
 body.st-glass20 .stat span,
 body.st-glass20 .light-surface23 small,
 body.st-glass20 .light-surface23 .muted{
-  color:#6b7483!important;
-  -webkit-text-fill-color:#6b7483!important;
+  color:#494f59!important;
+  -webkit-text-fill-color:#494f59!important;
 }
 /* Interactieve accenten mogen hun accentkleur houden. */
 body.st-glass20 .card:not(.welcome) .text-btn,
