@@ -1487,26 +1487,73 @@ html[data-theme20="dark"] body.st-glass20 button.primary{
 }
 
 /* =========================================================
-   BUDGET — Kees & Daphne leesbaar in donkere weergave
-   Alleen de tekst in de twee persoonsblokken wordt aangepast.
-   Achtergronden en overige Budget-opmaak blijven ongewijzigd.
+   BUDGET DARK MODE — INKOMEN & VERDELING + MAANDELIJKSE GELDVERDELING
+   Alleen tekstcontrast. Achtergronden worden NIET gewijzigd.
    ========================================================= */
-html[data-theme20="dark"] body.st-glass20 .budget23 .people23 > div{
-  --ink:var(--darkTextPrimary,#f7f9ff);
-  --muted:var(--darkTextMuted,#c7d8e8);
+
+/* Hoofdtekst in de twee donkere Budget-kaarten */
+:root[data-theme20="dark"] body.st-glass20 .budget23 .budget-sheet23{
+  color:#f7f9ff!important;
 }
 
-/* Namen Kees / Daphne */
-html[data-theme20="dark"] body.st-glass20 .budget23 .people23 > div > span{
+/* Sectietitels en hoofdtitels */
+:root[data-theme20="dark"] body.st-glass20 .budget23 .budget-sheet23 > header small{
   color:var(--darkTextAccent,#9ed8ff)!important;
   -webkit-text-fill-color:var(--darkTextAccent,#9ed8ff)!important;
-  opacity:1!important;
+}
+:root[data-theme20="dark"] body.st-glass20 .budget23 .budget-sheet23 > header h2{
+  color:#ffffff!important;
+  -webkit-text-fill-color:#ffffff!important;
 }
 
-/* Bedragen/hoofdtekst direct onder de namen */
-html[data-theme20="dark"] body.st-glass20 .budget23 .people23 > div > strong{
-  color:var(--darkTextPrimary,#f7f9ff)!important;
-  -webkit-text-fill-color:var(--darkTextPrimary,#f7f9ff)!important;
-  opacity:1!important;
+/* Kees/Daphne: bedragen en verdeling */
+:root[data-theme20="dark"] body.st-glass20 .budget23 .people23 strong{
+  color:#ffffff!important;
+  -webkit-text-fill-color:#ffffff!important;
+}
+:root[data-theme20="dark"] body.st-glass20 .budget23 .people23 span{
+  color:var(--darkTextAccent,#9ed8ff)!important;
+  -webkit-text-fill-color:var(--darkTextAccent,#9ed8ff)!important;
+}
+
+/* Labels boven de invoervelden: Kees netto, Daphne netto, Afdracht %, enz. */
+:root[data-theme20="dark"] body.st-glass20 .budget23 .fields23 label{
+  color:#f4f8ff!important;
+  -webkit-text-fill-color:#f4f8ff!important;
+}
+
+/* Maandelijkse geldverdeling: Vaste lasten / Huisbudget / Sparen / Beleggen / Resterend */
+:root[data-theme20="dark"] body.st-glass20 .budget23 .chart-row23{
+  color:var(--darkTextMuted,#c7d8e8)!important;
+  -webkit-text-fill-color:var(--darkTextMuted,#c7d8e8)!important;
+}
+:root[data-theme20="dark"] body.st-glass20 .budget23 .chart-row23 > :first-child{
+  color:var(--darkTextAccent,#9ed8ff)!important;
+  -webkit-text-fill-color:var(--darkTextAccent,#9ed8ff)!important;
+}
+:root[data-theme20="dark"] body.st-glass20 .budget23 .chart-row23 > :last-child{
+  color:#f4f8ff!important;
+  -webkit-text-fill-color:#f4f8ff!important;
+}
+
+/* Gezamenlijke afdracht / Maandbehoefte / Resterend onder de grafiek */
+:root[data-theme20="dark"] body.st-glass20 .budget23 .calc23,
+:root[data-theme20="dark"] body.st-glass20 .budget23 .calc23 span{
+  color:var(--darkTextMuted,#c7d8e8)!important;
+  -webkit-text-fill-color:var(--darkTextMuted,#c7d8e8)!important;
+}
+:root[data-theme20="dark"] body.st-glass20 .budget23 .calc23 span > :last-child{
+  color:#f4f8ff!important;
+  -webkit-text-fill-color:#f4f8ff!important;
+}
+:root[data-theme20="dark"] body.st-glass20 .budget23 .calc23 .total23,
+:root[data-theme20="dark"] body.st-glass20 .budget23 .total23{
+  color:#ffffff!important;
+  -webkit-text-fill-color:#ffffff!important;
+}
+
+/* Zorg dat eventuele generieke donkere tekstregels deze Budget-fix niet overschrijven */
+:root[data-theme20="dark"] body.st-glass20 .budget23 .budget-sheet23 :is(h2,strong,b){
+  text-shadow:none;
 }
 
