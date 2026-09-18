@@ -428,7 +428,7 @@ body.st-glass20 #view,body.st-glass20 main,body.st-glass20 .content{padding-bott
 :root[data-theme20="dark"] .st-glass20 [class*="answer"],
 :root[data-theme20="dark"] .st-glass20 [class*="response"]{
   background:rgba(13,39,62,.82)!important;
-  color:#f5f8ff!important;
+  color:#a9c2ff!important;
   border-color:rgba(132,174,216,.24)!important;
 }
 
