@@ -427,7 +427,7 @@ body.st-glass20 #view,body.st-glass20 main,body.st-glass20 .content{padding-bott
 :root[data-theme20="dark"] .st-glass20 .settings-card,
 :root[data-theme20="dark"] .st-glass20 [class*="answer"],
 :root[data-theme20="dark"] .st-glass20 [class*="response"]{
-  background:rgba(13,39,62,.82)!important;
+  background:#0d273e!important;
   color:#f5f8ff!important;
   border-color:rgba(132,174,216,.24)!important;
 }
@@ -437,7 +437,7 @@ body.st-glass20 #view,body.st-glass20 main,body.st-glass20 .content{padding-bott
 :root[data-theme20="dark"] .st-glass20 [style*="background: #fff"],
 :root[data-theme20="dark"] .st-glass20 [style*="background:#fff"],
 :root[data-theme20="dark"] .st-glass20 [style*="background: rgb(255"]{
-  background:rgba(13,39,62,.82)!important;
+  background:#0d273e!important;
   color:#f5f8ff!important;
 }
 
@@ -1300,104 +1300,169 @@ body.st-glass20 button.primary{
 }
 
 /* =========================================================
-   DONKERE WEERGAVE — TEKST OP ACHTERGROND #0D273E
+   DONKERE WEERGAVE — #0D273E KLEURCONTRACT
    ========================================================= */
 
-/* Donkere kaarten in de donkere weergave */
+/*
+   Donkere hoofdvlakken.
+   Alleen deze vlakken krijgen #0D273E als achtergrond.
+*/
 :root[data-theme20="dark"] body.st-glass20 .card,
 :root[data-theme20="dark"] body.st-glass20 .panel,
 :root[data-theme20="dark"] body.st-glass20 .section-card,
 :root[data-theme20="dark"] body.st-glass20 .daily-question,
 :root[data-theme20="dark"] body.st-glass20 .quote-card,
 :root[data-theme20="dark"] body.st-glass20 .travel-actions,
-:root[data-theme20="dark"] body.st-glass20 .settings-card,
-:root[data-theme20="dark"] body.st-glass20 .surface-dark {
+:root[data-theme20="dark"] body.st-glass20 .settings-card {
   background:#0d273e !important;
-  color:#f4f8ff !important;
-}
-
-/* Titels en belangrijke tekst op #0D273E: wit */
-:root[data-theme20="dark"] body.st-glass20 .card h1,
-:root[data-theme20="dark"] body.st-glass20 .card h2,
-:root[data-theme20="dark"] body.st-glass20 .card h3,
-:root[data-theme20="dark"] body.st-glass20 .card h4,
-:root[data-theme20="dark"] body.st-glass20 .card strong,
-:root[data-theme20="dark"] body.st-glass20 .surface-dark h1,
-:root[data-theme20="dark"] body.st-glass20 .surface-dark h2,
-:root[data-theme20="dark"] body.st-glass20 .surface-dark h3,
-:root[data-theme20="dark"] body.st-glass20 .surface-dark h4,
-:root[data-theme20="dark"] body.st-glass20 .surface-dark strong {
-  color:#ffffff !important;
-  -webkit-text-fill-color:#ffffff !important;
-  opacity:1 !important;
-}
-
-/* Normale tekst op #0D273E: bijna wit */
-:root[data-theme20="dark"] body.st-glass20 .card p,
-:root[data-theme20="dark"] body.st-glass20 .card label,
-:root[data-theme20="dark"] body.st-glass20 .card li,
-:root[data-theme20="dark"] body.st-glass20 .surface-dark p,
-:root[data-theme20="dark"] body.st-glass20 .surface-dark label,
-:root[data-theme20="dark"] body.st-glass20 .surface-dark li {
-  color:#f4f8ff !important;
-  -webkit-text-fill-color:#f4f8ff !important;
-  opacity:1 !important;
-}
-
-/* Secundaire tekst op #0D273E: lichtblauw */
-:root[data-theme20="dark"] body.st-glass20 .card small,
-:root[data-theme20="dark"] body.st-glass20 .card .muted,
-:root[data-theme20="dark"] body.st-glass20 .card .description,
-:root[data-theme20="dark"] body.st-glass20 .card .helper,
-:root[data-theme20="dark"] body.st-glass20 .card .eyebrow,
-:root[data-theme20="dark"] body.st-glass20 .surface-dark small,
-:root[data-theme20="dark"] body.st-glass20 .surface-dark .muted,
-:root[data-theme20="dark"] body.st-glass20 .surface-dark .description,
-:root[data-theme20="dark"] body.st-glass20 .surface-dark .helper,
-:root[data-theme20="dark"] body.st-glass20 .surface-dark .eyebrow {
-  color:#c7d8e8 !important;
-  -webkit-text-fill-color:#c7d8e8 !important;
-  opacity:1 !important;
-}
-
-/* Vraag van de dag */
-:root[data-theme20="dark"] body.st-glass20 .daily-question h1,
-:root[data-theme20="dark"] body.st-glass20 .daily-question h2,
-:root[data-theme20="dark"] body.st-glass20 .daily-question h3,
-:root[data-theme20="dark"] body.st-glass20 .daily-question strong {
-  color:#ffffff !important;
-  -webkit-text-fill-color:#ffffff !important;
-}
-:root[data-theme20="dark"] body.st-glass20 .daily-question p {
+  border-color:#244761 !important;
   color:#f4f8ff !important;
   -webkit-text-fill-color:#f4f8ff !important;
 }
-:root[data-theme20="dark"] body.st-glass20 .daily-question .question-hint,
-:root[data-theme20="dark"] body.st-glass20 .daily-question small,
-:root[data-theme20="dark"] body.st-glass20 .daily-question .muted {
-  color:#c7d8e8 !important;
-  -webkit-text-fill-color:#c7d8e8 !important;
-}
 
-/* Reizen — prioriteiten en deadlines */
+/* Hoofdtekst op #0D273E */
+:root[data-theme20="dark"] body.st-glass20 .card > h1,
+:root[data-theme20="dark"] body.st-glass20 .card > h2,
+:root[data-theme20="dark"] body.st-glass20 .card > h3,
+:root[data-theme20="dark"] body.st-glass20 .card > strong,
+:root[data-theme20="dark"] body.st-glass20 .card .card-head h1,
+:root[data-theme20="dark"] body.st-glass20 .card .card-head h2,
+:root[data-theme20="dark"] body.st-glass20 .card .card-head h3,
+:root[data-theme20="dark"] body.st-glass20 .card .card-head strong,
+:root[data-theme20="dark"] body.st-glass20 .daily-question > h1,
+:root[data-theme20="dark"] body.st-glass20 .daily-question > h2,
+:root[data-theme20="dark"] body.st-glass20 .daily-question > h3,
 :root[data-theme20="dark"] body.st-glass20 .travel-actions h1,
 :root[data-theme20="dark"] body.st-glass20 .travel-actions h2,
 :root[data-theme20="dark"] body.st-glass20 .travel-actions h3,
 :root[data-theme20="dark"] body.st-glass20 .travel-actions strong {
   color:#ffffff !important;
   -webkit-text-fill-color:#ffffff !important;
+  opacity:1 !important;
 }
-:root[data-theme20="dark"] body.st-glass20 .travel-actions p,
+
+/* Normale tekst direct op #0D273E */
+:root[data-theme20="dark"] body.st-glass20 .card > p,
+:root[data-theme20="dark"] body.st-glass20 .card > label,
+:root[data-theme20="dark"] body.st-glass20 .daily-question > p,
+:root[data-theme20="dark"] body.st-glass20 .travel-actions > p {
+  color:#f4f8ff !important;
+  -webkit-text-fill-color:#f4f8ff !important;
+  opacity:1 !important;
+}
+
+/* Secundaire tekst direct op #0D273E */
+:root[data-theme20="dark"] body.st-glass20 .card > small,
+:root[data-theme20="dark"] body.st-glass20 .card > .muted,
+:root[data-theme20="dark"] body.st-glass20 .card > .description,
+:root[data-theme20="dark"] body.st-glass20 .card > .helper,
+:root[data-theme20="dark"] body.st-glass20 .card .card-head .eyebrow,
+:root[data-theme20="dark"] body.st-glass20 .daily-question .question-hint,
 :root[data-theme20="dark"] body.st-glass20 .travel-actions small,
 :root[data-theme20="dark"] body.st-glass20 .travel-actions .muted {
   color:#c7d8e8 !important;
   -webkit-text-fill-color:#c7d8e8 !important;
+  opacity:1 !important;
 }
 
-/* Inline elementen die expliciet #0D273E gebruiken */
-:root[data-theme20="dark"] body.st-glass20 [style*="background:#0d273e"],
-:root[data-theme20="dark"] body.st-glass20 [style*="background: #0d273e"],
-:root[data-theme20="dark"] body.st-glass20 [style*="background-color:#0d273e"],
-:root[data-theme20="dark"] body.st-glass20 [style*="background-color: #0d273e"] {
-  color:#f4f8ff !important;
+/*
+   LICHTE KAARTEN BINNEN EEN DONKER #0D273E HOOFDVLAK
+   Deze moeten juist donkere tekst houden.
+*/
+:root[data-theme20="dark"] body.st-glass20 .daily-question .answer-grid > article,
+:root[data-theme20="dark"] body.st-glass20 .card .day,
+:root[data-theme20="dark"] body.st-glass20 .card .idea,
+:root[data-theme20="dark"] body.st-glass20 .card .calendar-event,
+:root[data-theme20="dark"] body.st-glass20 .card .trip-subfolder,
+:root[data-theme20="dark"] body.st-glass20 .card .travel-preview-card,
+:root[data-theme20="dark"] body.st-glass20 .card .v13-card,
+:root[data-theme20="dark"] body.st-glass20 .card .chore-chip {
+  background:#ffffff !important;
+  color:#17243a !important;
+  -webkit-text-fill-color:#17243a !important;
+  border-color:#dbe2e8 !important;
 }
+
+/* Hoofdtekst op lichte geneste kaarten */
+:root[data-theme20="dark"] body.st-glass20 .daily-question .answer-grid > article h1,
+:root[data-theme20="dark"] body.st-glass20 .daily-question .answer-grid > article h2,
+:root[data-theme20="dark"] body.st-glass20 .daily-question .answer-grid > article h3,
+:root[data-theme20="dark"] body.st-glass20 .daily-question .answer-grid > article strong,
+:root[data-theme20="dark"] body.st-glass20 .card .day strong,
+:root[data-theme20="dark"] body.st-glass20 .card .idea strong,
+:root[data-theme20="dark"] body.st-glass20 .card .idea h3,
+:root[data-theme20="dark"] body.st-glass20 .card .calendar-event strong,
+:root[data-theme20="dark"] body.st-glass20 .card .trip-subfolder strong,
+:root[data-theme20="dark"] body.st-glass20 .card .travel-preview-card strong,
+:root[data-theme20="dark"] body.st-glass20 .card .v13-card strong,
+:root[data-theme20="dark"] body.st-glass20 .card .chore-chip strong {
+  color:#17243a !important;
+  -webkit-text-fill-color:#17243a !important;
+}
+
+/* Normale en secundaire tekst op lichte geneste kaarten */
+:root[data-theme20="dark"] body.st-glass20 .daily-question .answer-grid > article p,
+:root[data-theme20="dark"] body.st-glass20 .daily-question .answer-grid > article label,
+:root[data-theme20="dark"] body.st-glass20 .card .day p,
+:root[data-theme20="dark"] body.st-glass20 .card .idea p,
+:root[data-theme20="dark"] body.st-glass20 .card .calendar-event span,
+:root[data-theme20="dark"] body.st-glass20 .card .trip-subfolder p,
+:root[data-theme20="dark"] body.st-glass20 .card .travel-preview-card p,
+:root[data-theme20="dark"] body.st-glass20 .card .v13-card p,
+:root[data-theme20="dark"] body.st-glass20 .card .chore-chip small {
+  color:#475363 !important;
+  -webkit-text-fill-color:#475363 !important;
+}
+
+/* Agenda-dagkaart */
+:root[data-theme20="dark"] body.st-glass20 .day {
+  background:#ffffff !important;
+  color:#17243a !important;
+  -webkit-text-fill-color:#17243a !important;
+}
+:root[data-theme20="dark"] body.st-glass20 .day .day-name {
+  color:#475363 !important;
+  -webkit-text-fill-color:#475363 !important;
+}
+:root[data-theme20="dark"] body.st-glass20 .day .day-date {
+  color:#0b1728 !important;
+  -webkit-text-fill-color:#0b1728 !important;
+}
+
+/* Date-idee kaart */
+:root[data-theme20="dark"] body.st-glass20 .idea {
+  background:#ffffff !important;
+  color:#17243a !important;
+  -webkit-text-fill-color:#17243a !important;
+}
+:root[data-theme20="dark"] body.st-glass20 .idea p,
+:root[data-theme20="dark"] body.st-glass20 .idea small {
+  color:#475363 !important;
+  -webkit-text-fill-color:#475363 !important;
+}
+
+/* Knoppen en links behouden hun eigen accentkleur */
+:root[data-theme20="dark"] body.st-glass20 .primary,
+:root[data-theme20="dark"] body.st-glass20 button.primary {
+  color:#ffffff !important;
+  -webkit-text-fill-color:#ffffff !important;
+}
+
+/* Formuliervelden op donkere hoofdvlakken */
+:root[data-theme20="dark"] body.st-glass20 input,
+:root[data-theme20="dark"] body.st-glass20 select,
+:root[data-theme20="dark"] body.st-glass20 textarea {
+  background:#112f4a !important;
+  color:#f7f9ff !important;
+  -webkit-text-fill-color:#f7f9ff !important;
+  border-color:#345674 !important;
+}
+
+/* Placeholdertekst */
+:root[data-theme20="dark"] body.st-glass20 input::placeholder,
+:root[data-theme20="dark"] body.st-glass20 textarea::placeholder {
+  color:#b8c8d8 !important;
+  -webkit-text-fill-color:#b8c8d8 !important;
+  opacity:1 !important;
+}
+
