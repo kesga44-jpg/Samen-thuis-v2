@@ -1,5 +1,5 @@
 :root {
-  --ink: #606875; --muted: #6b7483; --line: #e2e7ed; --paper: #ffffff;
+  --ink: #17243a; --muted: #6b7483; --line: #e2e7ed; --paper: #ffffff;
   --bg: #f3f6f8; --blue: #315f86; --blue-soft: #e7f0f6; --orange: #e98248;
   --green: #2e7d67; --green-soft: #e4f2ed; --red: #b84f58; --shadow: 0 12px 35px rgba(23,36,58,.08);
 }
@@ -15,7 +15,7 @@ main{min-width:0}.topbar{height:106px;padding:24px clamp(22px,4vw,54px) 15px;dis
 .laptop-save{border:1px solid #d8e0e7;background:white;color:var(--blue);white-space:nowrap}.short-label{display:none}
 .view{padding:10px clamp(22px,4vw,54px) 52px;max-width:1500px;margin:auto}
 .grid{display:grid;gap:18px}.grid.two{grid-template-columns:repeat(2,minmax(0,1fr))}.grid.three{grid-template-columns:repeat(3,minmax(0,1fr))}.card{background:var(--paper);border:1px solid var(--line);border-radius:18px;padding:21px;box-shadow:0 5px 18px rgba(23,36,58,.035)}.card h2,.card h3{margin:0}.card-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:17px}.card-head h2{font-size:1.08rem}.text-btn{border:0;background:none;color:var(--blue);font-weight:700;padding:5px}
-.welcome{background:linear-gradient(120deg,#606875,#294767);color:white;border:0;padding:26px;display:flex;justify-content:space-between;align-items:flex-end;min-height:150px;overflow:hidden;position:relative}.welcome:after{content:"";width:210px;height:210px;border:38px solid rgba(255,255,255,.06);border-radius:50%;position:absolute;right:-50px;top:-70px}.welcome p{color:#cedbe7;margin:8px 0 0;max-width:520px}.welcome .date-chip{background:rgba(255,255,255,.12);padding:9px 13px;border-radius:12px;white-space:nowrap;z-index:1}
+.welcome{background:linear-gradient(120deg,#17243a,#294767);color:white;border:0;padding:26px;display:flex;justify-content:space-between;align-items:flex-end;min-height:150px;overflow:hidden;position:relative}.welcome:after{content:"";width:210px;height:210px;border:38px solid rgba(255,255,255,.06);border-radius:50%;position:absolute;right:-50px;top:-70px}.welcome p{color:#cedbe7;margin:8px 0 0;max-width:520px}.welcome .date-chip{background:rgba(255,255,255,.12);padding:9px 13px;border-radius:12px;white-space:nowrap;z-index:1}
 .stat-row{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin:18px 0}.stat{background:white;border:1px solid var(--line);padding:17px;border-radius:15px}.stat strong{display:block;font-size:1.65rem}.stat span{color:var(--muted);font-size:.84rem}
 .list{display:grid;gap:9px}.list-item{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--line)}.list-item:last-child{border:0}.check{width:22px;height:22px;border:2px solid #bec8d3;border-radius:7px;background:white;flex:0 0 auto}.check.done{background:var(--green);border-color:var(--green);color:white}.item-main{min-width:0;flex:1}.item-main strong,.item-main small{display:block}.item-main small{color:var(--muted);margin-top:2px}.done-text{text-decoration:line-through;color:var(--muted)}.tag{padding:5px 9px;border-radius:999px;background:var(--blue-soft);color:var(--blue);font-size:.74rem;font-weight:700;white-space:nowrap}.tag.orange{background:#fff0e6;color:#ad5a2c}.tag.green{background:var(--green-soft);color:var(--green)}.tag.red{background:#faeaeb;color:var(--red)}.delete{border:0;background:transparent;color:#a5adb7;font-size:1.2rem;padding:5px}.delete:hover{color:var(--red)}
 .section-tools{display:flex;gap:10px;margin-bottom:17px;flex-wrap:wrap}.filter{border:1px solid var(--line);background:white;border-radius:10px;padding:9px 12px;color:var(--muted)}.filter.active{background:var(--ink);color:white;border-color:var(--ink)}
@@ -62,7 +62,7 @@ dialog{border:0;border-radius:20px;padding:0;width:min(570px,calc(100vw - 28px))
 .templates-head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin:0 0 14px}.templates-head h2{margin:2px 0 0}.second-weekday[hidden]{display:none}
 
 /* Instellingen en algemene hulpmiddelen */
-.settings-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;align-items:start}.settings-card>p{color:var(--muted);line-height:1.55}.compact-form{margin:20px 0}.settings-card details{border-top:1px solid var(--line);padding-top:15px;margin-top:18px}.settings-card summary{cursor:pointer;font-weight:800;color:var(--blue)}.settings-card ol{color:var(--muted);line-height:1.55;padding-left:21px}.settings-card pre{background:#606875;color:#eaf1f6;border-radius:12px;padding:14px;overflow:auto;font-size:.75rem;line-height:1.5;white-space:pre-wrap}.calendar-settings{display:grid;gap:8px;margin:17px 0}.calendar-setting{display:flex;align-items:center;gap:10px;border:1px solid var(--line);border-radius:11px;padding:10px 12px;font-weight:700}.calendar-setting input[type=color]{border:0;width:30px;height:26px;padding:0;background:transparent}.inline-form{display:flex;gap:8px}.inline-form input{min-width:0;flex:1;border:1px solid #ccd4dd;border-radius:10px;padding:10px 12px}
+.settings-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;align-items:start}.settings-card>p{color:var(--muted);line-height:1.55}.compact-form{margin:20px 0}.settings-card details{border-top:1px solid var(--line);padding-top:15px;margin-top:18px}.settings-card summary{cursor:pointer;font-weight:800;color:var(--blue)}.settings-card ol{color:var(--muted);line-height:1.55;padding-left:21px}.settings-card pre{background:#17243a;color:#eaf1f6;border-radius:12px;padding:14px;overflow:auto;font-size:.75rem;line-height:1.5;white-space:pre-wrap}.calendar-settings{display:grid;gap:8px;margin:17px 0}.calendar-setting{display:flex;align-items:center;gap:10px;border:1px solid var(--line);border-radius:11px;padding:10px 12px;font-weight:700}.calendar-setting input[type=color]{border:0;width:30px;height:26px;padding:0;background:transparent}.inline-form{display:flex;gap:8px}.inline-form input{min-width:0;flex:1;border:1px solid #ccd4dd;border-radius:10px;padding:10px 12px}
 .muted{color:var(--muted)}.body-copy{line-height:1.55}.stock-controls{display:flex;align-items:center;justify-content:space-between;margin-top:18px}.stock-controls>strong{font-size:1.5rem}.stock-controls small{font-size:.75rem;color:var(--muted)}.stock-min{display:block;text-align:center;color:var(--muted);margin-top:12px}.section-title{margin:28px 0 14px}.float-delete{float:right}.idea h3{margin:10px 0 0}.trip-date{min-width:55px;text-align:center}.trip-date strong{display:block;font-size:1.35rem}.trip-date small{display:block;color:var(--muted)}
 
 /* Reismappen en definitieve antwoorden */
@@ -918,7 +918,7 @@ body.st-glass20 .daily-question .answer-grid>article small{color:#66768a!importa
     padding:7px 10px max(8px,env(safe-area-inset-bottom))!important;
     border:0!important;
     border-radius:0!important;
-    background:#606875!important;
+    background:#17243a!important;
     box-shadow:0 -8px 28px rgba(23,36,58,.13)!important;
     -webkit-backdrop-filter:none!important;
     backdrop-filter:none!important;
@@ -953,7 +953,7 @@ body.st-glass20 .daily-question .answer-grid>article small{color:#66768a!importa
 /* HOOFDREGEL:
    ieder wit/licht kaartvlak gebruikt exact dezelfde tekst in light én dark.
    Dit is bewust gebaseerd op de oorspronkelijke v16-kleuren:
-   ink #606875 en muted #6b7483. */
+   ink #17243a en muted #6b7483. */
 body.st-glass20 .card,
 body.st-glass20 .stat,
 body.st-glass20 .list-item.light-surface23,
@@ -972,9 +972,9 @@ body.st-glass20 .card:not(.welcome):not(.dark-card):not(.hero-card),
 body.st-glass20 .stat,
 body.st-glass20 .light-surface23,
 body.st-glass20 .daily-question .answer-grid>article{
-  --ink:#606875!important;
+  --ink:#17243a!important;
   --muted:#6b7483!important;
-  color:#606875!important;
+  color:#17243a!important;
 }
 body.st-glass20 .card:not(.welcome):not(.dark-card):not(.hero-card) h1,
 body.st-glass20 .card:not(.welcome):not(.dark-card):not(.hero-card) h2,
@@ -986,8 +986,8 @@ body.st-glass20 .card:not(.welcome):not(.dark-card):not(.hero-card) .item-main s
 body.st-glass20 .stat strong,
 body.st-glass20 .light-surface23 strong,
 body.st-glass20 .light-surface23 b{
-  color:#606875!important;
-  -webkit-text-fill-color:#606875!important;
+  color:#17243a!important;
+  -webkit-text-fill-color:#17243a!important;
 }
 body.st-glass20 .card:not(.welcome):not(.dark-card):not(.hero-card) small,
 body.st-glass20 .card:not(.welcome):not(.dark-card):not(.hero-card) .muted,
