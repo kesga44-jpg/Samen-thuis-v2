@@ -1466,3 +1466,215 @@ body.st-glass20 button.primary{
   opacity:1 !important;
 }
 
+/* =========================================================
+   DEFINITIEF DARK-SURFACE CONTRAST — THEMA-AFHANKELIJK
+   =========================================================
+   Doel:
+   - Alleen op donkerblauwe #0D273E-vlakken lichte tekst gebruiken.
+   - Primaire tekst = wit/bijna wit.
+   - Secundaire/accenttekst = lichte variant van gekozen thema.
+   - Lichte/witte geneste kaarten houden donkere tekst.
+   ========================================================= */
+
+/* Standaard = blauw thema */
+:root{
+  --dark-surface:#0d273e;
+  --dark-text:#ffffff;
+  --dark-text-soft:#f4f8ff;
+  --dark-accent:#9ed8ff;
+  --dark-muted:#c7d8e8;
+}
+
+/*
+  Thema-accenten.
+  Meerdere attribuutnamen/waarden worden ondersteund zodat dit ook werkt
+  wanneer de app het gekozen accent op html/root/body opslaat.
+*/
+:root[data-accent="blue"],
+:root[data-accent20="blue"],
+:root[data-color="blue"],
+:root[data-theme-color="blue"],
+body[data-accent="blue"]{
+  --dark-accent:#9ed8ff;
+  --dark-muted:#c7d8e8;
+}
+:root[data-accent="orange"],
+:root[data-accent20="orange"],
+:root[data-color="orange"],
+:root[data-theme-color="orange"],
+body[data-accent="orange"]{
+  --dark-accent:#ffc58f;
+  --dark-muted:#f2d2b7;
+}
+:root[data-accent="purple"],
+:root[data-accent20="purple"],
+:root[data-color="purple"],
+:root[data-theme-color="purple"],
+body[data-accent="purple"]{
+  --dark-accent:#d7b8ff;
+  --dark-muted:#dfd0f2;
+}
+
+/*
+  De donkere hoofdvlakken. De tekstregels hieronder zijn bewust breed
+  binnen DEZE donkere vlakken, zodat o.a. voorraad-, boodschappen- en
+  reisitems niet meer een oude donkere tekstkleur kunnen erven.
+*/
+:root[data-theme20="dark"] body.st-glass20 .card,
+:root[data-theme20="dark"] body.st-glass20 .panel,
+:root[data-theme20="dark"] body.st-glass20 .section-card,
+:root[data-theme20="dark"] body.st-glass20 .daily-question,
+:root[data-theme20="dark"] body.st-glass20 .quote-card,
+:root[data-theme20="dark"] body.st-glass20 .travel-actions,
+:root[data-theme20="dark"] body.st-glass20 .settings-card,
+:root[data-theme20="dark"] body.st-glass20 .surface-dark {
+  background:var(--dark-surface) !important;
+  color:var(--dark-text-soft) !important;
+  -webkit-text-fill-color:var(--dark-text-soft) !important;
+}
+
+/* ALLE gewone tekst binnen een donker hoofdvlak: nooit donker */
+:root[data-theme20="dark"] body.st-glass20 .card :where(
+  h1,h2,h3,h4,h5,h6,p,span,label,li,strong,b,em,i,time,
+  .title,.name,.text,.task-title,.item-title,.stock-title,.grocery-title,
+  .travel-title,.question-text,.answer-text
+),
+:root[data-theme20="dark"] body.st-glass20 .panel :where(
+  h1,h2,h3,h4,h5,h6,p,span,label,li,strong,b,em,i,time,
+  .title,.name,.text,.task-title,.item-title
+),
+:root[data-theme20="dark"] body.st-glass20 .section-card :where(
+  h1,h2,h3,h4,h5,h6,p,span,label,li,strong,b,em,i,time,
+  .title,.name,.text,.task-title,.item-title
+),
+:root[data-theme20="dark"] body.st-glass20 .daily-question :where(
+  h1,h2,h3,h4,h5,h6,p,span,label,strong,b,.question-text,.answer-text
+),
+:root[data-theme20="dark"] body.st-glass20 .travel-actions :where(
+  h1,h2,h3,h4,h5,h6,p,span,label,li,strong,b,.title,.name,.text,.task-title,.item-title
+),
+:root[data-theme20="dark"] body.st-glass20 .surface-dark :where(
+  h1,h2,h3,h4,h5,h6,p,span,label,li,strong,b,em,i,time,
+  .title,.name,.text,.task-title,.item-title
+){
+  color:var(--dark-text-soft) !important;
+  -webkit-text-fill-color:var(--dark-text-soft) !important;
+  opacity:1 !important;
+}
+
+/* Titels/belangrijke tekst: helder wit */
+:root[data-theme20="dark"] body.st-glass20 .card :where(h1,h2,h3,h4,strong,b,.title,.task-title,.item-title,.stock-title,.grocery-title,.travel-title),
+:root[data-theme20="dark"] body.st-glass20 .panel :where(h1,h2,h3,h4,strong,b,.title,.task-title,.item-title),
+:root[data-theme20="dark"] body.st-glass20 .section-card :where(h1,h2,h3,h4,strong,b,.title,.task-title,.item-title),
+:root[data-theme20="dark"] body.st-glass20 .daily-question :where(h1,h2,h3,h4,strong,b,.question-text),
+:root[data-theme20="dark"] body.st-glass20 .travel-actions :where(h1,h2,h3,h4,strong,b,.title,.task-title,.item-title),
+:root[data-theme20="dark"] body.st-glass20 .surface-dark :where(h1,h2,h3,h4,strong,b,.title,.task-title,.item-title){
+  color:var(--dark-text) !important;
+  -webkit-text-fill-color:var(--dark-text) !important;
+}
+
+/*
+  Subtitels, metadata, hints en kleine labels:
+  lichte themakleur i.p.v. donkergrijs.
+  Dit pakt o.a. "Antwoorden blijven verborgen..." mee.
+*/
+:root[data-theme20="dark"] body.st-glass20 .card :where(
+  small,.muted,.subtitle,.sub-title,.description,.helper,.hint,.meta,.eyebrow,
+  .question-hint,.task-meta,.item-meta,.stock-meta,.grocery-meta,.travel-meta
+),
+:root[data-theme20="dark"] body.st-glass20 .panel :where(
+  small,.muted,.subtitle,.sub-title,.description,.helper,.hint,.meta,.eyebrow
+),
+:root[data-theme20="dark"] body.st-glass20 .section-card :where(
+  small,.muted,.subtitle,.sub-title,.description,.helper,.hint,.meta,.eyebrow
+),
+:root[data-theme20="dark"] body.st-glass20 .daily-question :where(
+  small,.muted,.subtitle,.sub-title,.description,.helper,.hint,.meta,.eyebrow,.question-hint
+),
+:root[data-theme20="dark"] body.st-glass20 .travel-actions :where(
+  small,.muted,.subtitle,.sub-title,.description,.helper,.hint,.meta,.eyebrow,.task-meta,.item-meta
+),
+:root[data-theme20="dark"] body.st-glass20 .surface-dark :where(
+  small,.muted,.subtitle,.sub-title,.description,.helper,.hint,.meta,.eyebrow,.task-meta,.item-meta
+){
+  color:var(--dark-accent) !important;
+  -webkit-text-fill-color:var(--dark-accent) !important;
+  opacity:1 !important;
+}
+
+/* Links/accenttekst op donkere achtergrond volgen eveneens de lichte themakleur */
+:root[data-theme20="dark"] body.st-glass20 .card a:not(.primary),
+:root[data-theme20="dark"] body.st-glass20 .panel a:not(.primary),
+:root[data-theme20="dark"] body.st-glass20 .section-card a:not(.primary),
+:root[data-theme20="dark"] body.st-glass20 .daily-question a:not(.primary),
+:root[data-theme20="dark"] body.st-glass20 .travel-actions a:not(.primary),
+:root[data-theme20="dark"] body.st-glass20 .surface-dark a:not(.primary){
+  color:var(--dark-accent) !important;
+  -webkit-text-fill-color:var(--dark-accent) !important;
+}
+
+/* =========================================================
+   UITZONDERING: LICHTE KAARTEN BINNEN DONKERE HOOFDVLAKKEN
+   =========================================================
+   Deze kaarten zijn wit/licht en moeten dus donkere tekst houden.
+*/
+:root[data-theme20="dark"] body.st-glass20 :is(
+  .answer-grid > article,
+  .day,
+  .idea,
+  .calendar-event,
+  .trip-subfolder,
+  .travel-preview-card,
+  .v13-card,
+  .chore-chip,
+  .white-card,
+  .light-card,
+  .light-surface23
+){
+  color:#17243a !important;
+  -webkit-text-fill-color:#17243a !important;
+}
+
+/* Reset alle kinderen van lichte geneste kaarten terug naar donkere tekst */
+:root[data-theme20="dark"] body.st-glass20 :is(
+  .answer-grid > article,
+  .day,
+  .idea,
+  .calendar-event,
+  .trip-subfolder,
+  .travel-preview-card,
+  .v13-card,
+  .chore-chip,
+  .white-card,
+  .light-card,
+  .light-surface23
+) :where(h1,h2,h3,h4,h5,h6,p,span,label,li,strong,b,em,i,time,.title,.name,.text,.task-title,.item-title){
+  color:#17243a !important;
+  -webkit-text-fill-color:#17243a !important;
+}
+
+/* Secundaire tekst op lichte geneste kaarten blijft donkergrijs */
+:root[data-theme20="dark"] body.st-glass20 :is(
+  .answer-grid > article,
+  .day,
+  .idea,
+  .calendar-event,
+  .trip-subfolder,
+  .travel-preview-card,
+  .v13-card,
+  .chore-chip,
+  .white-card,
+  .light-card,
+  .light-surface23
+) :where(small,.muted,.subtitle,.sub-title,.description,.helper,.hint,.meta,.eyebrow,.question-hint,.task-meta,.item-meta){
+  color:#475363 !important;
+  -webkit-text-fill-color:#475363 !important;
+}
+
+/* Knoppen behouden leesbaar contrast */
+:root[data-theme20="dark"] body.st-glass20 button.primary,
+:root[data-theme20="dark"] body.st-glass20 .primary{
+  color:#ffffff !important;
+  -webkit-text-fill-color:#ffffff !important;
+}
+
