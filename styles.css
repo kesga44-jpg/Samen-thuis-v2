@@ -477,7 +477,7 @@ body.st-glass20 #view,body.st-glass20 main,body.st-glass20 .content{padding-bott
 
 /* Dark mode: grijze tekst minder flets, dichter bij wit */
 :root[data-theme20="dark"]{
-  --muted:#a2b3cc!important;
+  --muted:#c3cede!important;
 }
 :root[data-theme20="dark"] .st-glass20{
   color:#f5f8ff!important;
@@ -486,11 +486,11 @@ body.st-glass20 #view,body.st-glass20 main,body.st-glass20 .content{padding-bott
 :root[data-theme20="dark"] .st-glass20 label,
 :root[data-theme20="dark"] .st-glass20 .description,
 :root[data-theme20="dark"] .st-glass20 .helper{
-  color:#b0c0d7!important;
+  color:#d2dbe8!important;
 }
 :root[data-theme20="dark"] .st-glass20 .muted,
 :root[data-theme20="dark"] .st-glass20 small{
-  color:#9dafc6!important;
+  color:#bdc9d9!important;
 }
 :root[data-theme20="dark"] .st-glass20 input,
 :root[data-theme20="dark"] .st-glass20 textarea,
