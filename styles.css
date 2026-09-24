@@ -11,3 +11,61 @@
 @media(max-width:520px){.topbar{align-items:flex-start}.top-actions{max-width:54%;}.top-actions .secondary{padding:8px 9px}.stat-row{grid-template-columns:1fr 1fr}.stat strong{font-size:1.25rem}.dialog form{padding:15px}.card{padding:14px}.price-top{align-items:flex-start;flex-direction:column}.answer-grid{grid-template-columns:1fr}}
 \n.source-card .source-big{font-size:2.4rem;font-weight:800}.source-values{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px}.source-values span{display:flex;flex-direction:column;padding:10px;border-radius:12px;background:rgba(127,127,127,.08)}\n
 .metric-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:14px 0}.metric-grid>div{padding:12px;border-radius:14px;background:rgba(127,127,127,.08);display:flex;flex-direction:column}.metric-grid strong{font-size:1.15rem}.health-badges{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}.health-badges span{padding:8px 10px;border-radius:999px;background:rgba(127,127,127,.09)}.right{text-align:right;display:flex;flex-direction:column}
+
+
+/* =========================================================
+   SAMEN THUIS β — VISUELE AANSLUITING OP HUIDIGE SAMEN THUIS v23
+   Donkerblauwe navigatie, oranje S, rustige grijs-witte achtergrond,
+   afgeronde witte kaarten, blauwe primaire acties en glassy mobiele balk.
+   ========================================================= */
+:root{
+ --ink:#17243a;--muted:#6b7483;--line:#e2e7ed;--paper:#fff;--bg:#f3f6f8;
+ --blue:#315f86;--blue-soft:#e7f0f6;--orange:#e98248;--green:#2e7d67;
+ --green-soft:#e4f2ed;--red:#b84f58;--shadow:0 12px 35px rgba(23,36,58,.08);
+}
+html{background:var(--bg);color:var(--ink)}
+body{background:var(--bg);color:var(--ink)}
+.sidebar{background:#17243a!important;color:#fff!important}
+.brand-mark{background:#e98248!important;color:#fff!important}
+.nav-item{color:#dfe8f2!important}
+.nav-item.active,.nav-item:hover{background:rgba(255,255,255,.11)!important;color:#fff!important}
+main,.view{background:var(--bg)}
+.topbar{background:rgba(243,246,248,.94)!important;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
+.topbar h1{color:var(--ink)}
+.topbar p,.eyebrow,.muted,small{color:var(--muted)}
+.card,.panel,.source-card,.stat,.day,.idea,.trip-subfolder{
+ background:var(--paper)!important;border:1px solid var(--line)!important;
+ border-radius:18px!important;box-shadow:0 5px 18px rgba(23,36,58,.035)!important
+}
+.primary{background:var(--blue)!important;color:#fff!important;box-shadow:0 5px 14px rgba(49,95,134,.18)}
+.secondary{background:#eef1f4!important;color:var(--ink)!important}
+.ghost,.text-btn{color:var(--blue)!important}
+.tag,.badge{background:var(--blue-soft)!important;color:var(--blue)!important}
+.tag.green,.badge.green{background:var(--green-soft)!important;color:var(--green)!important}
+.tag.red,.badge.red{background:#faeaeb!important;color:var(--red)!important}
+.notice.good{border-left:5px solid var(--green)!important}
+.notice.warn{border-left:5px solid var(--orange)!important}
+.welcome,.hero{
+ background:linear-gradient(120deg,#17243a,#294767)!important;color:#fff!important;border:0!important
+}
+.welcome p,.hero p,.welcome small,.hero small{color:#cedbe7!important}
+input,select,textarea{background:#fff;color:var(--ink);border-color:#ccd4dd!important}
+dialog{border-radius:20px!important;box-shadow:0 30px 80px rgba(12,22,35,.3)!important}
+.metric-grid>div,.health-badges span{background:#f6f8fa!important;border:1px solid var(--line)}
+.list-row,.list-item{border-color:var(--line)!important}
+.danger{color:var(--red)!important}
+@media(max-width:650px){
+ .sidebar{background:rgba(23,36,58,.94)!important;backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px)}
+ .nav-item.active{background:rgba(255,255,255,.14)!important}
+ .card,.panel,.source-card{border-radius:16px!important}
+}
+@media(prefers-color-scheme:dark){
+ body:not([data-theme="light"]){--ink:#edf3f8;--muted:#aab8c6;--line:#31445a;--paper:#1d2b3d;--bg:#111b28;--blue:#76a9d1;--blue-soft:#263d53;--green:#72b9a4;--green-soft:#203d38;--red:#ef9098}
+ body:not([data-theme="light"]){background:var(--bg);color:var(--ink)}
+ body:not([data-theme="light"]) main,body:not([data-theme="light"]) .view{background:var(--bg)}
+ body:not([data-theme="light"]) .topbar{background:rgba(17,27,40,.94)!important}
+ body:not([data-theme="light"]) .card,body:not([data-theme="light"]) .panel,body:not([data-theme="light"]) .source-card,
+ body:not([data-theme="light"]) .stat,body:not([data-theme="light"]) .day,body:not([data-theme="light"]) .idea{background:var(--paper)!important;color:var(--ink)}
+ body:not([data-theme="light"]) .secondary,body:not([data-theme="light"]) .metric-grid>div,body:not([data-theme="light"]) .health-badges span{background:#263547!important;color:var(--ink)!important}
+ body:not([data-theme="light"]) input,body:not([data-theme="light"]) select,body:not([data-theme="light"]) textarea{background:#172436;color:var(--ink);border-color:#3a4d62!important}
+}
