@@ -1,19 +1,14 @@
 {
-  "name": "Samen Thuis – Kees & Daphne",
-  "short_name": "Samen Thuis",
+  "name": "Samen Thuis Beta",
+  "short_name": "Thuis β",
+  "description": "Gratis beta-versie van Samen Thuis met slimme voorraad en zelflerende bodemprijzen.",
+  "id": "./?samen-thuis-beta-v1",
   "start_url": "./",
+  "scope": "./",
   "display": "standalone",
-  "background_color": "#f3f6f8",
-  "theme_color": "#17243a",
-  "lang": "nl",
+  "background_color": "#f4f6fb",
+  "theme_color": "#17233b",
   "icons": [
-    {
-      "src": "icon.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
-      "purpose": "any maskable"
-    }
-  ],
-  "version": "23.4",
-  "description": "Samen Thuis — opgeschoonde en gedocumenteerde stylesheet per pagina en onderdeel"
+    {"src":"icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}
+  ]
 }

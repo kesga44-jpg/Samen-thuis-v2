@@ -1,98 +1,101 @@
 <!doctype html>
 <html lang="nl">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#17243a">
+  <meta name="theme-color" content="#17233b">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="Samen Thuis">
-  <meta name="description" content="Het gezamenlijke thuisdashboard van Kees en Daphne.">
+  <meta name="apple-mobile-web-app-title" content="Samen Thuis β">
+  <meta name="description" content="Beta-versie van Samen Thuis met voorraad, boodschappen en slimme bodemprijzen.">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" href="icon.svg">
-  <link rel="stylesheet" href="styles.css?v=234">
-  <title>Samen Thuis</title>
-  <!-- Samen Thuis v21.6 · build 2026-09-16 22:xx -->
-
-
-
-  <!-- Samen Thuis v23 geïntegreerde build 2026-09-17 07:16:46 +0000 -->
-  <!-- Samen Thuis v23.1 DATA-VEILIG 2026-09-18 06:00:01 +0000 -->
-  <!-- v23.2 v16-balk + lichte tekst 2026-09-18 06:17:59 +0000 -->
-  <!-- v23.3 contrast + navpositie 2026-09-18 07:18:05 +0000 -->
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css?v=1.2.0-open-data">
+  <title>Samen Thuis β</title>
 </head>
 <body>
+  <div id="offlineBanner" class="offline-banner" hidden>Offline — wijzigingen blijven lokaal bewaard.</div>
   <div class="app-shell">
-    <aside class="sidebar" aria-label="Hoofdnavigatie">
-      <div class="brand"><span class="brand-mark">S</span><div><strong>Samen Thuis</strong><small>Kees & Daphne</small></div></div>
-      <nav id="nav"></nav>
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">S</div>
+        <div class="brand-copy">
+          <strong>Samen Thuis <span class="beta-pill">β</span></strong>
+          <small>Bèta • los van productie</small>
+        </div>
+      </div>
+      <nav id="nav" class="nav" aria-label="Hoofdnavigatie"></nav>
       <div class="sidebar-footer">
-        <button class="nav-item" data-action="backup"><span>↥</span> Back-up maken</button>
-        <button class="nav-item" data-action="restore"><span>↧</span> Back-up laden</button>
-        <input id="restoreInput" type="file" accept="application/json" hidden>
-        <input id="groceryImportFile" type="file" accept=".txt,.csv,.json,text/plain,text/csv,application/json" hidden>
-        <input id="ostaImportFile" type="file" accept=".txt,.csv,.json,text/plain,text/csv,application/json" hidden>
-        <input id="calendarImportFile" type="file" accept=".txt,.csv,.json,text/plain,text/csv,application/json" hidden>
-        <input id="travelImportFile" type="file" accept=".pdf,.txt,text/plain,application/pdf" hidden>
+        <button class="nav-utility" data-action="backup">↥ Back-up</button>
+        <button class="nav-utility" data-action="restore">↧ Back-up laden</button>
       </div>
     </aside>
 
-    <main>
+    <main class="main-shell">
       <header class="topbar">
-        <div><p id="eyebrow">Goedemorgen</p><h1 id="pageTitle">Vandaag</h1></div>
+        <div>
+          <p id="eyebrow" class="eyebrow">Bèta-omgeving</p>
+          <h1 id="pageTitle">Vandaag</h1>
+        </div>
         <div class="top-actions">
-          <span id="syncState" class="sync-state" title="Synchronisatiestatus">Alleen dit apparaat</span>
-          <span id="saveState" class="save-state">Lokaal bewaard</span>
-          <button id="laptopSaveBtn" class="secondary laptop-save" aria-label="Back-up opslaan voor laptop">
-            <span class="full-label">⇩ Opslaan voor laptop</span><span class="short-label">⇩ Laptop</span>
-          </button>
-          <button id="addBtn" class="primary">＋ Toevoegen</button>
+          <span id="syncState" class="status-chip">Alleen lokaal</span>
+          <span id="saveState" class="status-chip subtle">Bewaard</span>
+          <button id="priceRefreshBtn" class="secondary" type="button" hidden>↻ Prijzen</button>
+          <button id="addBtn" class="primary" type="button">＋ Toevoegen</button>
         </div>
       </header>
       <div id="view" class="view" aria-live="polite"></div>
     </main>
   </div>
 
-  <dialog id="itemDialog">
+  <dialog id="itemDialog" class="dialog">
     <form id="itemForm" method="dialog">
       <div class="dialog-head">
-        <div><p class="eyebrow">Nieuw item</p><h2 id="dialogTitle">Toevoegen</h2></div>
-        <button type="button" data-close-dialog class="icon-btn" aria-label="Sluiten">×</button>
+        <div><p class="eyebrow" id="dialogEyebrow">Item</p><h2 id="dialogTitle">Toevoegen</h2></div>
+        <button class="icon-btn" type="button" data-close-dialog aria-label="Sluiten">×</button>
       </div>
+      <input id="editId" name="editId" type="hidden">
       <div id="formFields" class="form-grid"></div>
       <div class="dialog-actions">
-        <button type="button" data-close-dialog class="secondary">Annuleren</button>
-        <button id="saveBtn" type="submit" class="primary">Opslaan</button>
+        <button class="secondary" type="button" data-close-dialog>Annuleren</button>
+        <button class="primary" type="submit">Opslaan</button>
       </div>
     </form>
   </dialog>
 
-  <dialog id="questionDialog">
+  <dialog id="questionDialog" class="dialog">
     <form id="questionForm" method="dialog">
       <div class="dialog-head">
-        <div><p class="eyebrow">Vraag van vandaag</p><h2 id="questionTitle">Jouw antwoord</h2></div>
-        <button type="button" data-close-question class="icon-btn" aria-label="Sluiten">×</button>
+        <div><p class="eyebrow">Vraag van vandaag</p><h2 id="questionDialogTitle">Antwoord</h2></div>
+        <button class="icon-btn" type="button" data-close-question aria-label="Sluiten">×</button>
       </div>
-      <p id="questionText" class="question-dialog-text"></p>
+      <p id="questionDialogText" class="question-copy"></p>
       <input id="questionPerson" name="person" type="hidden">
-      <div class="field">
-        <label for="questionAnswer">Antwoord</label>
-        <textarea id="questionAnswer" name="answer" required maxlength="800" placeholder="Schrijf je antwoord…"></textarea>
-      </div>
+      <label class="field">Antwoord<textarea id="questionAnswer" name="answer" maxlength="800" required></textarea></label>
       <div class="dialog-actions">
-        <button type="button" data-close-question class="secondary">Annuleren</button>
-        <button type="submit" class="primary">Bewaren</button>
+        <button class="secondary" type="button" data-close-question>Annuleren</button>
+        <button class="primary" type="submit">Bewaren</button>
       </div>
     </form>
   </dialog>
 
+  <dialog id="confirmDialog" class="dialog small-dialog">
+    <form method="dialog">
+      <div class="dialog-head"><h2 id="confirmTitle">Bevestigen</h2></div>
+      <p id="confirmText"></p>
+      <div class="dialog-actions">
+        <button id="confirmCancel" class="secondary" value="cancel">Annuleren</button>
+        <button id="confirmOk" class="danger" value="ok">Verwijderen</button>
+      </div>
+    </form>
+  </dialog>
+
+  <input id="restoreInput" type="file" accept="application/json,.json" hidden>
+  <input id="productionBackupInput" type="file" accept="application/json,.json" hidden>
+  <input id="importFileInput" type="file" accept=".txt,.csv,.json,.md,.pdf,.docx,.xlsx,.xls,.xlsm,text/plain,text/csv,application/json,application/pdf" hidden>
   <div id="toast" class="toast" role="status"></div>
 
-  <div id="brainyQuoteSource" class="brainy-source" aria-hidden="true">
-    <script src="https://www.brainyquote.com/link/quotebr.js"></script>
-    <a href="https://www.brainyquote.com/quote_of_the_day" target="_blank" rel="nofollow noopener">more Quotes</a>
-  </div>
-
-  <script src="app.js?v=234"></script>
+  <script type="module" src="js/app.js?v=1.2.0-open-data"></script>
 </body>
 </html>
