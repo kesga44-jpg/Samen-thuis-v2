@@ -3,11 +3,11 @@ import {todayISO,addDays,startOfWeek,weekDates,fmtDate,id,esc,groupBy,number,mon
 import {refreshPriceTracks,priceSummary,priceStatus,learnedThresholds,stockToGroceries,linkPriceTrackToItem} from './prices.js';
 import {syncNow,syncConfigured} from './sync.js';
 import {IMPORT_TARGETS,parseImportText,commitImported,readImportFile} from './importer.js';
-import {weather,openFoodFacts,openPrices,rdw,cbsFuel,overheidSearch,nedEnergy,extractOpenPrices} from './sources.js';
+import {weather,openFoodFacts,openPrices,rdw,cbsFuel,overheidSearch,nedEnergy,extractOpenPrices,airQuality} from './sources.js';
 
 const SECTIONS={
   today:['Vandaag','⌂'], planning:['Agenda','▦'], meals:['Weekmenu','♨'], groceries:['Boodschappen','🛒'],
-  chores:['Huishouden','✓'], stock:['Voorraad','▣'], ideas:['Ideeën','♡'], home:['Woning','⌂'], data:['Open data','◎'],
+  chores:['Huishouden','✓'], stock:['Voorraad','▣'], ideas:['Ideeën','♡'], home:['Woning','⌂'], cars:['Auto’s','🚗'], data:['Open data','◎'],
   trips:['Reizen','✈'], imports:['Import','↧'], settings:['Instellingen','⚙']
 };
 const GROCERY_CATEGORIES=['Groente','Fruit','Brood & wraps','Zuivel & vega','Vlees & vis','Diepvries','Voorraadkast','Kruiden & sauzen','Drinken','Schoonmaak','Persoonlijke verzorging','Overig'];
@@ -48,7 +48,7 @@ function updateHeader(){
 }
 function render(){
   updateHeader();
-  const map={today:renderToday,planning:renderPlanning,meals:renderMeals,groceries:renderGroceries,chores:renderChores,stock:renderStock,ideas:renderIdeas,home:renderHome,data:renderDataSources,trips:renderTrips,imports:renderImports,settings:renderSettings};
+  const map={today:renderToday,planning:renderPlanning,meals:renderMeals,groceries:renderGroceries,chores:renderChores,stock:renderStock,ideas:renderIdeas,home:renderHome,cars:renderCars,data:renderDataSources,trips:renderTrips,imports:renderImports,settings:renderSettings};
   document.querySelector('#view').innerHTML=map[current]();
 }
 function savedFlash(){ const el=document.querySelector('#saveState'); el.textContent='Zojuist bewaard'; setTimeout(()=>el.textContent='Bewaard',1000); }
@@ -127,9 +127,44 @@ function renderStock(){
 }
 function renderIdeas(){ return `<div class="idea-grid">${store.data.ideas.map(x=>`<article class="card idea-card"><div class="card-head"><span class="tag purple">${esc(x.category||'Idee')}</span>${rowActions('ideas',x)}</div><div class="idea-icon">♡</div><h2>${esc(x.title)}</h2><p>${esc(x.description||'')}</p>${x.date?`<small class="muted">${fmtDate(x.date)}</small>`:''}</article>`).join('')||empty('Bewaar hier dingen die jullie samen willen doen')}</div>`; }
 function renderHome(){ const groups=groupBy(store.data.home,x=>x.category||'Overig'); return `<div class="grid two">${Object.entries(groups).map(([cat,items])=>`<section class="card"><div class="card-head"><h2>${esc(cat)}</h2><span class="tag">${items.length}</span></div><div class="list">${items.map(x=>`<div class="list-item"><div class="item-main"><strong>${esc(x.title)}</strong><small>${esc(x.description||'')}${x.due?` · ${fmtDate(x.due)}`:''}${x.cost?` · ${money(x.cost)}`:''}</small></div>${rowActions('home',x)}</div>`).join('')}</div></section>`).join('')||empty('Nog geen woninginformatie')}</div>`; }
+
+function carById(id){return (store.data.cars||[]).find(x=>x.id===id);}
+function fuelForCar(id){return (store.data.fuelEntries||[]).filter(x=>x.carId===id).sort((a,b)=>new Date(a.date)-new Date(b.date));}
+function monthKey(d){return String(d||'').slice(0,7);}
+function fuelStats(entries){
+ const liters=entries.reduce((a,x)=>a+Number(x.liters||0),0),cost=entries.reduce((a,x)=>a+Number(x.total||0),0);
+ return {liters,cost,avg:liters?cost/liters:0};
+}
+function consumptionForCar(id){
+ const e=fuelForCar(id).filter(x=>x.fullTank&&Number(x.odometer)>0);
+ if(e.length<2)return null;
+ let liters=0,km=0,last=e[0];
+ for(let i=1;i<e.length;i++){const cur=e[i],dist=Number(cur.odometer)-Number(last.odometer);if(dist>0){km+=dist;liters+=Number(cur.liters||0);}last=cur;}
+ return km>0?{km,liters,l100:liters/km*100,kmPerLiter:liters?km/liters:0,costPerKm:fuelStats(e.slice(1)).cost/km}:null;
+}
+function renderCars(){
+ const cars=store.data.cars||[], entries=store.data.fuelEntries||[], mk=new Date().toISOString().slice(0,7);
+ const monthly=entries.filter(x=>monthKey(x.date)===mk), ms=fuelStats(monthly);
+ return `<section class="card notice good"><p class="eyebrow">Auto & brandstof</p><h2>${money(ms.cost)} deze maand</h2><p>${monthly.length} tankbeurt(en) · ${ms.liters.toFixed(1)} liter · gemiddeld ${money(ms.avg)}/L. Dit totaal kan automatisch in Budget worden opgenomen.</p><div class="button-row"><button class="primary" data-car-add>Auto toevoegen</button><button class="secondary" data-fuel-add>Tankbeurt toevoegen</button></div></section>
+ <div class="grid two">${cars.length?cars.map(c=>{const e=fuelForCar(c.id),st=fuelStats(e.filter(x=>monthKey(x.date)===mk)),con=consumptionForCar(c.id),last=e[e.length-1];return `<section class="card"><div class="card-head"><div><p class="eyebrow">${esc(c.nickname||'Auto')}</p><h2>${esc(c.brand||'')} ${esc(c.model||'')}</h2></div><button class="icon-button" data-car-edit="${c.id}">✎</button></div><p>${esc(c.plate||'Geen kenteken')} ${c.fuelType?`· ${esc(c.fuelType)}`:''}</p><div class="metric-grid"><div><small>Deze maand</small><strong>${money(st.cost)}</strong></div><div><small>Liters</small><strong>${st.liters.toFixed(1)}</strong></div><div><small>Verbruik</small><strong>${con?con.l100.toFixed(1)+' L/100 km':'–'}</strong></div><div><small>€/km</small><strong>${con?money(con.costPerKm):'–'}</strong></div></div>${last?`<p class="muted">Laatste stand: ${Number(last.odometer||0).toLocaleString('nl-NL')} km · ${esc(last.date)}</p>`:''}<div class="button-row"><button class="secondary" data-fuel-add="${c.id}">Tankbeurt</button><button class="ghost danger" data-car-delete="${c.id}">Verwijder</button></div></section>`}).join(''):`<section class="card empty"><h2>Nog geen auto's</h2><p>Voeg meerdere auto's toe. Tankkosten worden per auto én gezamenlijk bijgehouden.</p></section>`}</div>
+ ${cars.map(c=>{const e=fuelForCar(c.id).slice().reverse();return e.length?`<section class="card"><p class="eyebrow">${esc(c.nickname||c.plate||'Auto')}</p><h2>Tankhistorie</h2><div class="list">${e.slice(0,12).map(x=>`<div class="list-row"><div><strong>${esc(x.date)}</strong><small>${Number(x.odometer||0).toLocaleString('nl-NL')} km · ${Number(x.liters||0).toFixed(2)} L · ${x.station?esc(x.station):'tankstation niet ingevuld'}</small></div><div class="right"><strong>${money(x.total)}</strong><small>${money(x.pricePerLiter)}/L</small></div></div>`).join('')}</div></section>`:''}).join('')}`;
+}
+function carDialog(existing=null){
+ const c=existing||{};modal(`<form id="carForm" class="form-grid"><h2 class="wide">${existing?'Auto aanpassen':'Auto toevoegen'}</h2><input type="hidden" name="id" value="${esc(c.id||'')}"><label class="field">Naam<input name="nickname" required value="${esc(c.nickname||'')}" placeholder="Auto Kees"></label><label class="field">Kenteken<input name="plate" value="${esc(c.plate||'')}"></label><label class="field">Merk<input name="brand" value="${esc(c.brand||'')}"></label><label class="field">Model<input name="model" value="${esc(c.model||'')}"></label><label class="field">Brandstof<select name="fuelType"><option>Euro 95 (E10)</option><option>Euro 98 (E5)</option><option>Diesel</option><option>LPG</option><option>Elektrisch</option></select></label><label class="field">Tankinhoud (L)<input name="tankCapacity" type="number" step=".1" value="${esc(c.tankCapacity||'')}"></label><div class="button-row wide"><button class="primary">Opslaan</button><button class="secondary" type="button" data-modal-close>Annuleren</button></div></form>`);
+ const sel=document.querySelector('#carForm select[name=fuelType]');if(sel&&c.fuelType)sel.value=c.fuelType;
+}
+function fuelDialog(carId=''){
+ const cars=store.data.cars||[];if(!cars.length){toast('Voeg eerst een auto toe');return;}
+ modal(`<form id="fuelForm" class="form-grid"><h2 class="wide">Tankbeurt toevoegen</h2><label class="field">Auto<select name="carId">${cars.map(c=>`<option value="${c.id}" ${c.id===carId?'selected':''}>${esc(c.nickname||c.plate||'Auto')}</option>`).join('')}</select></label><label class="field">Datum<input required name="date" type="date" value="${new Date().toISOString().slice(0,10)}"></label><label class="field">Kilometerstand<input required name="odometer" type="number" min="0"></label><label class="field">Liters<input required name="liters" type="number" min="0" step=".01"></label><label class="field">Totaal betaald (€)<input name="total" type="number" min="0" step=".01"></label><label class="field">Prijs per liter (€)<input name="pricePerLiter" type="number" min="0" step=".001"></label><label class="field">Tankstation/plaats<input name="station" placeholder="bijv. Delft"></label><label class="check wide"><input name="fullTank" type="checkbox" checked> Volgetankt (nodig voor betrouwbare verbruiksberekening)</label><div class="button-row wide"><button class="primary">Tankbeurt opslaan</button><button class="secondary" type="button" data-modal-close>Annuleren</button></div></form>`);
+}
+
 function sourceCard(title,sub,body,action=''){return `<section class="card source-card"><div class="card-head"><div><p class="eyebrow">${esc(sub)}</p><h2>${esc(title)}</h2></div>${action}</div>${body}</section>`;}
 function renderDataSources(){
- const c=store.data.settings.dataSourcesCache||{},w=c.weather,car=c.rdw,fuel=c.fuel,ned=c.ned,off=c.off,op=c.openPrices,gov=c.gov;
+ const c=store.data.settings.dataSourcesCache||{},aq=c.airQuality,w=c.weather,car=c.rdw,fuel=c.fuel,ned=c.ned,off=c.off,op=c.openPrices,gov=c.gov;
+ const aqc=aq?.current||{}, pollenMax=Math.max(0,...['alder_pollen','birch_pollen','grass_pollen','mugwort_pollen','ragweed_pollen'].map(k=>Number(aqc[k]||0)));
+ const allergy=pollenMax>50?'Hoog':pollenMax>10?'Verhoogd':pollenMax>1?'Laag':'Zeer laag';
+ const asthma=Number(aqc.european_aqi||0)>60?'Ongunstig':Number(aqc.european_aqi||0)>40?'Matig':'Gunstig';
+ const health=aq?`<div class="health-badges"><span>🌿 Pollen: <strong>${allergy}</strong></span><span>🫁 Lucht: <strong>${asthma}</strong></span></div><p>Gras ${Number(aqc.grass_pollen||0).toFixed(1)} · Berk ${Number(aqc.birch_pollen||0).toFixed(1)} · Els ${Number(aqc.alder_pollen||0).toFixed(1)} korrels/m³</p><p>EU AQI ${Math.round(aqc.european_aqi||0)} · PM2.5 ${Number(aqc.pm2_5||0).toFixed(1)} · PM10 ${Number(aqc.pm10||0).toFixed(1)} µg/m³ · ozon ${Number(aqc.ozone||0).toFixed(0)} µg/m³</p><small class="muted">Indicatie voor hooikoorts/luchtkwaliteit; geen persoonlijk medisch advies.</small>`:`<p class="muted">Laad luchtkwaliteit voor pollen, fijnstof en ozon.</p>`;
  const wb=w?`<div class="source-big">${Math.round(w.current?.temperature_2m??0)}°C</div><p>Voelt als ${Math.round(w.current?.apparent_temperature??0)}° · wind ${w.current?.wind_speed_10m??'-'} km/u</p><small class="muted">Neerslagkans vandaag ${w.daily?.precipitation_probability_max?.[0]??'-'}%</small>`:`<p class="muted">Vul coördinaten in bij Instellingen.</p>`;
  const cb=car?`<strong>${esc(car.merk||'')} ${esc(car.handelsbenaming||'')}</strong><p>${esc(car.kenteken||'')} · ${esc(car.voertuigsoort||'')}</p><small class="muted">APK: ${esc(car.vervaldatum_apk||'onbekend')}</small>`:`<p class="muted">Vul een kenteken in bij Instellingen.</p>`;
  const fb=fuel?`<div class="source-values">${Object.entries(fuel.values||{}).map(([k,v])=>`<span><small>${esc(k)}</small><strong>${money(v)}</strong></span>`).join('')}</div><small class="muted">${esc(fuel.period||'Laatste CBS-waarneming')}</small>`:`<p class="muted">Landelijke gemiddelde pompprijzen.</p>`;
@@ -139,6 +174,7 @@ function renderDataSources(){
  const gb=gov?`<p>${gov.length} dataset(s).</p>${gov.slice(0,4).map(x=>`<small class="muted" style="display:block">${esc(x.title||'Dataset')}</small>`).join('')}`:`<p class="muted">Zoek in het Nederlandse Open Data Register.</p>`;
  return `<section class="card notice good"><p class="eyebrow">Gratis/open bronnen</p><h2>Databronnen voor Samen Thuis</h2><p>Alleen gegevens die jullie daadwerkelijk opvragen worden geladen.</p></section><div class="grid two">
  ${sourceCard('Open-Meteo','Weer',wb,'<button class="secondary" data-source="weather">Vernieuwen</button>')}
+ ${sourceCard('Pollen & luchtkwaliteit','Hooikoorts / luchtwegen',health,'<button class="secondary" data-source="air">Luchtkwaliteit</button>')}
  ${sourceCard('RDW Open Data','Auto',cb,'<button class="secondary" data-source="rdw">Kenteken laden</button>')}
  ${sourceCard('CBS brandstofdata','Brandstof',fb,'<button class="secondary" data-source="fuel">Laatste prijzen</button>')}
  ${sourceCard('Nationaal Energie Dashboard','Energie',nb,'<button class="secondary" data-source="ned">Energiedata</button>')}
@@ -149,6 +185,7 @@ function renderDataSources(){
  </div><section class="card"><p class="eyebrow">Folders</p><h2>Brede folderbron</h2><p>Er is geen betrouwbare officiële gratis open API gevonden die het brede winkelaanbod van AlleFolders levert. Daarom scrapen we geen folders. Supermarktaanbiedingen lopen via PrijsProfeet.</p></section>`;
 }
 async function loadSource(kind){const c=store.data.settings.dataSourcesCache ||= {};try{
+ if(kind==='air')c.airQuality=await airQuality(store.data.settings.weatherLat,store.data.settings.weatherLon);
  if(kind==='weather')c.weather=await weather(store.data.settings.weatherLat,store.data.settings.weatherLon);
  if(kind==='rdw')c.rdw=await rdw(store.data.settings.vehiclePlate);
  if(kind==='fuel'){const r=await cbsFuel(),row=r.row||{},vals={};for(const p of r.properties||[]){if(r.fields.includes(p.Key)&&row[p.Key]!=null)vals[p.Title]=Number(row[p.Key]);}c.fuel={period:row.Perioden||'',values:vals};}
@@ -259,6 +296,11 @@ function openQuestion(person){ const answers=store.data.dailyAnswers[todayISO()]
 setupNav(); render();
 document.addEventListener('click',async e=>{
   const sourceBtn=e.target.closest('[data-source]'); if(sourceBtn){ loadSource(sourceBtn.dataset.source); return; }
+  const addCar=e.target.closest('[data-car-add]');if(addCar){carDialog();return;}
+  const editCar=e.target.closest('[data-car-edit]');if(editCar){carDialog(carById(editCar.dataset.carEdit));return;}
+  const delCar=e.target.closest('[data-car-delete]');if(delCar){if(confirm('Auto en bijbehorende tankbeurten verwijderen?')){store.data.cars=store.data.cars.filter(x=>x.id!==delCar.dataset.carDelete);store.data.fuelEntries=store.data.fuelEntries.filter(x=>x.carId!==delCar.dataset.carDelete);store.save();}return;}
+  const addFuel=e.target.closest('[data-fuel-add]');if(addFuel){fuelDialog(addFuel.dataset.fuelAdd||'');return;}
+
 
   const view=e.target.closest('[data-view]')?.dataset.view; if(view){navigate(view);return;}
   if(e.target.closest('#addBtn')){ if(current==='trips'){ if(!store.data.tripFolders.length) return openFolderForm(); return openForm('trips'); } openForm(current); return; }
@@ -319,3 +361,8 @@ setTimeout(()=>doSync(true),1800);
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){autoPriceRefresh();doSync(true);}});
 
 document.addEventListener('submit',e=>{if(e.target.id!=='sourceSettingsForm')return;e.preventDefault();const f=new FormData(e.target);store.data.settings.weatherLat=String(f.get('weatherLat')||'').trim();store.data.settings.weatherLon=String(f.get('weatherLon')||'').trim();store.data.settings.vehiclePlate=String(f.get('vehiclePlate')||'').trim().toUpperCase();store.data.settings.openDataQuery=String(f.get('openDataQuery')||'energie').trim();store.save();toast('Broninstellingen bewaard');});
+
+document.addEventListener('submit',e=>{
+ if(e.target.id==='carForm'){e.preventDefault();const f=new FormData(e.target),id=String(f.get('id')||'')||crypto.randomUUID();const old=carById(id)||{};const c={...old,id,nickname:String(f.get('nickname')||''),plate:String(f.get('plate')||'').toUpperCase(),brand:String(f.get('brand')||''),model:String(f.get('model')||''),fuelType:String(f.get('fuelType')||''),tankCapacity:Number(f.get('tankCapacity')||0)};store.data.cars=store.data.cars||[];const i=store.data.cars.findIndex(x=>x.id===id);if(i>=0)store.data.cars[i]=c;else store.data.cars.push(c);store.save();closeModal();toast('Auto opgeslagen');}
+ if(e.target.id==='fuelForm'){e.preventDefault();const f=new FormData(e.target),liters=Number(f.get('liters')||0);let total=Number(f.get('total')||0),ppl=Number(f.get('pricePerLiter')||0);if(!total&&ppl)total=liters*ppl;if(!ppl&&total&&liters)ppl=total/liters;if(!total||!ppl){toast('Vul totaalbedrag of literprijs in');return;}store.data.fuelEntries=store.data.fuelEntries||[];store.data.fuelEntries.push({id:crypto.randomUUID(),carId:String(f.get('carId')),date:String(f.get('date')),odometer:Number(f.get('odometer')||0),liters,total,pricePerLiter:ppl,station:String(f.get('station')||''),fullTank:f.get('fullTank')==='on'});store.save();closeModal();toast('Tankbeurt opgeslagen');}
+});

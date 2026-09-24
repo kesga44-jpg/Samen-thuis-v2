@@ -9,3 +9,13 @@ export async function overheidSearch(query){const q=String(query||'').trim();if(
 export async function viaSupabase(data,action,payload={}){const base=String(data.settings.supabaseUrl||'').replace(/\/$/,'');if(!base)throw new Error('Supabase URL ontbreekt.');const h={'Content-Type':'application/json'};if(data.settings.supabaseAnonKey){h.apikey=data.settings.supabaseAnonKey;h.Authorization=`Bearer ${data.settings.supabaseAnonKey}`;}const r=await fetch(`${base}/functions/v1/data-sources`,{method:'POST',headers:h,body:JSON.stringify({action,...payload})});const b=await r.json().catch(()=>({}));if(!r.ok)throw new Error(b.error||`Bronservice ${r.status}`);return b;}
 export async function nedEnergy(data){return viaSupabase(data,'ned-energy',{});}
 export function extractOpenPrices(p){const r=p?.items||p?.results||p?.data||[];return Array.isArray(r)?r:[];}
+
+export async function airQuality(lat,lon){
+ if(!lat||!lon)throw new Error('Vul coördinaten in bij Instellingen.');
+ const u=new URL('https://air-quality-api.open-meteo.com/v1/air-quality');
+ u.searchParams.set('latitude',lat);u.searchParams.set('longitude',lon);
+ u.searchParams.set('current','european_aqi,pm2_5,pm10,nitrogen_dioxide,ozone,alder_pollen,birch_pollen,grass_pollen,mugwort_pollen,ragweed_pollen');
+ u.searchParams.set('hourly','european_aqi,pm2_5,pm10,ozone,alder_pollen,birch_pollen,grass_pollen,mugwort_pollen,ragweed_pollen');
+ u.searchParams.set('timezone','auto');u.searchParams.set('forecast_days','4');
+ return getJson(u);
+}
