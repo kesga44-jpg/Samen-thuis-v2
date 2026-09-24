@@ -16,10 +16,23 @@ export const defaultData=()=>({
     supabaseUrl:DEFAULT_SUPABASE_URL,
     supabaseAnonKey:DEFAULT_SUPABASE_KEY,
     householdCode:'',
-    lastSyncedAt:'', weatherLat:'', weatherLon:'', vehiclePlate:'', openDataQuery:'energie', dataSourcesCache:{}
+    lastSyncedAt:'', weatherLat:'', weatherLon:'', vehiclePlate:'', openDataQuery:'energie', dataSourcesCache:{},
+    fuelRadarFuel:'e10',
+    fuelRadarLocations:[
+      {id:'rotterdam',name:'Rotterdam',kind:'nl',note:'Thuis'},
+      {id:'nieuwerkerk',name:'Nieuwerkerk aan den IJssel',kind:'nl',note:'Carpool'},
+      {id:'utrecht',name:'Utrecht',kind:'nl',note:'Werk Kees'},
+      {id:'delft',name:'Delft',kind:'nl',note:'Training'},
+      {id:'obdam',name:'Obdam',kind:'nl',note:'Ouders'},
+      {id:'oudbeijerland',name:'Oud-Beijerland',kind:'nl',note:'Werk Daphne / omgeving'},
+      {id:'fijnaart',name:'Fijnaart',kind:'nl',note:'Schoonouders'},
+      {id:'belgie',name:'België nabij Fijnaart',kind:'be',note:'Grensoptie'},
+      {id:'duitsland',name:'Emmerich am Rhein / Kleve',kind:'de',note:'Duitsland vanaf regio Rotterdam'}
+    ],
+    fuelRadarCache:{}
   },
   planning:[], meals:[], groceries:[], chores:[], stock:[], ideas:[], home:[],
-  tripFolders:[], tripSections:[], trips:[], priceTracks:[], dailyAnswers:{},
+  tripFolders:[], tripSections:[], trips:[], priceTracks:[], dailyAnswers:{}, cars:[], fuelEntries:[],
   importHistory:[]
 });
 
@@ -40,7 +53,7 @@ export function migrate(raw){
   const out={...base,...raw};
   out.meta={...base.meta,...raw.meta,version:1,environment:'beta'};
   out.settings={...base.settings,...raw.settings};
-  ['planning','meals','groceries','chores','stock','ideas','home','tripFolders','tripSections','trips','priceTracks','importHistory'].forEach(k=>out[k]=safeArray(raw[k]));
+  ['planning','meals','groceries','chores','stock','ideas','home','tripFolders','tripSections','trips','priceTracks','importHistory','cars','fuelEntries'].forEach(k=>out[k]=safeArray(raw[k]));
   out.dailyAnswers=raw.dailyAnswers&&typeof raw.dailyAnswers==='object'?raw.dailyAnswers:{};
   out.priceTracks=out.priceTracks.map(normalizeTrack);
   out.stock=out.stock.map(x=>({desired:Number(x.desired??x.min??0),priceTrackId:x.priceTrackId||'',...x}));

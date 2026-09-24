@@ -3,7 +3,7 @@ import {todayISO,addDays,startOfWeek,weekDates,fmtDate,id,esc,groupBy,number,mon
 import {refreshPriceTracks,priceSummary,priceStatus,learnedThresholds,stockToGroceries,linkPriceTrackToItem} from './prices.js';
 import {syncNow,syncConfigured} from './sync.js';
 import {IMPORT_TARGETS,parseImportText,commitImported,readImportFile} from './importer.js';
-import {weather,openFoodFacts,openPrices,rdw,cbsFuel,overheidSearch,nedEnergy,extractOpenPrices,airQuality} from './sources.js';
+import {weather,openFoodFacts,openPrices,rdw,cbsFuel,overheidSearch,nedEnergy,extractOpenPrices,airQuality,euFuelSummary,germanFuelStations} from './sources.js';
 
 const SECTIONS={
   today:['Vandaag','⌂'], planning:['Agenda','▦'], meals:['Weekmenu','♨'], groceries:['Boodschappen','🛒'],
@@ -142,10 +142,75 @@ function consumptionForCar(id){
  for(let i=1;i<e.length;i++){const cur=e[i],dist=Number(cur.odometer)-Number(last.odometer);if(dist>0){km+=dist;liters+=Number(cur.liters||0);}last=cur;}
  return km>0?{km,liters,l100:liters/km*100,kmPerLiter:liters?km/liters:0,costPerKm:fuelStats(e.slice(1)).cost/km}:null;
 }
+
+function ownFuelObservations(){
+ const entries=store.data.fuelEntries||[];
+ return entries.filter(x=>Number(x.pricePerLiter)>0).slice().sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+}
+function placeOwnStats(name){
+ const n=norm(name),aliases={
+  'oud beijerland':['oud beijerland','hoeksche waard'],
+  'nieuwerkerk aan den ijssel':['nieuwerkerk'],
+  'belgie nabij fijnaart':['belgie','belgië'],
+  'emmerich am rhein kleve':['emmerich','kleve','duitsland']
+ };
+ const keys=[n,...(aliases[n]||[])];
+ const rows=ownFuelObservations().filter(x=>keys.some(k=>norm(x.station||'').includes(k)));
+ if(!rows.length)return null;
+ const prices=rows.map(x=>Number(x.pricePerLiter)).filter(Number.isFinite);
+ return {last:rows[0],min:Math.min(...prices),avg:prices.reduce((s,x)=>s+x,0)/prices.length,count:prices.length};
+}
+function fuelRadarCard(){
+ const s=store.data.settings,cache=s.fuelRadarCache||{},eu=cache.eu||[],de=cache.de||null;
+ const nl=eu.find(x=>x.country_code==='NL'),be=eu.find(x=>x.country_code==='BE');
+ const fuel=s.fuelRadarFuel||'e10';
+ const euFuel=(country)=>country?.fuels?.[fuel]||country?.fuels?.sp95||null;
+ const nlF=euFuel(nl),beF=euFuel(be);
+ const locations=s.fuelRadarLocations||[];
+ const rows=locations.map(loc=>{
+   const own=placeOwnStats(loc.name);
+   let ref='',detail='';
+   if(loc.kind==='nl'){
+     ref=nlF?.avg?money(nlF.avg)+'/L NL gem.':'Eigen waarnemingen';
+     detail=own?`Eigen: ${money(own.last.pricePerLiter)}/L · ${esc(own.last.date)} · ${own.count} meting(en)`:'Nog geen eigen prijs op deze plek';
+   }else if(loc.kind==='be'){
+     ref=beF?.avg?money(beF.avg)+'/L BE gem.':'België referentie';
+     detail=beF?.min?`Landelijk bereik vanaf ${money(beF.min)}/L · geen stationniveau in gratis bron`:'Gratis bron heeft geen stationniveau';
+   }else{
+     const st=de?.stations?.[0];
+     ref=st&&Number(st.price)>0?money(st.price)+'/L':'Duitse live prijs';
+     detail=st?`${esc(st.name||'Tankstation')} · ${esc(st.place||'')} · ${Number(st.dist||0).toFixed(1)} km vanaf zoekpunt`:'Voeg Tankerkönig-key toe en vernieuw';
+   }
+   return `<div class="fuel-radar-row"><div><strong>${esc(loc.name)}</strong><small>${esc(loc.note||'')}</small></div><div class="right"><strong>${ref}</strong><small>${detail}</small></div></div>`;
+ }).join('');
+ const cbs=store.data.settings.dataSourcesCache?.fuel;
+ return `<section class="card fuel-radar"><div class="card-head"><div><p class="eyebrow">Brandstofradar</p><h2>Waar tanken langs jullie vaste plekken?</h2></div><button class="primary" data-fuel-radar-refresh>↻ Vernieuwen</button></div>
+ <div class="button-row fuel-choice"><button class="${fuel==='e10'?'primary':'secondary'}" data-fuel-kind="e10">Euro 95 / E10</button><button class="${fuel==='e5'?'primary':'secondary'}" data-fuel-kind="e5">Euro 98 / E5</button><button class="${fuel==='diesel'?'primary':'secondary'}" data-fuel-kind="diesel">Diesel</button></div>
+ <p class="muted">Nederland/België: gratis Europese landreferentie + jullie eigen tankwaarnemingen. Duitsland: actuele stations via Tankerkönig wanneer de gratis API-key is ingesteld.</p>
+ <div class="fuel-radar-list">${rows}</div>
+ <div class="fuel-radar-foot">${cbs?`CBS NL laatste daggemiddelde: ${esc(cbs.period||'')} · Euro95 ${money(cbs.values?.['Benzine Euro95'])}`:'CBS-referentie nog niet geladen.'}</div>
+ <div class="button-row"><a class="secondary button-link" href="https://www.anwb.nl/auto/brandstof/goedkoopste-tankstation" target="_blank" rel="noopener">ANWB actuele NL-prijzen</a><a class="secondary button-link" href="https://directlease.nl/tankservice/" target="_blank" rel="noopener">DirectLease Tankservice</a></div>
+ </section>`;
+}
+async function refreshFuelRadar(){
+ const c=store.data.settings.fuelRadarCache ||= {};
+ try{
+   const [eu,de]=await Promise.allSettled([
+     euFuelSummary(),
+     germanFuelStations(store.data,{place:'Emmerich am Rhein',fuel:store.data.settings.fuelRadarFuel||'e10',radius:25})
+   ]);
+   if(eu.status==='fulfilled')c.eu=eu.value;
+   if(de.status==='fulfilled')c.de=de.value;
+   else c.deError=de.reason?.message||String(de.reason||'');
+   c.updated=new Date().toISOString();
+   store.save();
+   toast(de.status==='fulfilled'?'Brandstofradar bijgewerkt':'Radar bijgewerkt; Duitsland wacht op Tankerkönig-key');
+ }catch(e){console.error(e);toast(`Brandstofradar: ${e.message}`);}
+}
 function renderCars(){
  const cars=store.data.cars||[], entries=store.data.fuelEntries||[], mk=new Date().toISOString().slice(0,7);
  const monthly=entries.filter(x=>monthKey(x.date)===mk), ms=fuelStats(monthly);
- return `<section class="card notice good"><p class="eyebrow">Auto & brandstof</p><h2>${money(ms.cost)} deze maand</h2><p>${monthly.length} tankbeurt(en) · ${ms.liters.toFixed(1)} liter · gemiddeld ${money(ms.avg)}/L. Dit totaal kan automatisch in Budget worden opgenomen.</p><div class="button-row"><button class="primary" data-car-add>Auto toevoegen</button><button class="secondary" data-fuel-add>Tankbeurt toevoegen</button></div></section>
+ return `${fuelRadarCard()}<section class="card notice good"><p class="eyebrow">Auto & brandstof</p><h2>${money(ms.cost)} deze maand</h2><p>${monthly.length} tankbeurt(en) · ${ms.liters.toFixed(1)} liter · gemiddeld ${money(ms.avg)}/L. Dit totaal kan automatisch in Budget worden opgenomen.</p><div class="button-row"><button class="primary" data-car-add>Auto toevoegen</button><button class="secondary" data-fuel-add>Tankbeurt toevoegen</button></div></section>
  <div class="grid two">${cars.length?cars.map(c=>{const e=fuelForCar(c.id),st=fuelStats(e.filter(x=>monthKey(x.date)===mk)),con=consumptionForCar(c.id),last=e[e.length-1];return `<section class="card"><div class="card-head"><div><p class="eyebrow">${esc(c.nickname||'Auto')}</p><h2>${esc(c.brand||'')} ${esc(c.model||'')}</h2></div><button class="icon-button" data-car-edit="${c.id}">✎</button></div><p>${esc(c.plate||'Geen kenteken')} ${c.fuelType?`· ${esc(c.fuelType)}`:''}</p><div class="metric-grid"><div><small>Deze maand</small><strong>${money(st.cost)}</strong></div><div><small>Liters</small><strong>${st.liters.toFixed(1)}</strong></div><div><small>Verbruik</small><strong>${con?con.l100.toFixed(1)+' L/100 km':'–'}</strong></div><div><small>€/km</small><strong>${con?money(con.costPerKm):'–'}</strong></div></div>${last?`<p class="muted">Laatste stand: ${Number(last.odometer||0).toLocaleString('nl-NL')} km · ${esc(last.date)}</p>`:''}<div class="button-row"><button class="secondary" data-fuel-add="${c.id}">Tankbeurt</button><button class="ghost danger" data-car-delete="${c.id}">Verwijder</button></div></section>`}).join(''):`<section class="card empty"><h2>Nog geen auto's</h2><p>Voeg meerdere auto's toe. Tankkosten worden per auto én gezamenlijk bijgehouden.</p></section>`}</div>
  ${cars.map(c=>{const e=fuelForCar(c.id).slice().reverse();return e.length?`<section class="card"><p class="eyebrow">${esc(c.nickname||c.plate||'Auto')}</p><h2>Tankhistorie</h2><div class="list">${e.slice(0,12).map(x=>`<div class="list-row"><div><strong>${esc(x.date)}</strong><small>${Number(x.odometer||0).toLocaleString('nl-NL')} km · ${Number(x.liters||0).toFixed(2)} L · ${x.station?esc(x.station):'tankstation niet ingevuld'}</small></div><div class="right"><strong>${money(x.total)}</strong><small>${money(x.pricePerLiter)}/L</small></div></div>`).join('')}</div></section>`:''}).join('')}`;
 }
@@ -188,7 +253,7 @@ async function loadSource(kind){const c=store.data.settings.dataSourcesCache ||=
  if(kind==='air')c.airQuality=await airQuality(store.data.settings.weatherLat,store.data.settings.weatherLon);
  if(kind==='weather')c.weather=await weather(store.data.settings.weatherLat,store.data.settings.weatherLon);
  if(kind==='rdw')c.rdw=await rdw(store.data.settings.vehiclePlate);
- if(kind==='fuel'){const r=await cbsFuel(),row=r.row||{},vals={};for(const p of r.properties||[]){if(r.fields.includes(p.Key)&&row[p.Key]!=null)vals[p.Title]=Number(row[p.Key]);}c.fuel={period:row.Perioden||'',values:vals};}
+ if(kind==='fuel'){const r=await cbsFuel();c.fuel={period:r.date,values:{'Benzine Euro95':r.petrol,'Diesel':r.diesel,'Lpg':r.lpg}};}
  if(kind==='ned'){const r=await nedEnergy(store.data);c.ned=r.summary||r;}
  if(kind==='off'){const code=prompt('Barcode (EAN)');if(!code)return;const r=await openFoodFacts(code);c.off=r.product||r;c.lastBarcode=code;}
  if(kind==='openprices'){const code=c.lastBarcode||prompt('Barcode (EAN)');if(!code)return;c.lastBarcode=code;c.openPrices=extractOpenPrices(await openPrices(code));}
