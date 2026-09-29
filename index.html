@@ -1,101 +1,44 @@
 <!doctype html>
 <html lang="nl">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#17233b">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#17243a">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="Samen Thuis β">
-  <meta name="description" content="Beta-versie van Samen Thuis met voorraad, boodschappen en slimme bodemprijzen.">
-  <link rel="manifest" href="manifest.webmanifest">
-  <link rel="apple-touch-icon" href="icon.svg">
-  <link rel="icon" href="icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="styles.css?v=1.7.0">
-  <title>Samen Thuis β · v1.7</title>
+  <meta name="apple-mobile-web-app-title" content="Samen Thuis">
+  <meta name="description" content="Het gezamenlijke thuisdashboard van Kees en Daphne.">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="./icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="./icon.svg">
+  <link rel="stylesheet" href="./styles.css?v=300">
+  <title>Samen Thuis</title>
 </head>
 <body>
-  <div id="offlineBanner" class="offline-banner" hidden>Offline — wijzigingen blijven lokaal bewaard.</div>
-  <div class="app-shell">
-    <aside class="sidebar">
-      <div class="brand">
-        <div class="brand-mark">S</div>
-        <div class="brand-copy">
-          <strong>Samen Thuis <span class="beta-pill">β</span></strong>
-          <small>Bèta • los van productie</small>
-        </div>
-      </div>
-      <nav id="nav" class="nav" aria-label="Hoofdnavigatie"></nav>
-      <div class="sidebar-footer">
-        <button class="nav-utility" data-action="backup">↥ Back-up</button>
-        <button class="nav-utility" data-action="restore">↧ Back-up laden</button>
-      </div>
-    </aside>
+<div class="app-shell">
+  <aside class="sidebar">
+    <div class="brand"><span class="brand-mark">S</span><div><strong>Samen Thuis</strong><small>Kees & Daphne</small></div></div>
+    <nav id="nav"></nav>
+    <div class="sidebar-footer">
+      <button class="nav-item" data-action="backup">↥ Back-up maken</button>
+      <button class="nav-item" data-action="restore">↧ Back-up laden</button>
+      <input id="restoreInput" type="file" accept="application/json" hidden>
+    </div>
+  </aside>
+  <main>
+    <header class="topbar">
+      <div><small id="saveState">Lokaal bewaard</small><h1 id="pageTitle">Today</h1></div>
+      <div class="top-actions"><span id="syncBadge" class="tag">Offline</span><button id="quickAddBtn" class="secondary">＋ Snel</button><button id="addBtn" class="primary">＋ Toevoegen</button></div>
+    </header>
+    <section id="view" class="view"></section>
+  </main>
+</div>
+<nav id="mobileNav" class="mobile-nav"></nav>
+<div id="toast" class="toast"></div>
 
-    <main class="main-shell">
-      <header class="topbar">
-        <div>
-          <p id="eyebrow" class="eyebrow">Bèta-omgeving</p>
-          <h1 id="pageTitle">Vandaag</h1>
-        </div>
-        <div class="top-actions">
-          <span id="syncState" class="status-chip">Alleen lokaal</span>
-          <span id="saveState" class="status-chip subtle">Bewaard</span>
-          <button id="priceRefreshBtn" class="secondary" type="button" hidden>↻ Prijzen</button>
-          <button id="addBtn" class="primary" type="button">＋ Toevoegen</button>
-        </div>
-      </header>
-      <div id="view" class="view" aria-live="polite"></div>
-    </main>
-  </div>
+<dialog id="itemDialog"><form id="itemForm"><div class="dialog-head"><h2 id="dialogTitle">Toevoegen</h2><button type="button" class="icon-btn" data-close>×</button></div><div id="formFields" class="form-grid"></div><div class="dialog-actions"><button type="button" class="secondary" data-close>Annuleren</button><button class="primary">Bewaren</button></div></form></dialog>
+<dialog id="quickDialog"><form id="quickForm"><div class="dialog-head"><h2>Snel toevoegen</h2><button type="button" class="icon-btn" data-close>×</button></div><p>Schrijf kort wat je wilt onthouden. Kies waar het terechtkomt.</p><div class="form-grid"><label class="field">Wat?<input name="title" required placeholder="Bijv. garage bellen"></label><label class="field">Naar<select name="target"><option value="tasks">Taken</option><option value="groceries">Boodschappen</option><option value="planning">Agenda</option><option value="ideas">Date ideeën</option><option value="home">Woning</option></select></label><label class="field">Voor wie?<select name="person"><option>Samen</option><option>Kees</option><option>Daphne</option></select></label><label class="field">Datum<input name="date" type="date"></label></div><div class="dialog-actions"><button type="button" class="secondary" data-close>Annuleren</button><button class="primary">Toevoegen</button></div></form></dialog>
 
-  <dialog id="itemDialog" class="dialog">
-    <form id="itemForm" method="dialog">
-      <div class="dialog-head">
-        <div><p class="eyebrow" id="dialogEyebrow">Item</p><h2 id="dialogTitle">Toevoegen</h2></div>
-        <button class="icon-btn" type="button" data-close-dialog aria-label="Sluiten">×</button>
-      </div>
-      <input id="editId" name="editId" type="hidden">
-      <div id="formFields" class="form-grid"></div>
-      <div class="dialog-actions">
-        <button class="secondary" type="button" data-close-dialog>Annuleren</button>
-        <button class="primary" type="submit">Opslaan</button>
-      </div>
-    </form>
-  </dialog>
-
-  <dialog id="questionDialog" class="dialog">
-    <form id="questionForm" method="dialog">
-      <div class="dialog-head">
-        <div><p class="eyebrow">Vraag van vandaag</p><h2 id="questionDialogTitle">Antwoord</h2></div>
-        <button class="icon-btn" type="button" data-close-question aria-label="Sluiten">×</button>
-      </div>
-      <p id="questionDialogText" class="question-copy"></p>
-      <input id="questionPerson" name="person" type="hidden">
-      <label class="field">Antwoord<textarea id="questionAnswer" name="answer" maxlength="800" required></textarea></label>
-      <div class="dialog-actions">
-        <button class="secondary" type="button" data-close-question>Annuleren</button>
-        <button class="primary" type="submit">Bewaren</button>
-      </div>
-    </form>
-  </dialog>
-
-  <dialog id="confirmDialog" class="dialog small-dialog">
-    <form method="dialog">
-      <div class="dialog-head"><h2 id="confirmTitle">Bevestigen</h2></div>
-      <p id="confirmText"></p>
-      <div class="dialog-actions">
-        <button id="confirmCancel" class="secondary" value="cancel">Annuleren</button>
-        <button id="confirmOk" class="danger" value="ok">Verwijderen</button>
-      </div>
-    </form>
-  </dialog>
-
-  <input id="restoreInput" type="file" accept="application/json,.json" hidden>
-  <input id="productionBackupInput" type="file" accept="application/json,.json" hidden>
-  <input id="importFileInput" type="file" accept=".txt,.csv,.json,.md,.pdf,.docx,.xlsx,.xls,.xlsm,text/plain,text/csv,application/json,application/pdf" hidden>
-  <div id="toast" class="toast" role="status"></div>
-
-  <script type="module" src="js/app.js?v=1.7.0"></script>
+<script src="./app.js?v=300"></script>
 </body>
 </html>

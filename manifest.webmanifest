@@ -1,14 +1,32 @@
 {
-  "name": "Samen Thuis Beta",
-  "short_name": "Thuis β",
-  "description": "Gratis beta-versie van Samen Thuis met slimme voorraad en zelflerende bodemprijzen.",
-  "id": "./?samen-thuis-beta-v1",
+  "name": "Samen Thuis",
+  "short_name": "Samen Thuis",
+  "description": "Gezamenlijke thuisapp voor planning, huishouden, voorraad, budget, reizen, taken en uitdagingen.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#f4f6fb",
-  "theme_color": "#17233b",
+  "background_color": "#f3f6f8",
+  "theme_color": "#17243a",
   "icons": [
-    {"src":"icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Taken",
+      "url": "./?page=tasks"
+    },
+    {
+      "name": "Boodschappen",
+      "url": "./?page=groceries"
+    },
+    {
+      "name": "Uitdagingen",
+      "url": "./?page=challenges"
+    }
   ]
 }

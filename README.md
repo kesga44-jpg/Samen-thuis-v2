@@ -1,96 +1,58 @@
-# Samen Thuis β — volledige herbouw
+# Samen Thuis — vNext
 
-Dit is een zelfstandige bèta-versie van Samen Thuis. De app is opnieuw opgebouwd als statische PWA zonder buildstap en kan rechtstreeks via GitHub Pages worden gepubliceerd.
+Deze map bevat exact de 7 hoofdbestanden van de app:
 
-## Belangrijk: veilig naast productie
+1. `index.html`
+2. `app.js`
+3. `styles.css`
+4. `sw.js`
+5. `manifest.webmanifest`
+6. `icon.svg`
+7. `README.md`
 
-Deze versie gebruikt andere sleutels en een ander sync-record dan de productie-app:
+## Belangrijk
+- De app blijft `samenThuisDataV2` gebruiken.
+- Migratie behoudt onbekende bestaande datavelden.
+- Maak vóór vervanging altijd een JSON-back-up vanuit de huidige app.
+- Wis geen browser-/websitegegevens tijdens de update.
+- Upload alle 7 bestanden in één commit naar de GitHub Pages branch.
+- Sluit daarna de geïnstalleerde PWA volledig en open de website één keer opnieuw.
 
-- lokale opslag: `samenThuisBetaV1`;
-- synchronisatie-id: SHA-256 van `samen-thuis-beta-v1|<huishoudcode>`;
-- PWA-naam: `Samen Thuis β`.
+## Nieuwe onderdelen
+- Universele Taken-pagina voor eenmalige en terugkerende taken.
+- Uitdagingen voor Kees, Daphne, samen of tegen elkaar.
+- Meettypen: aantal, afstand, tijd, streak, ja/nee en bedrag.
+- XP/puntenregels en inwisselbare beloningen.
+- Challenge-progressie op Today.
+- Slimmere Today met agenda, taken, huishouden, woning, reizen en voorraad.
+- Snel toevoegen vanuit iedere pagina.
+- Lage voorraad automatisch naar boodschappen.
+- Persoonlijke taakverdeling.
+- Woningonderhoud en reisdeadlines zichtbaar op Today.
+- Light/dark kleurcontract: lichte kaarten houden donkere tekst.
 
-Je kunt dus dezelfde Supabase-projectgegevens en zelfs dezelfde huishoudcode gebruiken zonder het productie-record te overschrijven. Gebruik bij voorkeur een **aparte GitHub-repository** voor de beta, bijvoorbeeld `Samen-thuis-beta`.
+## Datamodel vNext
+Nieuwe velden:
+- `tasks`
+- `challenges`
+- `challengeEntries`
+- `pointsLedger`
+- `rewards`
+- `pointRules`
+- `settingsVNext`
 
-## Wat zit erin?
+Alle velden worden meegenomen in lokale back-up. Omdat de volledige appdata als één object wordt opgeslagen, kunnen ze ook met een bestaande volledige-data synchronisatielaag worden meegestuurd.
 
-- Vandaag-dashboard;
-- Agenda;
-- Weekmenu;
-- Boodschappen;
-- Huishouden;
-- Voorraad;
-- Ideeën;
-- Woning;
-- Reizen met reismappen en submappen;
-- universele Import-pagina voor tekst/bestanden;
-- Instellingen;
-- dagelijkse vraag voor Kees en Daphne;
-- PWA/offline cache;
-- lokale JSON-back-ups;
-- versleutelde Supabase-sync;
-- productie-back-up kopiëren naar beta;
-- bewerken met potlood en verwijderen per item;
-- automatische koppeling Voorraad → Boodschappen;
-- automatische supermarktprijscontrole via een Supabase Edge Function;
-- handmatige én aangeleerde bodemprijzen.
+## Testlijst
+1. Open de app eerst met bestaande data.
+2. Controleer Agenda, Boodschappen, Huishouden, Voorraad, Reizen en Woning.
+3. Maak een nieuwe taak en vink hem af.
+4. Maak een challenge en voeg voortgang toe.
+5. Controleer punten en een beloning.
+6. Verlaag voorraad tot minimum en controleer Boodschappen.
+7. Test light/dark mode.
+8. Maak een back-up, herlaad die en controleer de nieuwe onderdelen.
+9. Test offline na één online laadbeurt.
 
-## Hoe de bodemprijs werkt
-
-Per gevolgd product bewaart de app een prijs-track. Die bevat:
-
-- zoekterm;
-- eventueel voorkeurswinkel;
-- handmatige goede-prijsgrens;
-- handmatige bodemprijsgrens;
-- laatste actuele aanbieding;
-- eigen prijshistorie.
-
-De status wordt zo bepaald:
-
-1. **Bodemprijs**: actuele prijs is ≤ handmatige bodemprijs, of ≤ aangeleerde 15e percentielgrens.
-2. **Goede prijs**: actuele prijs is ≤ handmatige goede-prijsgrens, ≤ aangeleerde 35e percentielgrens, of de aanbieding heeft minimaal 25% korting.
-3. **Aanbieding**: er is een actuele aanbieding, maar nog onvoldoende bewijs dat dit een goede/bodemprijs is.
-4. **Geen actuele aanbieding**: de bron levert op dit moment geen actieve aanbieding voor deze zoekterm.
-
-De app leert pas grenzen bij minimaal **vier verschillende prijzen van dezelfde huidige productmatch** (base product-id waar mogelijk; anders exact dezelfde productnaam). Zo worden verschillende merken/verpakkingen niet zomaar door elkaar gebruikt.
-
-## Voorraad → Boodschappen
-
-Als `in huis ≤ minimum`, maakt de app automatisch een open boodschappenregel aan. De hoeveelheid is:
-
-`gewenst - in huis`, minimaal 1.
-
-Als het boodschappenitem vanuit Voorraad komt en je vinkt het als gekocht af, verhoogt de beta automatisch de voorraad met die hoeveelheid. Maak je het vinkje ongedaan, dan draait de beta die automatische voorraadmutatie weer terug.
-
-## Prijsbron
-
-De Edge Function gebruikt de zoek-API van PrijsProfeet en vraagt uitsluitend actieve aanbiedingen op. De app gebruikt de eerste relevante fuzzy match en toont de gevonden productnaam, zodat je kunt controleren of de zoekterm nauwkeurig genoeg is.
-
-De gratis API is vooral een **aanbiedingenbron**, geen volledig supermarktschap. Deze gratis beta gebruikt bewust géén betaalde matching of prijshistorie. De app bouwt haar eigen historie op uit de actieve aanbiedingen die zij voor jullie gevolgde producten ontvangt.
-
-## Bestanden
-
-```text
-index.html
-styles.css
-manifest.webmanifest
-icon.svg
-sw.js
-js/
-  app.js
-  store.js
-  utils.js
-  prices.js
-  sync.js
-  importer.js
-supabase/
-  schema.sql
-  functions/
-    grocery-prices/
-      index.ts
-```
-
-## Installeren als aparte beta
-
-Zie `INSTALLATIE_BETA.md` voor de precieze stappen.
+## Opmerking over bestaande modules
+De vNext-migratie verwijdert bestaande onbekende objecten (waaronder oudere budget- en synchronisatievelden) niet. De kernopzet is bewust data-veilig gehouden zodat uitbreiding niet stilzwijgend data weggooit.
