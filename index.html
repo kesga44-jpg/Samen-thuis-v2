@@ -1,44 +1,24 @@
-<!doctype html>
-<html lang="nl">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="theme-color" content="#17243a">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="Samen Thuis">
-  <meta name="description" content="Het gezamenlijke thuisdashboard van Kees en Daphne.">
-  <link rel="manifest" href="./manifest.webmanifest">
-  <link rel="icon" href="./icon.svg" type="image/svg+xml">
-  <link rel="apple-touch-icon" href="./icon.svg">
-  <link rel="stylesheet" href="./styles.css?v=300">
-  <title>Samen Thuis</title>
-</head>
-<body>
-<div class="app-shell">
-  <aside class="sidebar">
-    <div class="brand"><span class="brand-mark">S</span><div><strong>Samen Thuis</strong><small>Kees & Daphne</small></div></div>
-    <nav id="nav"></nav>
-    <div class="sidebar-footer">
-      <button class="nav-item" data-action="backup">↥ Back-up maken</button>
-      <button class="nav-item" data-action="restore">↧ Back-up laden</button>
-      <input id="restoreInput" type="file" accept="application/json" hidden>
-    </div>
-  </aside>
-  <main>
-    <header class="topbar">
-      <div><small id="saveState">Lokaal bewaard</small><h1 id="pageTitle">Today</h1></div>
-      <div class="top-actions"><span id="syncBadge" class="tag">Offline</span><button id="quickAddBtn" class="secondary">＋ Snel</button><button id="addBtn" class="primary">＋ Toevoegen</button></div>
-    </header>
-    <section id="view" class="view"></section>
-  </main>
-</div>
-<nav id="mobileNav" class="mobile-nav"></nav>
-<div id="toast" class="toast"></div>
-
-<dialog id="itemDialog"><form id="itemForm"><div class="dialog-head"><h2 id="dialogTitle">Toevoegen</h2><button type="button" class="icon-btn" data-close>×</button></div><div id="formFields" class="form-grid"></div><div class="dialog-actions"><button type="button" class="secondary" data-close>Annuleren</button><button class="primary">Bewaren</button></div></form></dialog>
-<dialog id="quickDialog"><form id="quickForm"><div class="dialog-head"><h2>Snel toevoegen</h2><button type="button" class="icon-btn" data-close>×</button></div><p>Schrijf kort wat je wilt onthouden. Kies waar het terechtkomt.</p><div class="form-grid"><label class="field">Wat?<input name="title" required placeholder="Bijv. garage bellen"></label><label class="field">Naar<select name="target"><option value="tasks">Taken</option><option value="groceries">Boodschappen</option><option value="planning">Agenda</option><option value="ideas">Date ideeën</option><option value="home">Woning</option></select></label><label class="field">Voor wie?<select name="person"><option>Samen</option><option>Kees</option><option>Daphne</option></select></label><label class="field">Datum<input name="date" type="date"></label></div><div class="dialog-actions"><button type="button" class="secondary" data-close>Annuleren</button><button class="primary">Toevoegen</button></div></form></dialog>
-
-<script src="./app.js?v=300"></script>
-</body>
-</html>
+<!doctype html><html lang="nl"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#17243a"><meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Samen Thuis">
+<link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icon.svg">
+<link rel="stylesheet" href="styles.css?v=250"><title>Samen Thuis</title></head><body>
+<div class="app-shell"><aside class="sidebar" aria-label="Hoofdnavigatie">
+<div class="brand"><span class="brand-mark">S</span><div><strong>Samen Thuis</strong><small>Kees & Daphne</small></div></div>
+<nav id="nav"></nav><div class="sidebar-footer">
+<button class="nav-item" data-action="backup"><span>↥</span> Back-up maken</button>
+<button class="nav-item" data-action="restore"><span>↧</span> Back-up laden</button>
+<input id="restoreInput" type="file" accept="application/json" hidden>
+<input id="groceryImportFile" type="file" accept=".txt,.csv,.json,text/plain,text/csv,application/json" hidden>
+<input id="ostaImportFile" type="file" accept=".txt,.csv,.json,text/plain,text/csv,application/json" hidden>
+<input id="calendarImportFile" type="file" accept=".txt,.csv,.json,text/plain,text/csv,application/json" hidden>
+<input id="travelImportFile" type="file" accept=".pdf,.txt,text/plain,application/pdf" hidden></div></aside>
+<main><header class="topbar"><div><p id="eyebrow">Goedemorgen</p><h1 id="pageTitle">Vandaag</h1></div>
+<div class="top-actions"><span id="syncState" class="sync-state">Alleen dit apparaat</span><span id="saveState" class="save-state">Lokaal bewaard</span>
+<button id="laptopSaveBtn" class="secondary laptop-save"><span class="full-label">⇩ Opslaan voor laptop</span><span class="short-label">⇩ Laptop</span></button>
+<button id="addBtn" class="primary">＋ Toevoegen</button></div></header><div id="view" class="view" aria-live="polite"></div></main></div>
+<nav id="mobileNav" class="mobile-nav" aria-label="Mobiele navigatie"></nav>
+<dialog id="itemDialog"><form id="itemForm"><div class="dialog-head"><div><p class="eyebrow">Nieuw</p><h2 id="dialogTitle">Toevoegen</h2></div><button type="button" class="icon-btn" data-close>×</button></div><div id="formFields" class="form-grid"></div><div class="dialog-actions"><button type="button" class="secondary" data-close>Annuleren</button><button type="submit" class="primary">Bewaren</button></div></form></dialog>
+<div id="toast" class="toast" role="status"></div><script src="app.js?v=250"></script></body></html>
