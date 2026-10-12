@@ -1,10 +1,9 @@
 
-/* =========================================================
-   GEÏNTEGREERD: app.js
-   ========================================================= */
+/* ===== GEÏNTEGREERD: app.js ===== */
 const STORAGE_KEY = 'samenThuisDataV2';
 const LEGACY_STORAGE_KEY = 'samenThuisDataV1';
 const SYNC_KEY = 'samenThuisSyncV1';
+const SYNC_CONFLICT_KEY = 'samenThuisSyncConflictV1';
 const QUOTE_KEY = 'samenThuisQuoteCacheV1';
 const DEFAULT_PROJECT_URL = 'https://vwfuetxgapzfivydzhxc.supabase.co';
 const DEFAULT_PUBLISHABLE_KEY = 'sb_publishable_Xa1oLeM64F-jog1vVjJbkQ_BE3UV6mR';
@@ -119,6 +118,7 @@ const initialData = {
 };
 
 const clone = value => structuredClone(value);
+const syncConflictStore = SamenThuisCore.createConflictStore(localStorage, SYNC_CONFLICT_KEY);
 const id = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 const esc = (value = '') => String(value).replace(/[&<>'"]/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[character]));
 const fmtDate = (value, options = { weekday: 'short', day: 'numeric', month: 'short' }) => value ? new Intl.DateTimeFormat('nl-NL', options).format(parseDate(value)) : 'Geen datum';
@@ -131,6 +131,10 @@ const groupBy = (items, keyFn) => items.reduce((groups, item) => {
 function migrateData(raw) {
   if (!raw || typeof raw !== 'object') return clone(initialData);
   const migrated = clone(initialData);
+  // v23.1 DATA-VEILIG: behoud ook velden die door latere/oude modules zijn toegevoegd.
+  // Bekende structuren worden hieronder nog genormaliseerd, onbekende structuren
+  // worden één-op-één meegenomen zodat een update ze niet stilzwijgend verwijdert.
+  SamenThuisCore.preserveUnknownFields(raw, migrated, clone);
   ['planning', 'meals', 'groceries', 'chores', 'stock', 'ideas', 'home', 'trips'].forEach(key => {
     if (Array.isArray(raw[key])) migrated[key] = raw[key];
   });
@@ -149,6 +153,7 @@ function migrateData(raw) {
     if (!migrated.tripFolders.length && oldTrips.length) {
       migrated.tripFolders = [{ id: 'folder-algemeen', name: 'Reisplannen', startDate: '', endDate: '', note: '' }];
     }
+
     const fallbackFolderId = migrated.tripFolders[0]?.id || '';
     migrated.trips = oldTrips.filter(item => item.type !== 'Reis').map(item => ({ ...item, tripFolderId: item.tripFolderId || fallbackFolderId }));
   }
@@ -176,6 +181,13 @@ function migrateData(raw) {
     .filter(item => item && typeof item.name === 'string' && !excludedNames.has(calendarNameKey(item.name)))
     .map(item => ({ ...item, person: validCalendarPerson(item.person) || inferCalendarPerson(item.name) }));
   migrated.dailyAnswers = raw.dailyAnswers && typeof raw.dailyAnswers === 'object' ? raw.dailyAnswers : {};
+  // v23: preserve backward-compatible financial data instead of dropping it during migration.
+  if (raw.budget && typeof raw.budget === 'object') migrated.budget = clone(raw.budget);
+  if (raw.budget19 && typeof raw.budget19 === 'object') migrated.budget19 = clone(raw.budget19);
+  if (raw.budgetV23 && typeof raw.budgetV23 === 'object') migrated.budgetV23 = clone(raw.budgetV23);
+  if (Array.isArray(raw.priceReferences)) migrated.priceReferences = raw.priceReferences;
+  if (raw.priceReferenceSource) migrated.priceReferenceSource = raw.priceReferenceSource;
+  if (raw.priceReferenceUpdatedAt) migrated.priceReferenceUpdatedAt = raw.priceReferenceUpdatedAt;
   migrated.planning = migrated.planning.map(item => ({
     endTime: '',
     calendarId: 'persoonlijk',
@@ -196,8 +208,26 @@ function migrateData(raw) {
 function loadData() {
   try {
     const stored = localStorage.getItem(STORAGE_KEY) || localStorage.getItem(LEGACY_STORAGE_KEY);
-    return stored ? migrateData(JSON.parse(stored)) : clone(initialData);
+    if (!stored) return clone(initialData);
+
+    // v23.1 DATA-VEILIG: maak vóór migratie automatisch een ongewijzigde snapshot.
+    // De normale opslagkey blijft samenThuisDataV2, dus bestaande Voorraad,
+    // Boodschappen, Huishouden, Reizen enz. blijven op dezelfde plek staan.
+    try {
+      if (!localStorage.getItem('samenThuisPreV23Backup')) {
+        localStorage.setItem('samenThuisPreV23Backup', stored);
+        localStorage.setItem('samenThuisPreV23BackupAt', new Date().toISOString());
+      }
+    } catch {}
+
+    return migrateData(JSON.parse(stored));
   } catch {
+    // Bij een parse/migratiefout proberen we de safety snapshot terug te lezen
+    // in plaats van direct met voorbeelddata te starten.
+    try {
+      const backup = localStorage.getItem('samenThuisPreV23Backup');
+      if (backup) return migrateData(JSON.parse(backup));
+    } catch {}
     return clone(initialData);
   }
 }
@@ -224,6 +254,7 @@ let agendaWeekStart = startOfWeek(todayISO());
 let syncTimer;
 let syncing = false;
 let syncError = '';
+let syncConflictResolution = syncConflictStore.get()?.resolution || '';
 let calendarOperation = null;
 let addMode = 'item';
 
@@ -595,7 +626,8 @@ function renderSettings() {
       <form id="syncForm" class="form-grid compact-form"><div class="field"><label for="syncHouseholdCode">Geheime huishoudcode (minimaal 12 tekens)</label><input id="syncHouseholdCode" name="householdCode" type="password" value="${esc(syncConfig.householdCode)}" minlength="12" autocomplete="off" placeholder="Jullie gedeelde geheime code"></div><div class="button-row"><button class="primary" type="submit">Bewaren en verbinden</button>${configured ? '<button class="secondary" type="button" data-sync-now>Nu synchroniseren</button>' : ''}</div></form>
     </section>
     ${renderCalendarSettings()}
-    <section class="card settings-card"><div class="card-head"><div><p class="eyebrow">Gegevens</p><h2>Back-up</h2></div></div><p>Maak een los JSON-bestand of laad een eerdere back-up. De synchronisatiecode en sleutel worden niet in de back-up gezet.</p><div class="button-row"><button class="secondary" data-action="backup">Back-up maken</button><button class="secondary" data-action="restore">Back-up laden</button></div></section>
+    ${renderSyncConflictCard()}
+    <section class="card settings-card"><div class="card-head"><div><p class="eyebrow">Gegevens</p><h2>Back-up</h2></div></div><p>Maak een los JSON-bestand of herstel een eerdere back-up. Herstellen vervangt alle huidige gegevens op dit apparaat; Importeren voegt gegevens samen. De synchronisatiecode en sleutel worden niet in de back-up gezet.</p><div class="button-row"><button class="secondary" data-action="backup">Back-up maken</button><button class="secondary" data-action="restore">Back-up herstellen (vervangen)</button></div></section>
     <section class="card settings-card"><div class="card-head"><div><p class="eyebrow">Apple Opdracht</p><h2>Eenvoudig tekstformaat</h2></div></div><p>Laat de Opdracht per afspraak één regel maken:</p><pre><code>Agendanaam | 2026-09-04 | 09:00 | Titel</code></pre><p>De persoon volgt uit de agenda. Een vijfde veld met Kees, Daphne of Samen is optioneel en gaat voor de agendakeuze. Een zesde veld mag de eindtijd bevatten. Bij onbekende namen kies je de persoon één keer.</p><p>Dit is een import, geen tweerichtingskoppeling. Verplaatsen of verwijderen in Apple Agenda wordt niet automatisch overgenomen.</p></section>
   </div>`;
 }
@@ -1543,7 +1575,11 @@ document.addEventListener('click', event => {
   if (event.target.closest('[data-sync-now]')) { syncNow({ manual: true }); return; }
   const action = event.target.closest('[data-action]')?.dataset.action;
   if (action === 'backup') exportBackup();
-  if (action === 'restore') document.querySelector('#restoreInput').click();
+  if (action === 'restore') {
+    if (confirm('Back-up herstellen vervangt alle huidige gegevens op dit apparaat. Gebruik Importeren als je gegevens wilt samenvoegen. Doorgaan?')) {
+      document.querySelector('#restoreInput').click();
+    }
+  }
 });
 
 document.addEventListener('change', event => {
@@ -1589,7 +1625,11 @@ document.querySelector('#addBtn').addEventListener('click', openAdd);
 document.querySelector('#laptopSaveBtn').addEventListener('click', exportBackup);
 document.querySelector('#itemForm').addEventListener('submit', handleSubmit);
 document.querySelector('#questionForm').addEventListener('submit', handleQuestionSubmit);
-document.querySelector('#restoreInput').addEventListener('change', event => event.target.files[0] && importBackup(event.target.files[0]));
+document.querySelector('#restoreInput').addEventListener('change', async event => {
+  const file = event.target.files[0];
+  if (file) await importBackup(file);
+  event.target.value = '';
+});
 document.querySelector('#groceryImportFile').addEventListener('change', event => event.target.files[0] && readImportFile(event.target.files[0], 'groceries'));
 document.querySelector('#ostaImportFile').addEventListener('change', event => event.target.files[0] && readImportFile(event.target.files[0], 'osta'));
 document.querySelector('#calendarImportFile').addEventListener('change', event => event.target.files[0] && readImportFile(event.target.files[0], 'calendar'));
@@ -1612,9 +1652,7 @@ if (syncConfigured()) syncNow();
 ;
 
 
-/* =========================================================
-   GEÏNTEGREERD: upgrade-v11.js
-   ========================================================= */
+/* ===== GEÏNTEGREERD: upgrade-v11.js ===== */
 /* Samen Thuis v11 – travel editing, import preview, priorities and automatic two-way sync */
 (() => {
   if (window.__SAMEN_THUIS_V11_LOADED__) return;
@@ -1754,8 +1792,13 @@ if (syncConfigured()) syncNow();
   };
 
   updateSyncBadge = function updateSyncBadgeV11(message) {
-    baseUpdateSyncBadge(message);
     const badge = document.querySelector('#syncState');
+    if (!message && badge && getSyncConflict()) {
+      badge.textContent = 'Conflict oplossen';
+      badge.title = 'Open Instellingen en kies welke apparaatversie je wilt bewaren.';
+      return;
+    }
+    baseUpdateSyncBadge(message);
     if (!badge || message) return;
     if (syncConfigured() && navigator.onLine && !syncing && !syncError && syncConfig.lastSyncedAt) {
       const date = new Date(syncConfig.lastSyncedAt);
@@ -2071,6 +2114,11 @@ if (syncConfigured()) syncNow();
       if (manual && !navigator.onLine) toast('Geen internetverbinding');
       return;
     }
+    if (getSyncConflict() && !syncConflictResolution) {
+      syncError = 'Wijzigingen op beide apparaten; kies welke versie je wilt bewaren.';
+      updateSyncBadge();
+      return;
+    }
     syncing = true;
     syncError = '';
     updateSyncBadge();
@@ -2083,34 +2131,77 @@ if (syncConfigured()) syncNow();
       const rows = await response.json();
       let remoteData = null;
       if (rows[0]?.payload) remoteData = migrateData(await decryptData(rows[0].payload, syncConfig.householdCode));
+      const pendingConflict = syncConflictStore.get();
+      if (syncConflictResolution && pendingConflict?.resolution && remoteData
+        && SamenThuisCore.remoteChangedSinceChoice(pendingConflict.remoteData, remoteData)) {
+        const selectedData = pendingConflict.selectedData
+          || (syncConflictResolution === 'local' ? pendingConflict.localData : pendingConflict.remoteData);
+        const renewedConflict = {
+          ...pendingConflict,
+          localData: clone(selectedData),
+          remoteData: clone(remoteData),
+          localUpdatedAt: selectedData.meta?.updatedAt || '',
+          remoteUpdatedAt: remoteData.meta?.updatedAt || '',
+          resolution: '',
+          selectedData: null,
+          detectedAt: new Date().toISOString()
+        };
+        syncConflictStore.store(renewedConflict);
+        syncConflictResolution = '';
+        syncError = 'De andere versie is verder gewijzigd; maak opnieuw een keuze.';
+        if (current === 'settings') render();
+        toast(syncError);
+        return;
+      }
 
       const localTime = new Date(data.meta?.updatedAt || 0).getTime();
       const remoteTime = new Date(remoteData?.meta?.updatedAt || 0).getTime();
       let remoteLoaded = false;
 
       if (!remoteData) {
-        const payload = await encryptData(data, syncConfig.householdCode);
-        const upload = await fetch(`${baseUrl}/rest/v1/household_data?on_conflict=id`, {
-          method: 'POST', headers: { ...supabaseHeaders(), Prefer: 'resolution=merge-duplicates,return=minimal' },
-          body: JSON.stringify({ id: householdId, payload, updated_at: data.meta.updatedAt })
-        });
-        if (!upload.ok) throw new Error(`Opslaan gaf ${upload.status}`);
+        await uploadSyncData(baseUrl, householdId, rows[0]);
+      } else if (!syncConflictResolution && SamenThuisCore.hasConcurrentChanges(
+        data.meta?.updatedAt, remoteData.meta?.updatedAt, syncConfig.lastSyncedAt, data, remoteData
+      )) {
+        const conflict = {
+          localData: clone(data),
+          remoteData: clone(remoteData),
+          localUpdatedAt: data.meta.updatedAt,
+          remoteUpdatedAt: remoteData.meta.updatedAt,
+          detectedAt: new Date().toISOString()
+        };
+        if (!syncConflictStore.store(conflict)) {
+          syncError = 'Conflict gevonden, maar browseropslag is vol. Kies een versie voordat je deze pagina verlaat.';
+          if (current === 'settings') render();
+          toast(syncError);
+          return;
+        }
+        syncError = 'Wijzigingen op beide apparaten; kies welke versie je wilt bewaren.';
+        if (current === 'settings') render();
+        toast('Wijzigingen op beide apparaten gevonden. Kies een versie bij Instellingen.');
+        return;
+      } else if (syncConflictResolution === 'remote') {
+        data = clone(pendingConflict?.selectedData || remoteData);
+        normaliseTravelData();
+        save({ touch: false, sync: false });
+        remoteLoaded = true;
+      } else if (syncConflictResolution === 'local') {
+        data = clone(pendingConflict?.selectedData || data);
+        await uploadSyncData(baseUrl, householdId, rows[0]);
       } else if (remoteTime > localTime) {
         data = remoteData;
         normaliseTravelData();
         save({ touch: false, sync: false });
         remoteLoaded = true;
       } else if (localTime > remoteTime) {
-        const payload = await encryptData(data, syncConfig.householdCode);
-        const upload = await fetch(`${baseUrl}/rest/v1/household_data?on_conflict=id`, {
-          method: 'POST', headers: { ...supabaseHeaders(), Prefer: 'resolution=merge-duplicates,return=minimal' },
-          body: JSON.stringify({ id: householdId, payload, updated_at: data.meta.updatedAt })
-        });
-        if (!upload.ok) throw new Error(`Opslaan gaf ${upload.status}`);
+        await uploadSyncData(baseUrl, householdId, rows[0]);
       }
 
       syncConfig.lastSyncedAt = nowIso();
       localStorage.setItem(SYNC_KEY, JSON.stringify(syncConfig));
+      if (syncConflictResolution) {
+        if (syncConflictStore.clear()) syncConflictResolution = '';
+      }
       syncError = '';
       if (current === 'settings' || remoteLoaded) render();
       if (manual) toast('Apparaten zijn bijgewerkt');
@@ -2200,9 +2291,7 @@ if (syncConfigured()) syncNow();
 ;
 
 
-/* =========================================================
-   GEÏNTEGREERD: samen-thuis-update-v4.js
-   ========================================================= */
+/* ===== GEÏNTEGREERD: samen-thuis-update-v4.js ===== */
 console.info('Samen Thuis update 12.0 geladen');
 
 (() => {
@@ -2603,9 +2692,7 @@ console.info('Samen Thuis update 12.0 geladen');
 ;
 
 
-/* =========================================================
-   GEÏNTEGREERD: samen-thuis-update-v13.js
-   ========================================================= */
+/* ===== GEÏNTEGREERD: samen-thuis-update-v13(1).js ===== */
 /* CLEAN MASTER BUILD 2026-09-08 20:xx
    Samen Thuis v13.1
    Fix: gestructureerde reisdocumenten worden als blokken gelezen.
@@ -3517,9 +3604,7 @@ console.info('Samen Thuis update 13.1 geladen');
 ;
 
 
-/* =========================================================
-   GEÏNTEGREERD: samen-thuis-update-v14.js
-   ========================================================= */
+/* ===== GEÏNTEGREERD: samen-thuis-update-v14(1).js ===== */
 /* Samen Thuis v14.0 — universele importlaag
    Eén vast importformaat voor Agenda t/m Reizen.
    Ondersteunt | ; tab, " / " en " - " als scheidingsteken.
@@ -4036,9 +4121,7 @@ Reizen: [reizen] | [reis] | [map/onderdeel] | [titel] | [type] | [omschrijving] 
 ;
 
 
-/* =========================================================
-   GEÏNTEGREERD: samen-thuis-update-v15.js
-   ========================================================= */
+/* ===== GEÏNTEGREERD: samen-thuis-update-v15(1).js ===== */
 /* Samen Thuis v15.0
    - Bodemprijzen / goede-deal database
    - Gierige Gerda lijst 31-08-2026 als startdata
@@ -4321,9 +4404,7 @@ console.info('Samen Thuis update 15.0 geladen');
 ;
 
 
-/* =========================================================
-   GEÏNTEGREERD: samen-thuis-update-v16.js
-   ========================================================= */
+/* ===== GEÏNTEGREERD: samen-thuis-update-v16(1).js ===== */
 /* Samen Thuis v16.0
    SMART HOUSEHOLD + SCROLL PRESERVATION
    - Geen vaste weekdagen meer voor huishoudtaken.
@@ -4429,20 +4510,7 @@ console.info('Samen Thuis update 16.0 geladen');
   }
 
   function nextDue16(chore) {
-    const cfg=frequency16(chore);
-    const last=lastDone16(chore);
-
-    if(cfg.kind==='manual') return '';
-    if(cfg.kind==='once') {
-      if(last) return '';
-      return chore.due || today16();
-    }
-
-    // First ever run: due is only an initial hint, never a fixed recurring weekday.
-    if(!last) return chore.due || today16();
-
-    if(cfg.kind==='month') return addMonths16(last,cfg.months);
-    return addDays16(last,cfg.days);
+    return SamenThuisCore.nextDue(lastDone16(chore), chore.due || today16(), chore.repeat);
   }
 
   function smartStatus16(chore, date=today16()) {
@@ -4718,359 +4786,940 @@ console.info('Samen Thuis update 16.0 geladen');
 
 ;
 
+/* ===== v18 CLEAN DASHBOARD ===== */
+(() => {
+'use strict';
+if(window.__ST_V18__) return; window.__ST_V18__=true;
+const oldRender18=render, WC='stWeatherV18', LOC={name:'Rotterdam',lat:51.9225,lon:4.47917};
+const wi=c=>({0:'☀️',1:'🌤️',2:'⛅',3:'☁️',45:'🌫️',48:'🌫️',51:'🌦️',53:'🌦️',55:'🌧️',61:'🌦️',63:'🌧️',65:'🌧️',71:'🌨️',73:'🌨️',75:'❄️',77:'❄️',80:'🌦️',81:'🌧️',82:'⛈️',85:'🌨️',86:'🌨️',95:'⛈️',96:'⛈️',99:'⛈️'})[c]||'🌤️';
+function wt(c){if(c===0)return'Zonnig';if(c<=2)return'Licht bewolkt';if(c===3)return'Bewolkt';if(c<=48)return'Mistig';if(c<=57)return'Motregen';if(c<=67)return'Regen';if(c<=77)return'Sneeuw';if(c<=86)return'Buien';return'Onweer'}
+function outfit(w){let f=Math.round(w.current?.apparent_temperature??15),r=+(w.daily?.precipitation_probability_max?.[0]||0),wind=+(w.current?.wind_speed_10m||0),a=f<=5?['Winterjas','warme trui']:f<=11?['Jas','trui of vest']:f<=16?['Lichte jas of vest','lange broek']:f<=22?['T-shirt','lichte broek']:['Luchtige kleding','korte broek'];if(r>=40)a.push('regenjas of paraplu');if(wind>=30)a.push('winddichte laag');if((w.current?.weather_code||99)<=1&&f>=18)a.push('zonnebril');return a}
+function data18(){
+ let chores=0;try{chores=occurrencesForDate(todayISO()).filter(({chore})=>!isChoreDone(chore,todayISO())).length}catch(_){chores=(data.chores||[]).filter(x=>!x.done).length}
+ const groceries=(data.groceries||[]).filter(x=>!x.done).length;
+ const low=(data.stock||[]).filter(x=>{let a=+(x.amount??0),m=+(x.min??x.minimum??0);return m>0&&a<=m}).length;
+ const dinner=(data.meals||[]).find(x=>x.date===todayISO()&&/avond/i.test(x.type||x.mealType||''));
+ let agenda=[];try{agenda=(data.planning||[]).filter(x=>x.date>=todayISO()).sort(typeof sortPlanning==='function'?sortPlanning:(a,b)=>`${a.date}${a.time||''}`.localeCompare(`${b.date}${b.time||''}`)).slice(0,4)}catch(_){}
+ return{chores,groceries,low,dinner,agenda}
+}
+function html18(){
+ const s=data18(),date=new Intl.DateTimeFormat('nl-NL',{weekday:'long',day:'numeric',month:'long'}).format(new Date());
+ return `<section class="dash18" data-dash18><header class="dh18"><div><p class="eyebrow">Jullie thuis, in één oogopslag</p><h2>Vandaag</h2><p>${date}</p></div><div class="people18"><span>K</span><span>D</span></div></header><div class="dg18">
+ <section class="weather18" data-weather18>Weer ophalen…</section>
+ <section class="today18"><div class="ct18"><strong>Vandaag</strong><span>${s.chores} taken</span></div><div class="stats18"><button data-view="chores"><b>${s.chores}</b><small>Huishouden</small></button><button data-view="groceries"><b>${s.groceries}</b><small>Boodschappen</small></button><button data-view="stock"><b>${s.low}</b><small>Bijna op</small></button></div><div class="meal18"><small>🍽️ VANAVOND</small><strong>${esc(s.dinner?.title||'Nog geen avondeten gepland')}</strong></div></section>
+ <section class="agenda18"><div class="ct18"><strong>Komende afspraken</strong><button class="text-btn" data-view="planning">Alles →</button></div>${s.agenda.length?s.agenda.map(x=>`<div class="ar18"><time>${esc(x.date===todayISO()?(x.time||'Hele dag'):new Intl.DateTimeFormat('nl-NL',{weekday:'short',day:'numeric'}).format(parseDate(x.date)))}</time><div><strong>${esc(x.title)}</strong><small>${esc(x.person||'')}</small></div></div>`).join(''):'<p class="muted">Geen komende afspraken.</p>'}</section>
+ <section class="outfit18" data-outfit18><span>👕</span><div><strong>Wat trek je aan?</strong><p>Weeradvies laden…</p></div></section></div></section>`
+}
+async function weather18(force=false){
+ const box=document.querySelector('[data-weather18]');if(!box)return;
+ try{let w=null;if(!force)try{let c=JSON.parse(localStorage.getItem(WC)||'null');if(c&&Date.now()-c.t<1800000)w=c.w}catch(_){}
+ if(!w){let q=new URLSearchParams({latitude:LOC.lat,longitude:LOC.lon,current:'temperature_2m,apparent_temperature,weather_code,precipitation,wind_speed_10m',hourly:'temperature_2m,weather_code,precipitation_probability',daily:'temperature_2m_max,temperature_2m_min,precipitation_probability_max',timezone:'Europe/Amsterdam',forecast_days:'5'});let r=await fetch('https://api.open-meteo.com/v1/forecast?'+q,{cache:'no-store'});if(!r.ok)throw 0;w=await r.json();localStorage.setItem(WC,JSON.stringify({t:Date.now(),w}))}
+ let c=w.current,d=w.daily,h=w.hourly,n=new Date(),i=h.time.findIndex(t=>new Date(t)>=new Date(n.getFullYear(),n.getMonth(),n.getDate(),n.getHours()));if(i<0)i=0;let ids=Array.from({length:6},(_,k)=>i+k).filter(k=>k<h.time.length);
+ box.innerHTML=`<div class="wm18"><div><small>⌖ ${LOC.name}</small><div class="temp18"><span>${wi(c.weather_code)}</span><strong>${Math.round(c.temperature_2m)}°</strong></div><p>${wt(c.weather_code)} · voelt als ${Math.round(c.apparent_temperature)}°</p></div><div class="wf18"><b>${Math.round(d.temperature_2m_max[0])}° / ${Math.round(d.temperature_2m_min[0])}°</b><span>☂ ${Math.round(d.precipitation_probability_max[0]||0)}%</span><span>↗ ${Math.round(c.wind_speed_10m||0)} km/u</span></div></div><div class="hours18">${ids.map(k=>`<div><small>${h.time[k].slice(11,16)}</small><b>${wi(h.weather_code[k])}</b><strong>${Math.round(h.temperature_2m[k])}°</strong><small>${Math.round(h.precipitation_probability[k]||0)}%</small></div>`).join('')}</div><button class="wr18" data-wr18>↻</button>`;
+ let o=document.querySelector('[data-outfit18]');if(o)o.innerHTML=`<span>👕</span><div><strong>Wat trek je aan?</strong><p>${outfit(w).map(esc).join(' · ')}</p><small>Gebaseerd op temperatuur, regen en wind.</small></div>`
+ }catch(_){box.innerHTML='<strong>Weer tijdelijk niet beschikbaar</strong><p><button class="text-btn" data-wr18>Opnieuw proberen</button></p>'}
+}
+function enhance18(){if(current!=='today')return;let v=document.querySelector('#view');if(!v||v.querySelector('[data-dash18]'))return;v.insertAdjacentHTML('afterbegin',html18());let w=v.querySelector('.welcome');if(w)w.style.display='none';weather18()}
+render=function(...a){let r=oldRender18(...a);requestAnimationFrame(enhance18);return r};
+document.addEventListener('click',e=>{if(e.target.closest('[data-wr18]'))weather18(true)});
+requestAnimationFrame(enhance18);
+})();
+
 
 /* =========================================================
-   SAMEN THUIS v17 — geïntegreerd Vandaag-dashboard
-   Weer: Open-Meteo, standaard Rotterdam; locatie kan later
-   zonder aparte updatefile in deze app.js worden aangepast.
+   SAMEN THUIS v19 — 12 PAGINA'S + APPARAATGEBONDEN WEERGAVE
    ========================================================= */
 (() => {
-  'use strict';
-  if (window.__SAMEN_THUIS_V170__) return;
-  window.__SAMEN_THUIS_V170__ = true;
+'use strict';
+if(window.__ST_V19__) return; window.__ST_V19__=true;
 
-  const WEATHER_CACHE17 = 'samenThuisWeatherV17';
-  const WEATHER_TTL17 = 30 * 60 * 1000;
-  const WEATHER_LAT17 = 51.9225;
-  const WEATHER_LON17 = 4.47917;
-  const WEATHER_PLACE17 = 'Rotterdam';
+const UIKEY19='samenThuisDeviceUiV19';
+const DEFAULTUI19={theme:'system',accent:'bluePurple',density:'comfortable',mobileNav:['today','planning','meals','groceries']};
+function loadUi19(){try{return {...DEFAULTUI19,...JSON.parse(localStorage.getItem(UIKEY19)||'{}')}}catch(_){return {...DEFAULTUI19}}}
+let ui19=loadUi19();
+function saveUi19(){localStorage.setItem(UIKEY19,JSON.stringify(ui19));applyUi19()}
+function applyUi19(){
+  const dark=ui19.theme==='dark'||(ui19.theme==='system'&&matchMedia('(prefers-color-scheme:dark)').matches);
+  document.documentElement.dataset.theme19=dark?'dark':'light';
+  document.documentElement.dataset.accent19=ui19.accent||'bluePurple';
+  document.documentElement.dataset.density19=ui19.density||'comfortable';
+}
+applyUi19();
+try{matchMedia('(prefers-color-scheme:dark)').addEventListener('change',()=>ui19.theme==='system'&&applyUi19())}catch(_){}
 
-  const baseRender17 = render;
+const pages19=[
+ ['today','Today','⌂'],['planning','Agenda','▦'],['meals','Weekmenu','♨'],['groceries','Boodschappen','✓'],
+ ['chores','Huishouden','⌁'],['stock','Voorraad','▤'],['trips','Reizen','✈'],['ideas','Date ideeën','♡'],
+ ['home','Woning','⌂'],['budget19','Budget','€'],['extra19','Extra','＋'],['settings','Instellingen','⚙']
+];
+try{
+  sections.today={label:'Today',icon:'⌂'};
+  sections.ideas={label:'Date ideeën',icon:'♡'};
+  sections.budget19={label:'Budget',icon:'€'};
+  sections.extra19={label:'Extra',icon:'＋'};
+}catch(_){}
 
-  function icon17(code) {
-    return ({0:'☀️',1:'🌤️',2:'⛅',3:'☁️',45:'🌫️',48:'🌫️',51:'🌦️',53:'🌦️',
-      55:'🌧️',61:'🌦️',63:'🌧️',65:'🌧️',71:'🌨️',73:'🌨️',75:'❄️',
-      77:'❄️',80:'🌦️',81:'🌧️',82:'⛈️',85:'🌨️',86:'🌨️',95:'⛈️',96:'⛈️',99:'⛈️'})[code] || '🌤️';
+function go19(view,focusId=''){
+  if(view==='budget19'||view==='extra19'){current=view;render();return}
+  current=view;render();
+  if(focusId)setTimeout(()=>{
+    const el=document.querySelector(`[data-id="${CSS.escape(focusId)}"],[data-edit="${CSS.escape(focusId)}"],#${CSS.escape(focusId)}`);
+    el?.scrollIntoView({behavior:'smooth',block:'center'});
+  },80);
+}
+window.SamenThuisGo=go19;
+
+function nav19(){
+  const desktop=document.querySelector('.sidebar nav,.side-nav,.nav-list');
+  if(desktop){
+    desktop.innerHTML=pages19.map(([id,label,icon])=>`<button class="${current===id?'active':''}" data-v19-go="${id}"><span>${icon}</span>${label}</button>`).join('');
   }
-
-  function label17(code) {
-    if (code === 0) return 'Zonnig';
-    if (code <= 2) return 'Licht bewolkt';
-    if (code === 3) return 'Bewolkt';
-    if (code <= 48) return 'Mistig';
-    if (code <= 57) return 'Motregen';
-    if (code <= 67) return 'Regen';
-    if (code <= 77) return 'Sneeuw';
-    if (code <= 86) return 'Buien';
-    return 'Onweer';
+  const mobile=document.querySelector('.mobile-nav,.bottom-nav');
+  if(mobile){
+    const direct=(ui19.mobileNav||DEFAULTUI19.mobileNav).slice(0,4);
+    mobile.innerHTML=direct.map(id=>{const p=pages19.find(x=>x[0]===id)||pages19[0];return `<button class="${current===id?'active':''}" data-v19-go="${id}"><span>${p[2]}</span><small>${p[1]}</small></button>`}).join('')+
+      `<button data-v19-more><span>•••</span><small>Meer</small></button>`;
   }
+}
+function more19(){
+  let old=document.querySelector('[data-v19-moremenu]');if(old){old.remove();return}
+  const direct=new Set(ui19.mobileNav||DEFAULTUI19.mobileNav);
+  document.body.insertAdjacentHTML('beforeend',`<div class="more19" data-v19-moremenu><div class="more19-sheet"><div class="more19-head"><strong>Alle pagina's</strong><button data-v19-more>×</button></div>${pages19.filter(p=>!direct.has(p[0])).map(p=>`<button data-v19-go="${p[0]}"><span>${p[2]}</span><b>${p[1]}</b></button>`).join('')}</div></div>`);
+}
+function budgetPage19(){
+  const b=data.budget||data.budget19||{income:0,expenses:[]};
+  const expenses=Array.isArray(b.expenses)?b.expenses:[];
+  const total=expenses.reduce((s,x)=>s+Number(x.amount||0),0), income=Number(b.income||0);
+  return `<div class="page19"><div class="page19-head"><div><p class="eyebrow">GELD</p><h1>Budget</h1><p>Inkomsten, uitgaven en doelen op één plek.</p></div><button class="primary" data-v19-budget-add>+ Toevoegen</button></div>
+  <div class="budget19-grid"><section class="card"><small>Inkomen</small><h2>€ ${income.toLocaleString('nl-NL')}</h2></section><section class="card"><small>Uitgaven</small><h2>€ ${total.toLocaleString('nl-NL')}</h2></section><section class="card"><small>Resterend</small><h2>€ ${(income-total).toLocaleString('nl-NL')}</h2></section></div>
+  <section class="card"><div class="card-head"><h2>Uitgaven</h2></div>${expenses.length?expenses.map((x,i)=>`<div class="row19"><div><strong>${esc(x.title||x.category||'Uitgave')}</strong><small>${esc(x.category||'')}</small></div><b>€ ${Number(x.amount||0).toLocaleString('nl-NL')}</b><button data-v19-budget-edit="${i}">Bewerk</button></div>`).join(''):'<p class="muted">Nog geen budgetposten. Gebruik + Toevoegen.</p>'}</section></div>`;
+}
+function extraPage19(){
+ const tools=[
+ ['weather','☀️','Weer','Actueel weer op Vandaag','today'],
+ ['daily','💡','Vraag van de dag','Beantwoord de vraag op Vandaag','today'],
+ ['floor','🏷️','Bodemprijzen','Bekijk prijsreferenties bij Boodschappen','groceries']
+ ];
+ return `<div class="page19"><div class="page19-head"><div><p class="eyebrow">HANDIGE TOOLS</p><h1>Extra</h1><p>Snelle toegang tot handige onderdelen.</p></div></div><div class="tools19">
+ ${tools.map(([id,icon,label,description])=>`<button data-v19-tool="${id}"><span>${icon}</span><strong>${label}</strong><small>${description}</small></button>`).join('')}</div></div>`;
+}
+function settingsPanel19(){
+ if(current!=='settings')return;
+ const v=document.querySelector('#view');if(!v||v.querySelector('[data-v19-device-settings]'))return;
+ v.insertAdjacentHTML('afterbegin',`<section class="card device-settings19" data-v19-device-settings><div class="card-head"><div><p class="eyebrow">DIT APPARAAT</p><h2>Thema & weergave</h2></div><span class="tag">Niet gedeeld</span></div><p class="muted">Deze instellingen blijven alleen op dit apparaat. Daphne kan op haar telefoon dus een ander thema gebruiken.</p>
+ <div class="settings-grid19"><label>Thema<select data-v19-theme><option value="system">Systeem</option><option value="light">Licht</option><option value="dark">Donker</option></select></label>
+ <label>Accent<select data-v19-accent><option value="bluePurple">Blauw / paars</option><option value="blue">Blauw</option><option value="purple">Paars</option><option value="orange">Oranje</option></select></label>
+ <label>Weergave<select data-v19-density><option value="comfortable">Ruim</option><option value="compact">Compact</option></select></label></div></section>`);
+ v.querySelector('[data-v19-theme]').value=ui19.theme;v.querySelector('[data-v19-accent]').value=ui19.accent;v.querySelector('[data-v19-density]').value=ui19.density;
+}
+function editBudget19(index=null){
+ data.budget ||= {income:0,expenses:[]}; data.budget.expenses ||= [];
+ const old=index===null?{}:data.budget.expenses[index];
+ const title=prompt('Naam',old.title||'');if(title===null)return;
+ const amount=prompt('Bedrag (€)',old.amount??'');if(amount===null)return;
+ const category=prompt('Categorie',old.category||'Overig');if(category===null)return;
+ const item={...old,id:old.id||uid(),title,amount:Number(String(amount).replace(',','.'))||0,category};
+ if(index===null)data.budget.expenses.push(item);else data.budget.expenses[index]=item;save();render();
+}
+function crossLinks19(){
+  if(current!=='today')return;
+  const v=document.querySelector('#view');if(!v)return;
+  // Existing Today content remains source-of-truth; cards receive explicit navigation.
+  v.querySelectorAll('[data-dashboard-v18] .today18,[data-dash18] .today18').forEach(x=>{x.dataset.v19Go='chores'});
+  v.querySelectorAll('[data-dashboard-v18] .agenda18,[data-dash18] .agenda18').forEach(x=>{x.dataset.v19Go='planning'});
+  v.querySelectorAll('[data-outfit18],[data-outfit-v18]').forEach(x=>{x.dataset.v19Tool='weather'});
+}
+const baseRender19=render;
+render=function(...args){
+ let r;
+ if(current==='budget19'){document.querySelector('#view').innerHTML=budgetPage19();r=undefined}
+ else if(current==='extra19'){document.querySelector('#view').innerHTML=extraPage19();r=undefined}
+ else r=baseRender19(...args);
+ requestAnimationFrame(()=>{nav19();settingsPanel19();crossLinks19();applyUi19()});
+ return r;
+};
+document.addEventListener('click',e=>{
+ const g=e.target.closest('[data-v19-go]');if(g){e.preventDefault();go19(g.dataset.v19Go);return}
+ if(e.target.closest('[data-v19-more]')){e.preventDefault();more19();return}
+ if(e.target.closest('[data-v19-budget-add]')){editBudget19();return}
+ const be=e.target.closest('[data-v19-budget-edit]');if(be){editBudget19(Number(be.dataset.v19BudgetEdit));return}
+ const tool=e.target.closest('[data-v19-tool]');if(tool){
+   const t=tool.dataset.v19Tool;   if(t==='weather'){go19('today');return}
+   if(t==='floor'){go19('groceries');return}
+   if(t==='daily'){go19('today');return}
+ }
+});
+document.addEventListener('change',e=>{
+ if(e.target.matches('[data-v19-theme]')){ui19.theme=e.target.value;saveUi19()}
+ if(e.target.matches('[data-v19-accent]')){ui19.accent=e.target.value;saveUi19()}
+ if(e.target.matches('[data-v19-density]')){ui19.density=e.target.value;saveUi19()}
+});
+requestAnimationFrame(()=>{nav19();settingsPanel19();applyUi19()});
+})();
 
-  function outfit17(w) {
-    const feels = Math.round(w.current?.apparent_temperature ?? 15);
-    const rain = Number(w.daily?.precipitation_probability_max?.[0] || 0);
-    const wind = Number(w.current?.wind_speed_10m || 0);
-    const code = Number(w.current?.weather_code || 0);
-    let advice;
-    if (feels <= 5) advice = ['Winterjas', 'warme trui', 'lange broek'];
-    else if (feels <= 11) advice = ['Jas', 'trui of vest', 'lange broek'];
-    else if (feels <= 16) advice = ['Lichte jas of vest', 'lange broek'];
-    else if (feels <= 22) advice = ['T-shirt', 'lichte broek'];
-    else advice = ['Luchtige kleding', 'korte broek'];
-    if (rain >= 40) advice.push('regenjas of paraplu');
-    if (wind >= 30) advice.push('winddichte laag');
-    if (code <= 1 && feels >= 18) advice.push('zonnebril');
-    return advice;
+/* =========================================================
+   SAMEN THUIS v20 — GLASS THEME / DEVICE UI
+   Alleen interfacevoorkeuren zijn apparaatgebonden.
+   ========================================================= */
+(() => {
+'use strict';
+if (window.__ST_V20__) return;
+window.__ST_V20__ = true;
+
+const KEY20 = 'samenThuisDeviceUiV20';
+const FALLBACK20 = { theme:'system', accent:'purple', density:'comfortable' };
+
+function get20(){
+  try {
+    const old = JSON.parse(localStorage.getItem('samenThuisDeviceUiV19') || '{}');
+    const now = JSON.parse(localStorage.getItem(KEY20) || '{}');
+    return {...FALLBACK20, ...old, ...now};
+  } catch (_) { return {...FALLBACK20}; }
+}
+let ui20 = get20();
+
+function apply20(){
+  const systemDark = window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches;
+  const dark = ui20.theme === 'dark' || (ui20.theme === 'system' && systemDark);
+  const html = document.documentElement;
+  html.dataset.theme19 = dark ? 'dark' : 'light';
+  html.dataset.theme20 = dark ? 'dark' : 'light';
+  html.dataset.accent19 = ui20.accent || 'purple';
+  html.dataset.accent20 = ui20.accent || 'purple';
+  html.dataset.density19 = ui20.density || 'comfortable';
+  html.dataset.density20 = ui20.density || 'comfortable';
+  html.style.colorScheme = dark ? 'dark' : 'light';
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark ? '#081b2d' : '#eef3f9');
+}
+function save20(){
+  localStorage.setItem(KEY20, JSON.stringify(ui20));
+  localStorage.setItem('samenThuisDeviceUiV19', JSON.stringify(ui20));
+  apply20();
+}
+apply20();
+try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => ui20.theme === 'system' && apply20()); } catch(_){}
+
+function beautifySettings20(){
+  if (typeof current === 'undefined' || current !== 'settings') return;
+  const box = document.querySelector('[data-v19-device-settings]');
+  if (!box) return;
+  box.classList.add('glass20');
+  const theme = box.querySelector('[data-v19-theme]');
+  const accent = box.querySelector('[data-v19-accent]');
+  const density = box.querySelector('[data-v19-density]');
+  if(theme){ theme.value=ui20.theme; theme.onchange=()=>{ui20.theme=theme.value;save20()}; }
+  if(accent){ accent.value=ui20.accent; accent.onchange=()=>{ui20.accent=accent.value;save20()}; }
+  if(density){ density.value=ui20.density; density.onchange=()=>{ui20.density=density.value;save20()}; }
+}
+
+function dock20(){
+  const mobile = document.querySelector('.mobile-nav,.bottom-nav');
+  if(!mobile) return;
+  mobile.classList.add('glass-dock20');
+  const buttons = [...mobile.querySelectorAll('button')];
+  buttons.forEach(b => b.classList.add('glass-dock-item20'));
+
+  // Make the middle action a prominent glass + button without changing navigation data.
+  let add = mobile.querySelector('[data-v20-add]');
+  if(!add){
+    add = document.createElement('button');
+    add.type='button';
+    add.dataset.v20Add='';
+    add.className='glass-dock-item20 glass-add20';
+    add.innerHTML='<span>＋</span><small>Toevoegen</small>';
+    const more = mobile.querySelector('[data-v19-more]');
+    mobile.insertBefore(add, more || null);
   }
+}
+function enhance20(){
+  document.body.classList.add('st-glass20');
+  apply20();
+  beautifySettings20();
+  dock20();
+}
 
-  function todayStats17() {
-    let chores = 0;
-    try {
-      if (typeof smartHouseholdStatus16 === 'function') {
-        chores = (data.chores || []).filter(chore => {
-          const status = smartHouseholdStatus16(chore);
-          return status && !status.done && (status.due || status.soon || status.overdue);
-        }).length;
-      } else {
-        chores = occurrencesForDate(todayISO()).filter(({chore}) => !isChoreDone(chore, todayISO())).length;
-      }
-    } catch (_) {}
-    const groceries = (data.groceries || []).filter(item => !item.done).length;
-    const lowStock = (data.stock || []).filter(item => {
-      const amount = Number(item.amount ?? 0);
-      const minimum = Number(item.min ?? item.minimum ?? 0);
-      return minimum > 0 && amount <= minimum;
-    }).length;
-    const dinner = (data.meals || []).find(item => item.date === todayISO() && /avond/i.test(item.type || item.mealType || ''));
-    return { chores, groceries, lowStock, dinner };
-  }
-
-  function agenda17() {
-    try {
-      return (data.planning || [])
-        .filter(item => item.date >= todayISO())
-        .filter(item => {
-          const cal = typeof calendarById === 'function' ? calendarById(item.calendarId) : null;
-          return !cal || cal.visible !== false;
-        })
-        .sort(typeof sortPlanning === 'function' ? sortPlanning : (a,b) => `${a.date}${a.time||''}`.localeCompare(`${b.date}${b.time||''}`))
-        .slice(0, 4);
-    } catch (_) { return []; }
-  }
-
-  function dashboardHtml17() {
-    const hour = new Date().getHours();
-    const greeting = hour < 12 ? 'Goedemorgen' : hour < 18 ? 'Goedemiddag' : 'Goedenavond';
-    const stats = todayStats17();
-    const agenda = agenda17();
-    const dateLabel = new Intl.DateTimeFormat('nl-NL',{weekday:'long',day:'numeric',month:'long'}).format(new Date());
-
-    return `<section class="dashboard-v17" data-dashboard-v17>
-      <header class="dashboard-head-v17">
-        <div><p class="eyebrow">Samen Thuis</p><h2>${greeting} 👋</h2><p>${dateLabel}</p></div>
-        <div class="people-v17" aria-label="Kees en Daphne"><span>K</span><span>D</span></div>
-      </header>
-
-      <div class="dashboard-grid-v17">
-        <section class="weather-card-v17" data-weather-v17>
-          <div class="weather-loading-v17">Weer ophalen…</div>
-        </section>
-
-        <section class="today-card-v17">
-          <div class="dashboard-title-v17"><strong>Vandaag</strong><span>${stats.chores} huishoudtaken</span></div>
-          <div class="mini-stats-v17">
-            <button type="button" data-view="chores"><b>${stats.chores}</b><small>Huishouden</small></button>
-            <button type="button" data-view="groceries"><b>${stats.groceries}</b><small>Boodschappen</small></button>
-            <button type="button" data-view="stock"><b>${stats.lowStock}</b><small>Bijna op</small></button>
-          </div>
-          <div class="meal-v17"><small>🍽️ VANAVOND</small><strong>${esc(stats.dinner?.title || 'Nog geen avondeten gepland')}</strong></div>
-        </section>
-
-        <section class="agenda-card-v17">
-          <div class="dashboard-title-v17"><strong>Komende afspraken</strong><button class="text-btn" type="button" data-view="planning">Agenda →</button></div>
-          ${agenda.length ? agenda.map(item => {
-            const cal = typeof calendarById === 'function' ? calendarById(item.calendarId) : null;
-            const when = item.date === todayISO() ? (item.time || 'Hele dag') :
-              new Intl.DateTimeFormat('nl-NL',{weekday:'short',day:'numeric'}).format(parseDate(item.date));
-            return `<div class="agenda-row-v17">
-              <time>${esc(when)}</time><i style="background:${esc(cal?.color || '#315f86')}"></i>
-              <div><strong>${esc(item.title)}</strong><small>${esc(cal?.name || item.person || '')}</small></div>
-            </div>`;
-          }).join('') : '<p class="muted">Geen komende afspraken.</p>'}
-        </section>
-
-        <section class="outfit-card-v17" data-outfit-v17>
-          <span class="outfit-icon-v17">👕</span><div><strong>Wat trek je aan?</strong><p>Weeradvies laden…</p></div>
-        </section>
-      </div>
-    </section>`;
-  }
-
-  async function loadWeather17(force=false) {
-    const box = document.querySelector('[data-weather-v17]');
-    if (!box) return;
-    try {
-      let weather = null;
-      if (!force) {
-        try {
-          const cached = JSON.parse(localStorage.getItem(WEATHER_CACHE17) || 'null');
-          if (cached && Date.now() - cached.savedAt < WEATHER_TTL17) weather = cached.data;
-        } catch (_) {}
-      }
-      if (!weather) {
-        const params = new URLSearchParams({
-          latitude: WEATHER_LAT17,
-          longitude: WEATHER_LON17,
-          current: 'temperature_2m,apparent_temperature,weather_code,precipitation,wind_speed_10m',
-          hourly: 'temperature_2m,weather_code,precipitation_probability',
-          daily: 'weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max',
-          timezone: 'Europe/Amsterdam',
-          forecast_days: '5'
-        });
-        const response = await fetch(`https://api.open-meteo.com/v1/forecast?${params}`, {cache:'no-store'});
-        if (!response.ok) throw new Error('Weer kon niet worden opgehaald');
-        weather = await response.json();
-        localStorage.setItem(WEATHER_CACHE17, JSON.stringify({savedAt:Date.now(),data:weather}));
-      }
-
-      const c = weather.current, d = weather.daily, h = weather.hourly;
-      const now = new Date();
-      let start = h.time.findIndex(t => new Date(t) >= new Date(now.getFullYear(),now.getMonth(),now.getDate(),now.getHours()));
-      if (start < 0) start = 0;
-      const hours = Array.from({length:6},(_,i)=>start+i).filter(i=>i<h.time.length);
-
-      box.innerHTML = `<div class="weather-main-v17">
-        <div><small class="weather-place-v17">⌖ ${WEATHER_PLACE17}</small>
-          <div class="weather-temp-v17"><span>${icon17(c.weather_code)}</span><strong>${Math.round(c.temperature_2m)}°</strong></div>
-          <p>${label17(c.weather_code)} · voelt als ${Math.round(c.apparent_temperature)}°</p>
-        </div>
-        <div class="weather-facts-v17">
-          <b>${Math.round(d.temperature_2m_max[0])}° / ${Math.round(d.temperature_2m_min[0])}°</b>
-          <span>☂ ${Math.round(d.precipitation_probability_max[0] || 0)}%</span>
-          <span>↗ ${Math.round(c.wind_speed_10m || 0)} km/u</span>
-        </div>
-      </div>
-      <div class="weather-hours-v17">${hours.map(i=>`<div><small>${h.time[i].slice(11,16)}</small><b>${icon17(h.weather_code[i])}</b><strong>${Math.round(h.temperature_2m[i])}°</strong><small>${Math.round(h.precipitation_probability[i]||0)}%</small></div>`).join('')}</div>
-      <button class="weather-refresh-v17" type="button" data-weather-refresh-v17 aria-label="Weer vernieuwen">↻</button>`;
-
-      const outfit = document.querySelector('[data-outfit-v17]');
-      if (outfit) {
-        outfit.innerHTML = `<span class="outfit-icon-v17">👕</span><div><strong>Wat trek je aan?</strong>
-          <p>${outfit17(weather).map(esc).join(' · ')}</p>
-          <small>Gebaseerd op gevoelstemperatuur, regen en wind.</small></div>`;
-      }
-    } catch (_) {
-      box.innerHTML = `<div><strong>Weer tijdelijk niet beschikbaar</strong><p>Controleer je internetverbinding.</p>
-        <button class="text-btn" type="button" data-weather-refresh-v17>Opnieuw proberen</button></div>`;
-    }
-  }
-
-  function enhanceToday17() {
-    if (current !== 'today') return;
-    const view = document.querySelector('#view');
-    if (!view || view.querySelector('[data-dashboard-v17]')) return;
-    view.insertAdjacentHTML('afterbegin', dashboardHtml17());
-    const welcome = view.querySelector('.welcome');
-    if (welcome) welcome.hidden = true;
-    loadWeather17();
-  }
-
-  render = function renderV17(...args) {
-    const result = baseRender17(...args);
-    requestAnimationFrame(enhanceToday17);
+const previousRender20 = typeof render === 'function' ? render : null;
+if(previousRender20){
+  render = function(...args){
+    const result = previousRender20(...args);
+    requestAnimationFrame(enhance20);
     return result;
   };
+}
 
-  document.addEventListener('click', event => {
-    if (event.target.closest('[data-weather-refresh-v17]')) loadWeather17(true);
-  });
-
-  requestAnimationFrame(enhanceToday17);
+document.addEventListener('click', e => {
+  if(e.target.closest('[data-v20-add]')){
+    const topAdd = [...document.querySelectorAll('button')].find(b =>
+      !b.closest('.mobile-nav,.bottom-nav') && /toevoegen|\+\s*toevoegen/i.test(b.textContent || '')
+    );
+    if(topAdd) topAdd.click();
+    else {
+      const generic = document.querySelector('[data-add],[data-action="add"],.add-btn');
+      generic?.click();
+    }
+  }
+});
+requestAnimationFrame(enhance20);
 })();
 
+/* ===== v21 TRUE GLASS DOCK ===== */
+(()=>{'use strict';if(window.__ST21)return;window.__ST21=1;
+const pages=[['today','⌂','Today'],['planning','▦','Agenda'],['meals','♨','Weekmenu'],['groceries','✓','Boodschappen'],['chores','⌁','Huishouden'],['stock','▤','Voorraad'],['trips','✈','Reizen'],['ideas','♡','Date ideeën'],['home','⌂','Woning'],['budget19','€','Budget'],['extra19','＋','Extra'],['settings','⚙','Instellingen']],direct=['today','planning','meals','groceries'];
+function go(id){if(window.SamenThuisGo)SamenThuisGo(id);else{current=id;render()}}
+function dock(){
+ document.querySelectorAll('.mobile-nav,.bottom-nav').forEach(x=>x.classList.add('old21'));
+ let n=document.querySelector('#dock21');if(!n){n=document.createElement('nav');n.id='dock21';n.className='dock21';document.body.append(n)}
+ n.innerHTML=direct.map(id=>{let p=pages.find(x=>x[0]===id);return`<button data-go21="${id}" class="${current===id?'on':''}"><span>${p[1]}</span><small>${p[2]}</small></button>`}).join('')+`<button data-more21 class="${direct.includes(current)?'':'on'}"><span>•••</span><small>Meer</small></button>`;
+ document.querySelectorAll('.sync-info,[class*="info-box"],[class*="sync-info"]').forEach(x=>x.classList.add('surface21'));
+}
+function sheet(){document.querySelector('#sheet21')?.remove();let w=document.createElement('div');w.id='sheet21';w.className='sheetwrap21';w.innerHTML=`<button class="shade21" data-close21></button><section class="sheet21"><header><div><small>SNEL NAAR</small><strong>Alle pagina's</strong></div><button data-close21>×</button></header><div>${pages.filter(p=>!direct.includes(p[0])).map(p=>`<button data-go21="${p[0]}" class="${current===p[0]?'on':''}"><span>${p[1]}</span><b>${p[2]}</b></button>`).join('')}</div></section>`;document.body.append(w)}
+const rr=render;render=function(...a){let x=rr(...a);requestAnimationFrame(dock);return x};
+document.addEventListener('click',e=>{let g=e.target.closest('[data-go21]');if(g){e.preventDefault();document.querySelector('#sheet21')?.remove();go(g.dataset.go21);return}if(e.target.closest('[data-more21]')){e.preventDefault();sheet();return}if(e.target.closest('[data-close21]'))document.querySelector('#sheet21')?.remove()});
+requestAnimationFrame(dock);
+})();
+
+/* Samen Thuis v21.6 · build 2026-09-16 22:xx · app.js volledig opnieuw uitgegeven */
+
+/* v21.7 fresh build: 2026-09-16 20:58:16 +0000 */
+
+/* v21.8 build 2026-09-16 21:01:28 +0000 */
 
 
 /* =========================================================
-   SAMEN THUIS v25 — DOCUMENTATIEGESTUURDE UITBREIDING
-   Zelfstandige integratie; geen extern updatebestand nodig.
-   Nieuwe functies: universele inbox/taken, challenges,
-   deep-link helper en cross-module navigatie.
+   SAMEN THUIS v23 — GEÏNTEGREERDE MOBIELE NAVIGATIE + BUDGET
+   Eén implementatie; geen v21.9/v22 render-wrappers.
+   ========================================================= */
+(()=>{
+'use strict';
+if(window.__ST_V23__) return; window.__ST_V23__=true;
+
+const NAV23=[
+ ['today','⌂','Vandaag'],['planning','▦','Agenda'],['meals','♨','Weekmenu'],
+ ['groceries','✓','Boodschappen'],['stock','▤','Voorraad'],['chores','⌁','Huishouden'],
+ ['home','⌂','Woning'],['budget19','€','Budget'],['trips','✈','Reizen'],
+ ['ideas','♡','Date ideeën'],['extra19','＋','Extra'],['settings','⚙','Instellingen']
+];
+
+const DEFAULT_BUDGET23={
+ incomes:{Kees:2731,Daphne:3427},
+ contributionPct:75,
+ houseBudget:1000,
+ houseCategories:[
+  {id:'hb-groceries',title:'Boodschappen',amount:650},
+  {id:'hb-household',title:'Huishouden',amount:125},
+  {id:'hb-home',title:'Woning',amount:125},
+  {id:'hb-other',title:'Overig gezamenlijk',amount:100}
+ ],
+ investing:75,
+ fixed:[
+  ['Huur',1170.11,'maand'],['Eneco',101,'maand'],['Evides',20,'maand'],
+  ['Odido',40.52,'maand'],['Vodafone',22.33,'maand'],['Gym',27.99,'maand'],
+  ['Univé',181.19,'maand'],['Zorgverzekering',184.50,'maand'],
+  ['Scooterverzekering',33.15,'maand'],['Netflix',6.30,'maand'],
+  ['Rabobank',5.95,'maand'],['Parkeervergunning',35.20,'maand'],
+  ['Wegenbelasting Daphne',62.67,'maand'],['Wegenbelasting Kees',33,'maand']
+ ].map((x,i)=>({id:`fixed23-${i}`,title:x[0],amount:x[1],period:x[2]})),
+ goals:[
+  {id:'buffer23',title:'Buffer',target:3000,current:1000,monthly:150,deadline:'',recurring:false},
+  {id:'vacation23',title:'Vakantie',target:5000,current:0,monthly:416.67,deadline:'Jaarlijks',recurring:true},
+  {id:'home23',title:'Huis',target:15000,current:0,monthly:1000,deadline:'2027-12-31',recurring:false},
+  {id:'other23',title:'Overig',target:10000,current:0,monthly:0,deadline:'',recurring:false}
+ ]
+};
+const clone23=x=>JSON.parse(JSON.stringify(x));
+function budget23(){
+ if(!data.budgetV23){
+   const old=data.budget219||data.budgetV22||null;
+   data.budgetV23=clone23(DEFAULT_BUDGET23);
+   if(old){
+    if(old.incomes) data.budgetV23.incomes={...data.budgetV23.incomes,...old.incomes};
+    ['contributionPct','houseBudget','investing'].forEach(k=>{if(old[k]!=null)data.budgetV23[k]=Number(old[k])});
+    if(Array.isArray(old.fixed)&&old.fixed.length)data.budgetV23.fixed=old.fixed.map(x=>({...x}));
+    if(Array.isArray(old.goals)&&old.goals.length)data.budgetV23.goals=old.goals.map(x=>({...x}));
+   }
+   save({touch:false});
+ }
+ const b=data.budgetV23;
+ b.incomes={...DEFAULT_BUDGET23.incomes,...(b.incomes||{})};
+ b.fixed=Array.isArray(b.fixed)?b.fixed:clone23(DEFAULT_BUDGET23.fixed);
+ b.goals=Array.isArray(b.goals)?b.goals:clone23(DEFAULT_BUDGET23.goals);
+ b.houseCategories=Array.isArray(b.houseCategories)&&b.houseCategories.length?b.houseCategories:clone23(DEFAULT_BUDGET23.houseCategories);
+ return b;
+}
+const n23=v=>Number(String(v??0).replace(',','.'))||0;
+const eur23=v=>new Intl.NumberFormat('nl-NL',{style:'currency',currency:'EUR'}).format(n23(v));
+const pct23=v=>Math.max(0,Math.min(100,n23(v)));
+const monthlyFixed23=x=>x.period==='jaar'?n23(x.amount)/12:x.period==='kwartaal'?n23(x.amount)/3:n23(x.amount);
+function calcBudget23(){
+ const b=budget23(),K=n23(b.incomes.Kees),D=n23(b.incomes.Daphne),rate=n23(b.contributionPct)/100;
+ const fixed=b.fixed.reduce((s,x)=>s+monthlyFixed23(x),0);
+ const saving=b.goals.reduce((s,x)=>s+n23(x.monthly),0);
+ const investing=n23(b.investing),house=n23(b.houseBudget),income=K+D,contribution=income*rate;
+ const needed=fixed+house+saving+investing,remainder=contribution-needed;
+ const saved=b.goals.reduce((s,x)=>s+n23(x.current),0),targets=b.goals.reduce((s,x)=>s+n23(x.target),0);
+ return {b,K,D,rate,fixed,saving,investing,house,income,contribution,needed,remainder,saved,targets,
+  kContribution:K*rate,dContribution:D*rate,kPersonal:K*(1-rate),dPersonal:D*(1-rate),
+  neededPct:income?needed/income*100:0};
+}
+function deadlineMonths23(deadline){
+ if(!deadline||deadline==='Jaarlijks')return null;
+ const d=new Date(deadline+'T12:00:00'),now=new Date();
+ if(Number.isNaN(d.getTime()))return null;
+ return Math.max(0,Math.ceil((d-now)/(30.4375*86400000)));
+}
+function goalStatus23(g){
+ const left=Math.max(0,n23(g.target)-n23(g.current)),m=n23(g.monthly);
+ const months=m>0?Math.ceil(left/m):null,deadline=deadlineMonths23(g.deadline);
+ return {left,months,deadline,enough:deadline==null||left===0||(m>0&&months<=deadline)};
+}
+function donut23(value,max,label){
+ const p=pct23(max?n23(value)/n23(max)*100:0),r=42,c=2*Math.PI*r,d=c*p/100;
+ return `<div class="donut23"><svg viewBox="0 0 110 110"><circle class="ring-bg23" cx="55" cy="55" r="${r}"/><circle class="ring-value23" cx="55" cy="55" r="${r}" stroke-dasharray="${d} ${c-d}" transform="rotate(-90 55 55)"/></svg><div><b>${Math.round(p)}%</b><small>${esc(label)}</small></div></div>`;
+}
+function bars23(rows,stacked=false){
+ const max=Math.max(1,...rows.flatMap(x=>[Math.abs(n23(x.value)),Math.abs(n23(x.value2))]));
+ return `<div class="chart-bars23">${rows.map(x=>`<div class="chart-row23"><span>${esc(x.label)}</span><div class="chart-track23"><i style="width:${Math.max(x.value?2:0,Math.abs(n23(x.value))/max*100)}%"></i>${x.value2!=null?`<em style="width:${Math.max(x.value2?2:0,Math.abs(n23(x.value2))/max*100)}%"></em>`:''}</div><b>${eur23(x.value)}</b></div>`).join('')}</div>`;
+}
+function projection23(g){
+ const st=goalStatus23(g),points=[],months=Math.min(24,Math.max(12,st.months||12));
+ for(let i=0;i<=months;i+=Math.max(1,Math.ceil(months/8)))points.push({m:i,v:Math.min(n23(g.target),n23(g.current)+n23(g.monthly)*i)});
+ if(points.at(-1)?.m!==months)points.push({m:months,v:Math.min(n23(g.target),n23(g.current)+n23(g.monthly)*months)});
+ const max=Math.max(1,n23(g.target)),w=300,h=100,pad=12;
+ const coords=points.map((p,i)=>`${pad+(w-2*pad)*(p.m/months)},${h-pad-(h-2*pad)*(p.v/max)}`).join(' ');
+ return `<svg class="projection23" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><line x1="${pad}" y1="${h-pad}" x2="${w-pad}" y2="${h-pad}"/><line x1="${pad}" y1="${pad}" x2="${w-pad}" y2="${pad}" class="target23"/><polyline points="${coords}"/></svg>`;
+}
+function renderBudget23(){
+ const c=calcBudget23(),b=c.b;
+ const goals=b.goals.map((g,i)=>{
+  const st=goalStatus23(g);
+  return `<article class="light-surface23 goal-card23">
+   <header><div><small>SPAARDOEL</small><h3>${esc(g.title)}</h3><p>${esc(g.deadline||'Geen deadline')}</p></div><div><button data-budget23-goal="${i}">Bewerk</button><button class="danger23" data-budget23-delgoal="${i}">×</button></div></header>
+   <div class="goal-visual23">${donut23(g.current,g.target,g.title)}<div><b>${eur23(g.current)} / ${eur23(g.target)}</b><span>Nog nodig ${eur23(st.left)}</span><span>${n23(g.monthly)>0?`${eur23(g.monthly)} per maand`:'Geen maandbedrag'}</span><span class="${st.enough?'ok23':'warn23'}">${st.months===0?'Doel bereikt':st.months?`Verwacht over ${st.months} maanden`:'Geen prognose'}${st.deadline!=null?` · ${st.enough?'op schema':'inleg te laag voor deadline'}`:''}</span></div></div>
+   ${projection23(g)}
+  </article>`;
+ }).join('');
+ const fixed=b.fixed.map((x,i)=>`<div class="light-surface23 fixed-row23"><div><b>${esc(x.title)}</b><small>${x.period==='jaar'?'Jaarlijks':x.period==='kwartaal'?'Per kwartaal':'Maandelijks'} · ${eur23(monthlyFixed23(x))}/mnd</small></div><strong>${eur23(x.amount)}</strong><button data-budget23-fixed="${i}">Bewerk</button><button class="danger23" data-budget23-delfixed="${i}">×</button></div>`).join('');
+ const goalBars=b.goals.map(g=>({label:g.title,value:n23(g.current),value2:Math.max(0,n23(g.target)-n23(g.current))}));
+ const money=[{label:'Vaste lasten',value:c.fixed},{label:'Huisbudget',value:c.house},{label:'Sparen',value:c.saving},{label:'Beleggen',value:c.investing},{label:'Resterend',value:Math.max(0,c.remainder)}];
+ const house=b.houseCategories.map((x,i)=>`<label>${esc(x.title)}<input inputmode="decimal" data-budget23-house="${i}" value="${n23(x.amount)}"></label>`).join('');
+ return `<div class="budget23">
+  <header class="budget-title23"><p class="eyebrow">SAMEN THUIS · FINANCIËN</p><h1>Budgetdashboard</h1><p>Één maandberekening voor inkomen, lasten, sparen, beleggen en wat er overblijft.</p></header>
+  <section class="kpis23">
+   <article><small>NETTO INKOMEN</small><b>${eur23(c.income)}</b><span>samen per maand</span></article>
+   <article><small>GEZAMENLIJKE AFDACHT</small><b>${eur23(c.contribution)}</b><span>${n23(b.contributionPct)}%</span></article>
+   <article><small>MAANDELIJKS NODIG</small><b>${eur23(c.needed)}</b><span>benodigd ${c.neededPct.toFixed(1).replace('.',',')}%</span></article>
+   <article class="${c.remainder<0?'negative23':'positive23'}"><small>${c.remainder<0?'TEKORT':'OVER'}</small><b>${eur23(Math.abs(c.remainder))}</b><span>na alle ingestelde posten</span></article>
+   <article><small>SPAARGELD TOTAAL</small><b>${eur23(c.saved)}</b><span>van ${eur23(c.targets)}</span></article>
+   <article><small>BELEGGEN</small><b>${eur23(c.investing)}</b><span>per maand</span></article>
+  </section>
+
+  <section class="budget-grid23">
+   <article class="budget-sheet23"><header><div><small>INKOMEN & VERDELING</small><h2>Kees en Daphne</h2></div></header>
+    <div class="people23"><div><b>Kees</b><strong>${eur23(c.K)}</strong><span>Gezamenlijk ${eur23(c.kContribution)}</span><span>Persoonlijk ${eur23(c.kPersonal)}</span></div><div><b>Daphne</b><strong>${eur23(c.D)}</strong><span>Gezamenlijk ${eur23(c.dContribution)}</span><span>Persoonlijk ${eur23(c.dPersonal)}</span></div></div>
+    <div class="fields23"><label>Kees netto<input data-budget23-field="incomes.Kees" inputmode="decimal" value="${c.K}"></label><label>Daphne netto<input data-budget23-field="incomes.Daphne" inputmode="decimal" value="${c.D}"></label><label>Afdracht %<input data-budget23-field="contributionPct" inputmode="decimal" value="${n23(b.contributionPct)}"></label><label>Huisbudget<input data-budget23-field="houseBudget" inputmode="decimal" value="${c.house}"></label><label>Beleggen<input data-budget23-field="investing" inputmode="decimal" value="${c.investing}"></label></div>
+   </article>
+   <article class="budget-sheet23"><header><div><small>MAANDELIJKSE GELDVERDELING</small><h2>Waar gaat het heen?</h2></div></header>${bars23(money)}
+    <div class="calc23"><span>Gezamenlijke afdracht <b>${eur23(c.contribution)}</b></span><span>Maandbehoefte <b>− ${eur23(c.needed)}</b></span><span class="total23">Resterend <b>${eur23(c.remainder)}</b></span></div>
+   </article>
+  </section>
+
+  <section class="budget-sheet23"><header><div><small>SPAARDOELEN & PROGNOSE</small><h2>Voortgang</h2></div><button class="primary" data-budget23-addgoal>+ Spaardoel</button></header><div class="goals23">${goals}</div></section>
+
+  <section class="budget-grid23">
+   <article class="budget-sheet23"><header><div><small>SPAARGELD PER DOEL</small><h2>Gespaard versus nog nodig</h2></div></header><div class="legend23"><span><i></i>Gespaard</span><span><em></em>Nog nodig</span></div>${bars23(goalBars,true)}</article>
+   <article class="budget-sheet23"><header><div><small>HUISBUDGET</small><h2>${eur23(c.house)} per maand</h2></div></header><div class="fields23 house-fields23">${house}</div><p class="muted">Subcategorieën zijn een verdeling binnen het huisbudget; het totaalbudget blijft leidend in de maandberekening.</p></article>
+  </section>
+
+  <section class="budget-sheet23"><header><div><small>VASTE LASTEN</small><h2>${eur23(c.fixed)} per maand</h2></div><button class="primary" data-budget23-addfixed>+ Vaste last</button></header><div class="fixed-list23">${fixed}</div></section>
+ </div>`;
+}
+function setBudgetField23(path,value){
+ const b=budget23(),p=path.split('.');
+ if(p.length===2)b[p[0]][p[1]]=n23(value);else b[path]=n23(value);
+ save();render();
+}
+function editFixed23(i){
+ const b=budget23(),x=i==null?{id:id(),title:'Nieuwe vaste last',amount:0,period:'maand'}:b.fixed[i];
+ const title=prompt('Naam vaste last',x.title);if(title===null)return;
+ const amount=prompt('Bedrag',x.amount);if(amount===null)return;
+ const period=prompt('Frequentie: maand, kwartaal of jaar',x.period||'maand');if(period===null)return;
+ const item={...x,title:title.trim()||'Vaste last',amount:n23(amount),period:['maand','kwartaal','jaar'].includes(period.toLowerCase())?period.toLowerCase():'maand'};
+ if(i==null)b.fixed.push(item);else b.fixed[i]=item;save();render();
+}
+function editGoal23(i){
+ const b=budget23(),g=i==null?{id:id(),title:'Nieuw spaardoel',target:0,current:0,monthly:0,deadline:'',recurring:false}:b.goals[i];
+ const title=prompt('Naam spaardoel',g.title);if(title===null)return;
+ const target=prompt('Doelbedrag',g.target);if(target===null)return;
+ const currentAmount=prompt('Huidig gespaard',g.current);if(currentAmount===null)return;
+ const monthly=prompt('Maandelijkse inleg',g.monthly);if(monthly===null)return;
+ const deadline=prompt('Deadline (YYYY-MM-DD), "Jaarlijks" of leeg',g.deadline||'');if(deadline===null)return;
+ const item={...g,title:title.trim()||'Spaardoel',target:n23(target),current:n23(currentAmount),monthly:n23(monthly),deadline:deadline.trim(),recurring:/jaarlijks/i.test(deadline)};
+ if(i==null)b.goals.push(item);else b.goals[i]=item;save();render();
+}
+function mobileNav23(){
+ document.querySelectorAll('#dock21,#dock219,.dock21,.dock219,[data-v19-moremenu]').forEach(x=>x.remove());
+ document.querySelectorAll('.mobile-nav,.bottom-nav').forEach(x=>x.classList.add('legacy-mobile23'));
+ let nav=document.querySelector('#mobileNav23');
+ if(!nav){nav=document.createElement('nav');nav.id='mobileNav23';nav.className='mobile-nav23';nav.setAttribute('aria-label','Pagina navigatie');document.body.append(nav)}
+ nav.innerHTML=`<div class="mobile-nav-scroll23">${NAV23.map(([key,icon,label])=>`<button data-nav23="${key}" class="${current===key?'active':''}"><span>${icon}</span><small>${label}</small></button>`).join('')}</div>`;
+ const active=nav.querySelector('.active');
+ requestAnimationFrame(()=>active?.scrollIntoView({behavior:'smooth',block:'nearest',inline:'center'}));
+}
+function go23(view){
+ current=view;
+ if(view!=='budget19'&&view!=='extra19'&&sections[view]){setupNav();document.querySelector('#pageTitle').textContent=sections[view].label;document.querySelector('#addBtn').style.display=['today','settings'].includes(view)?'none':''}
+ render();
+}
+window.SamenThuisGo=go23;
+
+const baseRender23=render;
+render=function(...args){
+ if(current==='budget19'){document.querySelector('#view').innerHTML=renderBudget23();updateSyncBadge();}
+ else baseRender23(...args);
+ requestAnimationFrame(mobileNav23);
+};
+
+document.addEventListener('click',e=>{
+ const nav=e.target.closest('[data-nav23]');if(nav){e.preventDefault();go23(nav.dataset.nav23);return}
+ if(e.target.closest('[data-budget23-addfixed]')){editFixed23(null);return}
+ const ef=e.target.closest('[data-budget23-fixed]');if(ef){editFixed23(Number(ef.dataset.budget23Fixed));return}
+ const df=e.target.closest('[data-budget23-delfixed]');if(df&&confirm('Deze vaste last verwijderen?')){budget23().fixed.splice(Number(df.dataset.budget23Delfixed),1);save();render();return}
+ if(e.target.closest('[data-budget23-addgoal]')){editGoal23(null);return}
+ const eg=e.target.closest('[data-budget23-goal]');if(eg){editGoal23(Number(eg.dataset.budget23Goal));return}
+ const dg=e.target.closest('[data-budget23-delgoal]');if(dg&&confirm('Dit spaardoel verwijderen?')){budget23().goals.splice(Number(dg.dataset.budget23Delgoal),1);save();render();return}
+});
+document.addEventListener('change',e=>{
+ const f=e.target.closest('[data-budget23-field]');if(f){setBudgetField23(f.dataset.budget23Field,f.value);return}
+ const h=e.target.closest('[data-budget23-house]');if(h){budget23().houseCategories[Number(h.dataset.budget23House)].amount=n23(h.value);save();render();}
+});
+requestAnimationFrame(mobileNav23);
+})();
+
+/* v23.2 visual integration 2026-09-18 06:17:59 +0000 */
+
+
+/* =========================================================
+   v23.3 — mobiele navigatiepositie bewaren
    ========================================================= */
 (() => {
-  'use strict';
-  if (window.__SAMEN_THUIS_V25__) return;
-  window.__SAMEN_THUIS_V25__ = true;
+  const NAV_POS_KEY = 'samenThuisMobileNavScrollV233';
+  let restoringNav = false;
 
-  const uid25 = (p='x') => `${p}-${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
-  const esc25 = v => String(v ?? '').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-
-  function ensure25(){
-    if(typeof data==='undefined') return;
-    data.tasks25 ||= [];
-    data.challenges25 ||= [];
-  }
-  function persist25(){
-    if(typeof save==='function') save();
-    else if(typeof data!=='undefined') localStorage.setItem('samenThuisDataV2', JSON.stringify(data));
-  }
-  function go25(page, extra={}){
-    try{
-      const u=new URL(location.href);
-      u.searchParams.set('page',page);
-      Object.entries(extra).forEach(([k,v])=>v==null?u.searchParams.delete(k):u.searchParams.set(k,v));
-      history.replaceState({},'',u);
-    }catch{}
-    if(window.SamenThuisGo) return window.SamenThuisGo(page);
-    if(typeof current!=='undefined' && typeof render==='function'){ current=page; render(); }
-  }
-  window.SamenThuisDeepLink = go25;
-
-  function addSections25(){
-    if(typeof sections==='undefined') return;
-    if(!sections.tasks25) sections.tasks25={label:'Taken',icon:'✓'};
-    if(!sections.challenges25) sections.challenges25={label:'Challenges',icon:'◎'};
+  function getNavScroller(){
+    return document.querySelector('.mobile-nav-scroll23');
   }
 
-  function taskHtml25(){
-    ensure25();
-    const items=(data.tasks25||[]).slice().sort((a,b)=>(a.done-b.done)||String(a.due||'9999').localeCompare(String(b.due||'9999')));
-    return `<section class="v25-page">
-      <div class="v25-hero"><div><p class="eyebrow">SAMEN REGELEN</p><h2>Taken & inbox</h2><p class="muted">Eén plek voor persoonlijke, gezamenlijke en modulegebonden acties.</p></div>
-      <button class="primary" data-v25-new-task>＋ Taak</button></div>
-      <div class="v25-grid">
-      ${items.length?items.map(t=>`<article class="card v25-item ${t.done?'is-done':''}">
-        <button class="v25-check" data-v25-toggle-task="${t.id}" aria-label="${t.done?'Heropenen':'Afronden'}">${t.done?'✓':'○'}</button>
-        <div class="v25-grow"><strong>${esc25(t.title)}</strong>
-          <div class="v25-meta">${esc25(t.person||'Samen')}${t.due?` · ${esc25(t.due)}`:''}${t.module?` · ${esc25(t.module)}`:''}</div>
-          ${t.note?`<p>${esc25(t.note)}</p>`:''}
-        </div>
-        ${t.module?`<button class="secondary small" data-v25-open-module="${esc25(t.module)}">Open</button>`:''}
-        <button class="icon-btn" data-v25-del-task="${t.id}" aria-label="Taak verwijderen">×</button>
-      </article>`).join(''):`<div class="card empty-state"><h3>Nog geen taken</h3><p>Voeg een taak toe of gebruik deze inbox voor iets dat later naar een andere module moet.</p><button class="primary" data-v25-new-task>＋ Eerste taak</button></div>`}
-      </div></section>`;
+  function saveNavPosition(){
+    const scroller = getNavScroller();
+    if (!scroller || restoringNav) return;
+    try {
+      sessionStorage.setItem(NAV_POS_KEY, String(scroller.scrollLeft || 0));
+    } catch {}
   }
 
-  function challengeHtml25(){
-    ensure25();
-    const items=data.challenges25||[];
-    return `<section class="v25-page">
-      <div class="v25-hero"><div><p class="eyebrow">SAMEN UITDAGEN</p><h2>Challenges</h2><p class="muted">Maak doelen meetbaar zonder er een kinderlijk puntenspel van te maken.</p></div>
-      <button class="primary" data-v25-new-challenge>＋ Challenge</button></div>
-      <div class="v25-card-grid">
-      ${items.length?items.map(c=>{
-        const pct=Math.max(0,Math.min(100,Math.round((Number(c.progress)||0)/Math.max(1,Number(c.goal)||1)*100)));
-        return `<article class="card v25-challenge"><div class="card-head"><div><span class="tag">${esc25(c.person||'Samen')}</span><h3>${esc25(c.title)}</h3></div><strong>${pct}%</strong></div>
-          <div class="v25-progress"><span style="width:${pct}%"></span></div>
-          <p><b>${Number(c.progress)||0}</b> / ${Number(c.goal)||0} ${esc25(c.unit||'')}</p>
-          ${c.end?`<p class="muted">Tot ${esc25(c.end)}</p>`:''}
-          ${c.reward?`<p class="muted">Beloning: ${esc25(c.reward)}</p>`:''}
-          <div class="v25-actions"><button class="secondary" data-v25-progress="${c.id}">Voortgang</button><button class="icon-btn" data-v25-del-challenge="${c.id}" aria-label="Challenge verwijderen">×</button></div>
-        </article>`}).join(''):`<div class="card empty-state"><h3>Nog geen challenge</h3><p>Bijvoorbeeld 2 boeken lezen, 30 km hardlopen of samen een nieuwe skill leren.</p><button class="primary" data-v25-new-challenge>＋ Challenge maken</button></div>`}
-      </div></section>`;
-  }
-
-  function promptTask25(){
-    const title=prompt('Taak');
-    if(!title) return;
-    const person=prompt('Voor wie? Kees, Daphne of Samen','Samen')||'Samen';
-    const due=prompt('Deadline (optioneel, YYYY-MM-DD)','')||'';
-    const module=prompt('Koppel aan module (optioneel: planning, meals, groceries, chores, stock, trips, home, budget19)','')||'';
-    const note=prompt('Notitie (optioneel)','')||'';
-    data.tasks25.push({id:uid25('task'),title,person,due,module,note,done:false,createdAt:new Date().toISOString()});
-    persist25(); render();
-  }
-  function promptChallenge25(){
-    const title=prompt('Naam van de challenge');
-    if(!title) return;
-    const person=prompt('Deelnemer(s): Kees, Daphne of Samen','Samen')||'Samen';
-    const goal=Number(prompt('Doel (getal)','1')||1);
-    const unit=prompt('Eenheid, bijvoorbeeld km, boeken, keer','keer')||'';
-    const end=prompt('Einddatum (optioneel, YYYY-MM-DD)','')||'';
-    const reward=prompt('Beloning (optioneel)','')||'';
-    data.challenges25.push({id:uid25('challenge'),title,person,goal,unit,end,reward,progress:0,createdAt:new Date().toISOString()});
-    persist25(); render();
-  }
-
-  const install25=()=>{
-    if(typeof data==='undefined'||typeof render!=='function') return setTimeout(install25,100);
-    ensure25(); addSections25();
-    const oldRender=render;
-    render=function(...args){
-      addSections25();
-      if(current==='tasks25'){
-        const v=document.querySelector('#view'); if(v) v.innerHTML=taskHtml25();
-        const t=document.querySelector('#pageTitle'); if(t)t.textContent='Taken';
-        return;
-      }
-      if(current==='challenges25'){
-        const v=document.querySelector('#view'); if(v) v.innerHTML=challengeHtml25();
-        const t=document.querySelector('#pageTitle'); if(t)t.textContent='Challenges';
-        return;
-      }
-      return oldRender(...args);
-    };
-    document.addEventListener('click',e=>{
-      if(e.target.closest('[data-v25-new-task]')) return promptTask25();
-      if(e.target.closest('[data-v25-new-challenge]')) return promptChallenge25();
-      const tt=e.target.closest('[data-v25-toggle-task]'); if(tt){const x=data.tasks25.find(x=>x.id===tt.dataset.v25ToggleTask);if(x){x.done=!x.done;persist25();render()}return}
-      const dt=e.target.closest('[data-v25-del-task]'); if(dt&&confirm('Taak verwijderen?')){data.tasks25=data.tasks25.filter(x=>x.id!==dt.dataset.v25DelTask);persist25();render();return}
-      const om=e.target.closest('[data-v25-open-module]'); if(om)return go25(om.dataset.v25OpenModule);
-      const pc=e.target.closest('[data-v25-progress]'); if(pc){const x=data.challenges25.find(x=>x.id===pc.dataset.v25Progress);if(x){const n=Number(prompt(`Nieuwe voortgang (${x.unit||''})`,String(x.progress||0)));if(Number.isFinite(n)){x.progress=n;persist25();render()}}return}
-      const dc=e.target.closest('[data-v25-del-challenge]');if(dc&&confirm('Challenge verwijderen?')){data.challenges25=data.challenges25.filter(x=>x.id!==dc.dataset.v25DelChallenge);persist25();render();return}
+  function restoreNavPosition(){
+    const scroller = getNavScroller();
+    if (!scroller) return;
+    let saved = 0;
+    try {
+      saved = Number(sessionStorage.getItem(NAV_POS_KEY) || 0);
+    } catch {}
+    restoringNav = true;
+    requestAnimationFrame(() => {
+      scroller.scrollLeft = saved;
+      requestAnimationFrame(() => {
+        scroller.scrollLeft = saved;
+        restoringNav = false;
+      });
     });
-    // Deep link
-    const p=new URLSearchParams(location.search).get('page');
-    if(p && sections[p]){ current=p; render(); }
-    else render();
-  };
-  install25();
+  }
+
+  document.addEventListener('scroll', (event) => {
+    if (event.target && event.target.classList &&
+        event.target.classList.contains('mobile-nav-scroll23')) {
+      saveNavPosition();
+    }
+  }, true);
+
+  /* Vóór een navklik positie vastleggen. */
+  document.addEventListener('pointerdown', (event) => {
+    if (event.target.closest && event.target.closest('.mobile-nav23 button')) {
+      saveNavPosition();
+    }
+  }, true);
+
+  /* Na iedere klik/rerender dezelfde positie terugzetten. */
+  document.addEventListener('click', (event) => {
+    if (event.target.closest && event.target.closest('.mobile-nav23 button')) {
+      setTimeout(restoreNavPosition, 0);
+      setTimeout(restoreNavPosition, 60);
+    }
+  }, true);
+
+  /* MutationObserver vangt render() / innerHTML-vervanging van de balk af. */
+  const observer = new MutationObserver(() => {
+    if (getNavScroller()) restoreNavPosition();
+  });
+
+  function start(){
+    observer.observe(document.body, {childList:true, subtree:true});
+    restoreNavPosition();
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', start, {once:true});
+  } else {
+    start();
+  }
+
+  window.addEventListener('pageshow', restoreNavPosition);
 })();
+
+
+/* build v23.3 2026-09-18 07:18:05 +0000 */
+
+/* =========================================================
+   SAMEN THUIS v24 — AUTO / FUELNEST + OPEN-METEO LUCHT
+   ========================================================= */
+(()=>{
+'use strict';
+if(window.__ST_V24__)return;window.__ST_V24__=true;
+sections.auto24={label:'Auto',icon:'⛽'};
+data.cars ||= [];
+data.fuelEntries ||= [];
+const id24=()=>typeof uid==='function'?uid():`${Date.now()}-${Math.random().toString(36).slice(2)}`;
+const num24=v=>Number(String(v??'').replace(',','.'))||0;
+const euro24=v=>`€ ${num24(v).toLocaleString('nl-NL',{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+const date24=()=>typeof todayISO==='function'?todayISO():new Date().toISOString().slice(0,10);
+let autoTab24='fills',statsPeriod24='year',statsCars24=[];
+function ensureCar24(){data.cars ||= [];data.fuelEntries ||= [];}
+function car24(id){ensureCar24();return data.cars.find(x=>x.id===id)||data.cars[0]||null}
+function entries24(carId=''){return (data.fuelEntries||[]).filter(x=>!carId||x.carId===carId).sort((a,b)=>`${b.date||''}${b.odometer||0}`.localeCompare(`${a.date||''}${a.odometer||0}`))}
+function calc24(carId){const a=entries24(carId).slice().sort((x,y)=>num24(x.odometer)-num24(y.odometer)||String(x.date).localeCompare(String(y.date)));let liters=0,cost=0,dist=0,segments=[];a.forEach(x=>{liters+=num24(x.liters);cost+=num24(x.total)});for(let i=1;i<a.length;i++){const d=num24(a[i].odometer)-num24(a[i-1].odometer);if(d>0&&!a[i].missedPrevious){dist+=d;segments.push({d,l:num24(a[i].liters),e:a[i]})}}const used=segments.reduce((s,x)=>s+x.l,0);return{liters,cost,dist,l100:dist?used/dist*100:0,kmL:used?dist/used:0,perKm:dist?cost/dist:0}}
+function tabs24(){return `<div class="auto-tabs24">${[['fills','⛽','Tankbeurten'],['add','＋','Tanken'],['stats','↗','Statistieken'],['cars','🚗','Voertuigen']].map(x=>`<button data-auto24-tab="${x[0]}" class="${autoTab24===x[0]?'active':''}"><span>${x[1]}</span><b>${x[2]}</b></button>`).join('')}</div>`}
+function fillRows24(){const rows=entries24();if(!rows.length)return '<div class="empty24">Nog geen tankbeurten. Voeg je eerste tankbeurt toe.</div>';let month='';return rows.map(x=>{const m=(x.date||'').slice(0,7);let h='';if(m!==month){month=m;const dt=new Date(`${m}-01T12:00:00`);const total=rows.filter(r=>(r.date||'').startsWith(m)).reduce((s,r)=>s+num24(r.total),0);h=`<div class="month24"><strong>${new Intl.DateTimeFormat('nl-NL',{month:'long',year:'numeric'}).format(dt)}</strong><span>${euro24(total)}</span></div>`}return h+`<article class="fill24"><div class="fuel-dot24">⛽</div><div><strong>${esc(x.station||'Tankstation')}</strong><small>${esc(x.date||'')} · ${esc(x.fuelGrade||'E10')} · ${num24(x.liters).toLocaleString('nl-NL',{maximumFractionDigits:2})} L</small><small>${num24(x.odometer).toLocaleString('nl-NL')} km${x.partialFill?' · deelvulling':''}</small></div><div class="fill-money24"><strong>${euro24(x.total)}</strong><small>${euro24(x.pricePerLiter)}/L</small><button data-auto24-edit="${x.id}">Bewerk</button></div></article>`}).join('')}
+function fillForm24(edit=null){ensureCar24();const x=edit||{};if(!data.cars.length)return `<section class="card"><h3>Nog geen voertuig</h3><p>Voeg eerst een voertuig toe. Merk, model, kleur en APK worden daarna automatisch bij RDW opgehaald.</p><button class="primary" data-auto24-newcar>+ Voertuig toevoegen</button></section>`;return `<form class="fuel-form24" data-fuel24-form data-edit-id="${x.id||''}"><div class="form-grid24"><label>Voertuig<select name="carId">${data.cars.map(c=>`<option value="${c.id}" ${x.carId===c.id?'selected':''}>${esc(c.name||c.plate||'Auto')}</option>`).join('')}</select></label><label>Datum<input name="date" type="date" required value="${x.date||date24()}"></label><label>Kilometerstand<input name="odometer" type="number" step="1" required value="${x.odometer??''}"></label><label>Liters<input name="liters" type="number" step="0.01" required value="${x.liters??''}"></label><label>Totaalbedrag €<input name="total" type="number" step="0.01" value="${x.total??''}"></label><label>Prijs per liter €<input name="pricePerLiter" type="number" step="0.001" value="${x.pricePerLiter??''}"></label><label>Brandstof<select name="fuelGrade">${['E10','E5','Diesel','LPG','Anders'].map(v=>`<option ${x.fuelGrade===v?'selected':''}>${v}</option>`).join('')}</select></label><label>Tankstation<input name="station" value="${esc(x.station||'')}"></label><label class="check24"><input name="partialFill" type="checkbox" ${x.partialFill?'checked':''}> Deelvulling</label><label class="check24"><input name="missedPrevious" type="checkbox" ${x.missedPrevious?'checked':''}> Vorige tankbeurt gemist</label><label class="span24">Notitie<textarea name="note">${esc(x.note||'')}</textarea></label></div><div class="form-actions24"><button class="primary" type="submit">${edit?'Wijzigingen opslaan':'Tankbeurt opslaan'}</button>${edit?`<button type="button" class="danger24" data-auto24-delete="${x.id}">Verwijderen</button>`:''}</div></form>`}
+function cars24(){ensureCar24();if(!data.cars.length)return `<section class="card empty-car24"><h3>Nog geen voertuigen</h3><p>Voer alleen het kenteken in. Samen Thuis haalt merk, model, kleur en APK automatisch op bij RDW Open Data.</p><button class="primary" data-auto24-newcar>+ Voertuig toevoegen</button></section>`;return `<div class="car-grid24">${data.cars.map(c=>{const st=calc24(c.id),last=entries24(c.id)[0],odo=last?num24(last.odometer):0;return `<article class="car24"><div><small>${c.isDefault?'STANDAARDVOERTUIG':'VOERTUIG'}</small><h3>${esc(c.name||[c.make,c.model].filter(Boolean).join(' ')||'Auto')}</h3><p>${esc([c.make,c.model,c.year].filter(Boolean).join(' · '))}</p><b>${esc(c.plate||'Geen kenteken')}</b>${c.owner?`<p class="rdw-meta24"><span>Eigenaar</span><strong>${esc(c.owner)}</strong></p>`:''}${c.color?`<p class="rdw-meta24"><span>Kleur</span><strong>${esc(c.color)}</strong></p>`:''}${c.tankLiters?`<p class="rdw-meta24"><span>Tankinhoud</span><strong>${num24(c.tankLiters).toLocaleString('nl-NL')} L</strong></p>`:''}${odo?`<p class="rdw-meta24"><span>Laatste km-stand</span><strong>${Math.round(odo).toLocaleString('nl-NL')} km</strong></p>`:''}${c.apkExpiry?`<p class="rdw-meta24"><span>APK geldig t/m</span><strong>${fmtDate(c.apkExpiry,{day:'numeric',month:'long',year:'numeric'})}</strong></p>`:''}</div><div class="car-stats24"><span><b>${st.l100?st.l100.toFixed(1):'—'}</b><small>L/100 km</small></span><span><b>${euro24(st.cost)}</b><small>totaal</small></span><span><b>${Math.round(st.dist).toLocaleString('nl-NL')}</b><small>km gemeten</small></span></div><div class="car-actions24"><button data-auto24-car="${c.id}">Bewerk / RDW vernieuwen</button><button class="danger24" data-auto24-deletecar="${c.id}">Voertuig verwijderen</button></div></article>`}).join('')}</div><button class="primary" data-auto24-newcar>+ Voertuig toevoegen</button>`}
+function selectedCars24(){ensureCar24();const valid=statsCars24.filter(id=>data.cars.some(c=>c.id===id));statsCars24=valid;return valid.length?valid:data.cars.map(c=>c.id)}
+function statsCarPicker24(){ensureCar24();if(!data.cars.length)return '';const ids=selectedCars24(),all=ids.length===data.cars.length;return `<section class="card stats-filter24"><div class="stats-filter-head24"><div><small>STATISTIEKEN VAN</small><strong>${all?'Alle auto’s':ids.length===1?esc(car24(ids[0])?.name||car24(ids[0])?.plate||'1 auto'):`${ids.length} auto’s geselecteerd`}</strong></div><button data-auto24-allcars class="${all?'active':''}">Alle auto’s</button></div><div class="stats-car-options24">${data.cars.map(c=>`<label class="${ids.includes(c.id)?'selected':''}"><input type="checkbox" data-auto24-statcar="${c.id}" ${ids.includes(c.id)?'checked':''}><span>${esc(c.name||c.plate||'Auto')}<small>${esc(c.plate||'')}</small></span></label>`).join('')}</div>${data.cars.length>1?'<p class="muted">Selecteer één auto, meerdere auto’s of alle auto’s samen.</p>':''}</section>`}
+function statsEntriesAll24(){const ids=new Set(selectedCars24());return entries24().filter(x=>ids.has(x.carId))}
+function filtered24(){const now=new Date();return statsEntriesAll24().filter(x=>{const d=new Date(`${x.date}T12:00:00`);if(statsPeriod24==='week')return now-d<=7*864e5;if(statsPeriod24==='month')return d.getMonth()===now.getMonth()&&d.getFullYear()===now.getFullYear();return now-d<=365*864e5})}
+function statRows24(){return filtered24().slice().sort((a,b)=>String(a.date).localeCompare(String(b.date)))}
+function monthCost24(rows){const m={};rows.forEach(x=>{const k=(x.date||'').slice(0,7);if(k)m[k]=(m[k]||0)+num24(x.total)});return Object.entries(m).sort((a,b)=>a[0].localeCompare(b[0]))}
+function weekdayCost24(rows){const names=['Zo','Ma','Di','Wo','Do','Vr','Za'],v=Array(7).fill(0);rows.forEach(x=>{const d=new Date(`${x.date}T12:00:00`);if(!isNaN(d))v[d.getDay()]+=num24(x.total)});return [1,2,3,4,5,6,0].map(i=>[names[i],v[i]])}
+function calcSelected24(){const ids=selectedCars24();let liters=0,cost=0,dist=0,used=0;ids.forEach(id=>{const a=entries24(id).slice().sort((x,y)=>num24(x.odometer)-num24(y.odometer)||String(x.date).localeCompare(String(y.date)));a.forEach(x=>{liters+=num24(x.liters);cost+=num24(x.total)});for(let i=1;i<a.length;i++){const d=num24(a[i].odometer)-num24(a[i-1].odometer);if(d>0&&!a[i].missedPrevious){dist+=d;used+=num24(a[i].liters)}}});return{liters,cost,dist,l100:dist?used/dist*100:0,perKm:dist?cost/dist:0}}
+function economySegments24(){const out=[];selectedCars24().forEach(id=>{const a=entries24(id).slice().sort((x,y)=>num24(x.odometer)-num24(y.odometer)||String(x.date).localeCompare(String(y.date)));for(let i=1;i<a.length;i++){const d=num24(a[i].odometer)-num24(a[i-1].odometer),l=num24(a[i].liters);if(d>0&&l>0&&!a[i].missedPrevious&&!a[i].partialFill)out.push({l100:l/d*100,date:a[i].date})}});return out}
+function streak24(){const months=[...new Set(statsEntriesAll24().map(x=>(x.date||'').slice(0,7)).filter(Boolean))].sort();let best=0,run=0,prev=null;months.forEach(k=>{const [y,m]=k.split('-').map(Number),n=y*12+m;if(prev!==null&&n===prev+1)run++;else run=1;best=Math.max(best,run);prev=n});return best}
+function bars24(rows,cls=''){const max=Math.max(1,...rows.map(x=>x[1]));return `<div class="chart-bars24 ${cls}">${rows.map(([label,val])=>`<div class="chart-col24"><div class="chart-value24">${val?euro24(val):''}</div><div class="chart-track24"><i style="height:${val?Math.max(5,val/max*100):0}%"></i></div><small>${esc(label)}</small></div>`).join('')}</div>`}
+function consistency24(){const dates=new Set(statsEntriesAll24().map(x=>x.date).filter(Boolean));const today=new Date(),cells=[];for(let i=83;i>=0;i--){const d=new Date(today);d.setDate(d.getDate()-i);const k=d.toISOString().slice(0,10);cells.push(`<i class="${dates.has(k)?'hit':''}" title="${k}"></i>`)}return `<div class="heat24">${cells.join('')}</div>`}
+function stats24(){
+  const e=statRows24(),cost=e.reduce((s,x)=>s+num24(x.total),0),lit=e.reduce((s,x)=>s+num24(x.liters),0),all=calcSelected24(),selectedEntries=statsEntriesAll24();
+  const stations={};e.forEach(x=>stations[x.station||'Onbekend']=(stations[x.station||'Onbekend']||0)+num24(x.total));
+  const top=Object.entries(stations).sort((a,b)=>b[1]-a[1]).slice(0,6),monthly=monthCost24(e),weekdays=weekdayCost24(e);
+  const cheapest=selectedEntries.filter(x=>num24(x.pricePerLiter)>0).sort((a,b)=>num24(a.pricePerLiter)-num24(b.pricePerLiter))[0];
+  const biggest=selectedEntries.slice().sort((a,b)=>num24(b.liters)-num24(a.liters))[0],seg=economySegments24(),best=seg.slice().sort((a,b)=>a.l100-b.l100)[0],worst=seg.slice().sort((a,b)=>b.l100-a.l100)[0];
+  const annual=statsPeriod24==='year'?cost:statsPeriod24==='month'?cost*12:cost*52;
+  return `${statsCarPicker24()}<div class="period24">${[['week','Week'],['month','Maand'],['year','Jaar']].map(x=>`<button data-auto24-period="${x[0]}" class="${statsPeriod24===x[0]?'active':''}">${x[1]}</button>`).join('')}</div>
+  <div class="stats-hero24"><div><small>Totaal uitgegeven</small><strong>${euro24(cost)}</strong></div><div><small>Totaal brandstof</small><strong>${lit.toFixed(1)} L</strong></div><div><small>Gem. verbruik</small><strong>${all.l100?all.l100.toFixed(1):'—'} L/100km</strong></div><div><small>Totale afstand</small><strong>${Math.round(all.dist).toLocaleString('nl-NL')} km</strong></div></div>
+  <section class="card stats-card24"><h3>Kosten over tijd</h3>${monthly.length?bars24(monthly.map(([k,v])=>[new Intl.DateTimeFormat('nl-NL',{month:'short'}).format(new Date(`${k}-01T12:00:00`)),v]),'months24'):'<p class="muted">Nog geen gegevens.</p>'}</section>
+  <section class="card stats-card24"><h3>Uitgaven per weekdag</h3>${bars24(weekdays,'weekdays24')}</section>
+  <section class="card stats-card24"><h3>Uitgaven per tankstation</h3>${top.length?top.map(([n,v])=>`<div class="barrow24"><span>${esc(n)}</span><div><i style="width:${Math.max(6,v/top[0][1]*100)}%"></i></div><b>${euro24(v)}</b></div>`).join(''):'<p class="muted">Nog geen gegevens.</p>'}</section>
+  <section class="card stats-card24"><h3>Tankbeurt-consistentie</h3><p class="muted">Tankmomenten van de afgelopen 12 weken.</p>${consistency24()}</section>
+  <div class="projection24"><article class="card"><small>Geschatte jaarkosten</small><strong>${euro24(annual)}</strong><p>Gebaseerd op de geselecteerde periode.</p></article><article class="card"><small>Kosten per kilometer</small><strong>${all.perKm?euro24(all.perKm)+'/km':'—'}</strong><p>Op basis van de geselecteerde auto’s.</p></article></div>
+  <section class="card records24"><h3>Records</h3><div><span>🏆 Beste verbruik</span><b>${best?best.l100.toFixed(1)+' L/100km':'—'}</b></div><div><span>↗ Slechtste verbruik</span><b>${worst?worst.l100.toFixed(1)+' L/100km':'—'}</b></div><div><span>🏷 Laagste literprijs</span><b>${cheapest?euro24(cheapest.pricePerLiter)+'/L':'—'}</b></div><div><span>⛽ Grootste tankbeurt</span><b>${biggest?num24(biggest.liters).toFixed(1)+' L':'—'}</b></div><div><span>🔥 Langste reeks</span><b>${streak24()||'—'}${streak24()?` maand${streak24()===1?'':'en'}`:''}</b></div></section>`
+}
+function autoPage24(){ensureCar24();return `<div class="auto24"><header class="auto-head24"><div><p class="eyebrow">AUTO & BRANDSTOF</p><h1>Auto</h1><p>Tankbeurten, voertuigen en verbruik in één overzicht.</p></div></header>${tabs24()}<section class="auto-body24">${autoTab24==='fills'?fillRows24():autoTab24==='add'?fillForm24():autoTab24==='cars'?cars24():stats24()}</section></div>`}
+function plate24(v=''){return String(v||'').toUpperCase().replace(/[^A-Z0-9]/g,'')}
+function rdwDate24(v){const x=String(v||'').replace(/\D/g,'');return x.length===8?`${x.slice(0,4)}-${x.slice(4,6)}-${x.slice(6,8)}`:''}
+function apkAgenda24(c){
+  if(!c?.id)return;
+  data.planning ||= [];
+  data.planning=data.planning.filter(x=>x.autoApkCarId!==c.id);
+  if(!c.apkExpiry)return;
+  const title=`APK ${c.plate||c.name||'voertuig'}`;
+  data.planning.push({id:id(),title,date:c.apkExpiry,time:'',endTime:'',person:'Samen',calendarId:'persoonlijk',autoApkCarId:c.id,autoApkType:'expiry'});
+  const d=new Date(`${c.apkExpiry}T12:00:00`);d.setDate(d.getDate()-30);
+  const reminder=d.toISOString().slice(0,10);
+  if(reminder>=todayISO())data.planning.push({id:id(),title:`Herinnering: ${title} verloopt over 30 dagen`,date:reminder,time:'',endTime:'',person:'Samen',calendarId:'persoonlijk',autoApkCarId:c.id,autoApkType:'reminder'});
+}
+async function rdw24(plate){
+  const k=plate24(plate);if(!k)throw new Error('Vul een kenteken in');
+  const r=await fetch(`https://opendata.rdw.nl/resource/m9d7-ebf2.json?kenteken=${encodeURIComponent(k)}`,{headers:{Accept:'application/json'},cache:'no-store'});
+  if(!r.ok)throw new Error('RDW is tijdelijk niet bereikbaar');
+  const rows=await r.json();if(!rows?.length)throw new Error('Kenteken niet gevonden bij RDW');
+  const x=rows[0];
+  return {plate:k,make:x.merk||'',model:x.handelsbenaming||'',color:[x.eerste_kleur,x.tweede_kleur].filter(v=>v&&v!=='Niet geregistreerd').join(' / '),apkExpiry:rdwDate24(x.vervaldatum_apk),year:String(x.datum_eerste_toelating||'').slice(0,4)};
+}
+async function editCar24(carId=''){
+  ensureCar24();
+  const existing=carId?data.cars.find(x=>x.id===carId):null;
+  const input=prompt(existing?'Kenteken controleren/wijzigen':'Kenteken van het voertuig',existing?.plate||'');
+  if(input===null)return;
+  const plate=plate24(input);if(!plate)return toast('Vul een kenteken in');
+  toast('Voertuiggegevens ophalen bij RDW…');
+  try{
+    const info=await rdw24(plate);
+    const c=existing||{id:id24(),name:'',isDefault:data.cars.length===0};
+    Object.assign(c,info);c.name=[info.make,info.model].filter(Boolean).join(' ')||plate;
+    const owner=prompt('Eigenaar van het voertuig',c.owner||'');if(owner!==null)c.owner=owner.trim();
+    const tank=prompt('Tankinhoud in liters (optioneel)',c.tankLiters||'');if(tank!==null&&tank.trim()!=='')c.tankLiters=Math.max(0,num24(tank.replace(',','.')));
+    if(!existing)data.cars.push(c);
+    apkAgenda24(c);save();render();
+    toast(info.apkExpiry?'RDW-gegevens geladen · APK staat ook in Agenda':'RDW-gegevens geladen · geen APK-datum beschikbaar');
+  }catch(err){toast(err?.message||'RDW-gegevens konden niet worden opgehaald')}
+}
+function deleteCar24(carId){
+  const c=data.cars.find(x=>x.id===carId);if(!c)return;
+  const fills=(data.fuelEntries||[]).filter(x=>x.carId===carId).length;
+  const msg=fills?`Voertuig ${c.plate||c.name} verwijderen? De ${fills} gekoppelde tankbeurt${fills===1?'':'en'} worden ook verwijderd.`:`Voertuig ${c.plate||c.name} verwijderen?`;
+  if(!confirm(msg))return;
+  data.cars=data.cars.filter(x=>x.id!==carId);
+  data.fuelEntries=(data.fuelEntries||[]).filter(x=>x.carId!==carId);
+  data.planning=(data.planning||[]).filter(x=>x.autoApkCarId!==carId);
+  if(c.isDefault&&data.cars[0])data.cars[0].isDefault=true;
+  save();render();toast('Voertuig verwijderd');
+}
+function nav24(){const desktop=document.querySelector('.sidebar nav');if(desktop&&!desktop.querySelector('[data-v24-auto]')){const settings=desktop.querySelector('[data-v19-go="settings"], [data-view="settings"]');const b=document.createElement('button');b.className='nav-item';b.dataset.v24Auto='';b.innerHTML='<span>⛽</span>Auto';desktop.insertBefore(b,settings||null)}const scroll=document.querySelector('.mobile-nav-scroll23');if(scroll&&!scroll.querySelector('[data-v24-auto]')){const b=document.createElement('button');b.dataset.v24Auto='';b.className=current==='auto24'?'active':'';b.innerHTML='<span>⛽</span><small>Auto</small>';scroll.append(b)}}
+
+// Open-Meteo Air Quality API: pollen + luchtkwaliteit naast het bestaande Open-Meteo weer.
+const AQ24='stAirQualityV24';
+function level24(v){v=num24(v);return v>=50?'Hoog':v>=10?'Verhoogd':v>0?'Laag':'Zeer laag'}
+function aqiText24(v){v=num24(v);return v<=20?'Goed':v<=40?'Redelijk':v<=60?'Matig':v<=80?'Slecht':'Zeer slecht'}
+async function air24(force=false){if(current!=='today')return;const dash=document.querySelector('[data-dash18]');if(!dash)return;let card=dash.querySelector('[data-air24]');if(!card){card=document.createElement('section');card.className='air24';card.dataset.air24='';const grid=dash.querySelector('.dg18');grid?.append(card)}if(!card)return;card.innerHTML='<strong>Pollen & luchtkwaliteit</strong><p class="muted">Open-Meteo ophalen…</p>';try{let q=null;if(!force)try{const c=JSON.parse(localStorage.getItem(AQ24)||'null');if(c&&Date.now()-c.t<1800000)q=c.q}catch(_){}if(!q){const u=new URL('https://air-quality-api.open-meteo.com/v1/air-quality');u.searchParams.set('latitude','51.9225');u.searchParams.set('longitude','4.47917');u.searchParams.set('current','european_aqi,pm2_5,pm10,nitrogen_dioxide,ozone,alder_pollen,birch_pollen,grass_pollen,mugwort_pollen,ragweed_pollen');u.searchParams.set('timezone','Europe/Amsterdam');const r=await fetch(u,{cache:'no-store'});if(!r.ok)throw 0;q=await r.json();localStorage.setItem(AQ24,JSON.stringify({t:Date.now(),q}))}const c=q.current||{};const pol=[['Gras',c.grass_pollen],['Berk',c.birch_pollen],['Els',c.alder_pollen],['Bijvoet',c.mugwort_pollen],['Ambrosia',c.ragweed_pollen]].sort((a,b)=>num24(b[1])-num24(a[1]));card.innerHTML=`<div class="air-head24"><div><small>OPEN-METEO · ROTTERDAM</small><h3>Pollen & luchtkwaliteit</h3></div><button data-air24-refresh>↻</button></div><div class="aqi24"><span class="aqi-badge24">AQI ${Math.round(num24(c.european_aqi))}</span><div><strong>${aqiText24(c.european_aqi)}</strong><small>PM2.5 ${num24(c.pm2_5).toFixed(1)} · PM10 ${num24(c.pm10).toFixed(1)} µg/m³</small></div></div><div class="pollen-grid24">${pol.map(([n,v])=>`<div><span>${n}</span><b>${level24(v)}</b><small>${num24(v).toFixed(1)} gr/m³</small></div>`).join('')}</div><p class="air-note24">Indicatie van omgevingswaarden; geen persoonlijk medisch advies.</p>`}catch(_){card.innerHTML='<strong>Pollen & luchtkwaliteit</strong><p>Gegevens tijdelijk niet beschikbaar. <button class="text-btn" data-air24-refresh>Opnieuw</button></p>'}}
+const baseRender24=render;render=function(...args){if(current==='auto24'){document.querySelector('#view').innerHTML=autoPage24();updateSyncBadge();requestAnimationFrame(nav24);return}const r=baseRender24(...args);requestAnimationFrame(()=>{nav24();air24()});return r};
+document.addEventListener('click',e=>{if(e.target.closest('[data-v24-auto]')){current='auto24';render();return}const t=e.target.closest('[data-auto24-tab]');if(t){autoTab24=t.dataset.auto24Tab;render();return}const ed=e.target.closest('[data-auto24-edit]');if(ed){autoTab24='add';document.querySelector('#view').innerHTML=`<div class="auto24"><header class="auto-head24"><div><p class="eyebrow">AUTO & BRANDSTOF</p><h1>Tankbeurt bewerken</h1></div></header>${tabs24()}<section class="auto-body24">${fillForm24(data.fuelEntries.find(x=>x.id===ed.dataset.auto24Edit))}</section></div>`;return}const del=e.target.closest('[data-auto24-delete]');if(del&&confirm('Tankbeurt verwijderen?')){data.fuelEntries=data.fuelEntries.filter(x=>x.id!==del.dataset.auto24Delete);save();autoTab24='fills';render();return}const ca=e.target.closest('[data-auto24-car]');if(ca){editCar24(ca.dataset.auto24Car);return}if(e.target.closest('[data-auto24-newcar]')){editCar24();return}const dc=e.target.closest('[data-auto24-deletecar]');if(dc){deleteCar24(dc.dataset.auto24Deletecar);return}const p=e.target.closest('[data-auto24-period]');if(p){statsPeriod24=p.dataset.auto24Period;render();return}if(e.target.closest('[data-auto24-allcars]')){statsCars24=[];render();return}const sc=e.target.closest('[data-auto24-statcar]');if(sc){const id=sc.dataset.auto24Statcar;const currentIds=selectedCars24();if(sc.checked){statsCars24=[...new Set([...currentIds,id])]}else{statsCars24=currentIds.filter(x=>x!==id);if(!statsCars24.length){sc.checked=true;toast('Selecteer minimaal één auto');return}}render();return}if(e.target.closest('[data-air24-refresh]'))air24(true)});
+document.addEventListener('submit',e=>{const f=e.target.closest('[data-fuel24-form]');if(!f)return;e.preventDefault();const fd=new FormData(f),lit=num24(fd.get('liters'));let total=num24(fd.get('total')),price=num24(fd.get('pricePerLiter'));if(!total&&price&&lit)total=price*lit;if(!price&&total&&lit)price=total/lit;const old=data.fuelEntries.find(x=>x.id===f.dataset.editId)||{};const item={...old,id:old.id||id24(),carId:String(fd.get('carId')),date:String(fd.get('date')),odometer:num24(fd.get('odometer')),liters:lit,total,pricePerLiter:price,fuelGrade:String(fd.get('fuelGrade')),station:String(fd.get('station')||''),partialFill:fd.has('partialFill'),missedPrevious:fd.has('missedPrevious'),note:String(fd.get('note')||'')};if(old.id)Object.assign(old,item);else data.fuelEntries.push(item);save();autoTab24='fills';render();toast('Tankbeurt opgeslagen')});
+ensureCar24();save({touch:false,sync:false});requestAnimationFrame(()=>{nav24();air24()});
+})();
+
+/* build v24.2 · FuelMate stats/charts + vehicle owner/tank capacity + RDW/APK */
+
+
+/* ===== v24.3 CENTRALE IMPORTPAGINA ===== */
+(()=>{'use strict';if(window.__ST243IMPORT)return;window.__ST243IMPORT=1;
+let importTarget243='backup', importFile243=null;
+
+const IMPORT243={
+ backup:{label:'Volledige Samen Thuis back-up',formats:'JSON',example:'samen-thuis-backup-2026-09-24.json',help:'Voegt een Samen Thuis JSON-back-up samen met je huidige gegevens. Bestaande gegevens worden niet verwijderd.'},
+ planning:{label:'Agenda',formats:'Excel · CSV · TXT · JSON',example:'title,date,time,endTime,person,calendarId\nTandarts,2026-10-02,09:30,10:00,Kees,persoonlijk',help:'Velden: title, date (YYYY-MM-DD), time, endTime, person, calendarId.'},
+ meals:{label:'Weekmenu',formats:'Excel · CSV · TXT · JSON',example:'title,date,type\nCurry,2026-09-25,Avondeten',help:'Velden: title, date (YYYY-MM-DD), type.'},
+ groceries:{label:'Boodschappen',formats:'Excel · CSV · TXT · JSON',example:'title,category,done\nSpinazie,Groente,false',help:'Velden: title, category, done.'},
+ chores:{label:'Huishouden',formats:'Excel · CSV · TXT · JSON',example:'title,category,repeat,person,due\nBadkamer schoonmaken,Badkamer,Wekelijks,Samen,2026-09-26',help:'Velden: title, category, repeat, person, due.'},
+ stock:{label:'Voorraad',formats:'Excel · CSV · TXT · JSON',example:'title,category,amount,unit,min\nRijst,Voorraadkast,2,pakken,1',help:'Velden: title, category, amount, unit, min.'},
+ trips:{label:'Reizen',formats:'Excel · CSV · TXT · JSON',example:'title,type,date,note\nHotel Hanoi,Verblijf,2027-01-11,Inchecken',help:'Velden: title, type, date, note. Bestaande reismappen kunnen daarna in Reizen verder worden ingedeeld.'},
+ ideas:{label:'Date ideeën',formats:'Excel · CSV · TXT · JSON',example:'title,category,note\nMuseum,Uitje,Weekend',help:'Velden: title, category, note.'},
+ home:{label:'Woning',formats:'Excel · CSV · TXT · JSON',example:'title,category,note\nKit badkamer vervangen,Badkamer,Controleren',help:'Velden: title, category, note.'},
+ budget:{label:'Budget',formats:'JSON',example:'{"incomes":{"Kees":0,"Daphne":0},"fixed":[],"goals":[],"contributionPct":75,"houseBudget":1000,"investing":75}',help:'JSON-object met incomes, fixed, goals, contributionPct, houseBudget en investing.'},
+ auto:{label:'Auto / FuelMate',formats:'FuelMate JSON · Excel · CSV · Samen Thuis JSON',example:'FuelMate: fuelmate_backup_YYYY-MM-DD.json\nCSV tankbeurten: date,odometer,volume,totalCost,station,partial,missedFill',help:'FuelMate JSON importeert voertuigen én tankbeurten. Een CSV importeert tankbeurten; als er één voertuig is wordt dat automatisch gebruikt.'}
+};
+
+function esc243(v=''){return String(v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function renderImport243(){
+ const x=IMPORT243[importTarget243]||IMPORT243.backup;
+ return `<div class="import243">
+ <header class="import-head243"><div><p class="eyebrow">SAMEN THUIS · IMPORT</p><h1>Importeren</h1><p>Alle imports op één plek. Kies eerst waarvoor de informatie bedoeld is; hieronder staat precies welk formaat wordt verwacht.</p></div></header>
+ <section class="card import-main243">
+  <div class="form-grid">
+   <label class="field"><span>Wat wil je importeren?</span><select data-import243-target>${Object.entries(IMPORT243).map(([k,v])=>`<option value="${k}" ${k===importTarget243?'selected':''}>${esc243(v.label)}</option>`).join('')}</select></label>
+   <label class="field"><span>Bestand</span><input data-import243-file type="file" accept=".json,.csv,.txt,.xlsx,.xls,application/json,text/csv,text/plain,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"></label>
+  </div>
+  <div class="format243"><div><small>TOEGESTAAN FORMAAT</small><strong>${esc243(x.formats)}</strong><p>${esc243(x.help)}</p></div><pre>${esc243(x.example)}</pre></div>
+  <div class="button-row"><button class="primary" data-import243-run ${importFile243?'':'disabled'}>Importeren</button><button class="secondary" data-import243-template>Voorbeeldbestand downloaden</button></div>
+  ${importFile243?`<p class="muted">Gekozen: <strong>${esc243(importFile243.name)}</strong></p>`:''}
+ </section>
+ <section class="card">
+  <div class="card-head"><div><p class="eyebrow">FORMAATOVERZICHT</p><h2>Wat kan waar worden ingelezen?</h2></div></div>
+  <div class="format-list243">${Object.entries(IMPORT243).map(([k,v])=>`<button data-import243-jump="${k}"><span>${esc243(v.label)}</span><b>${esc243(v.formats)}</b></button>`).join('')}</div>
+  <p class="muted">PDF, Word en Excel worden bewust niet als universeel importformaat gebruikt: CSV/JSON is controleerbaarder en voorkomt dat kolommen verkeerd worden geïnterpreteerd. Excel kun je eerst opslaan als CSV.</p>
+ </section>
+ </div>`;
+}
+function csv243(text){
+ const lines=String(text).replace(/^\uFEFF/,'').replace(/\r/g,'').split('\n').filter(x=>x.trim());
+ if(!lines.length)return[];
+ const delim=lines[0].includes(';')?';':lines[0].includes('\t')?'\t':',';
+ const parse=line=>{let out=[],cur='',q=false;return out};
+ function row(line){const a=[];let c='',q=false;for(let i=0;i<line.length;i++){const ch=line[i];if(ch==='"'){if(q&&line[i+1]==='"'){c+='"';i++}else q=!q}else if(ch===delim&&!q){a.push(c.trim());c=''}else c+=ch}a.push(c.trim());return a}
+ const h=row(lines[0]).map(x=>x.trim());
+ return lines.slice(1).map(line=>{const vals=row(line),o={};h.forEach((k,i)=>o[k]=vals[i]??'');return o});
+}
+function bool243(v){return ['1','true','ja','yes','x','✓'].includes(String(v||'').trim().toLowerCase())}
+function plateImport243(v=''){return String(v||'').toUpperCase().replace(/[^A-Z0-9]/g,'')}
+function num243(v){return Number(String(v??0).replace(',','.'))||0}
+function normalize243(target,r){
+ const idv=typeof id==='function'?id():`i243-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+ if(target==='planning')return {id:idv,title:r.title||r.titel||'',date:r.date||r.datum||'',time:r.time||r.tijd||'',endTime:r.endTime||r.eindtijd||'',person:r.person||r.persoon||'Samen',calendarId:r.calendarId||r.agenda||'persoonlijk'};
+ if(target==='meals')return {id:idv,title:r.title||r.gerecht||'',date:r.date||r.datum||'',type:r.type||r.maaltijdmoment||'Avondeten'};
+ if(target==='groceries')return {id:idv,title:r.title||r.product||'',category:r.category||r.categorie||'Overig',done:bool243(r.done||r.afgevinkt)};
+ if(target==='chores')return {id:idv,title:r.title||r.taak||'',category:r.category||r.categorie||'',repeat:r.repeat||r.frequentie||'Wekelijks',person:r.person||r.persoon||r.toegewezenAan||'Samen',due:r.due||r.datum||r.startdatum||todayISO(),completedDates:[]};
+ if(target==='stock')return {id:idv,title:r.title||r.product||'',category:r.category||r.categorie||'Overig',amount:num243(r.amount||r.hoeveelheid),unit:r.unit||r.eenheid||'stuks',min:num243(r.min||r.minimum||r.minimumvoorraad)};
+ if(target==='trips')return {id:idv,title:r.title||r.titel||'',type:r.type||r.typeOnderdeel||'Notitie',date:r.date||r.datum||'',note:r.note||r.notitie||'',checkable:false,done:false};
+ if(target==='ideas')return {id:idv,title:r.title||r.titel||'',category:r.category||r.categorie||'Uitje',note:r.note||r.notitie||''};
+ if(target==='home')return {id:idv,title:r.title||r.titel||'',category:r.category||r.categorie||'Onderhoud',note:r.note||r.notitie||''};
+ return r;
+}
+function arrayKey243(target){return {planning:'planning',meals:'meals',groceries:'groceries',chores:'chores',stock:'stock',trips:'trips',ideas:'ideas',home:'home'}[target]}
+async function rowsFromExcel243(file){
+ if(!window.XLSX)throw new Error('Excel-module kon niet worden geladen. Controleer je internetverbinding en probeer opnieuw.');
+ const buf=await file.arrayBuffer(),wb=XLSX.read(buf,{type:'array',cellDates:false}),ws=wb.Sheets[wb.SheetNames[0]];
+ if(!ws)throw new Error('Het Excel-bestand bevat geen werkblad');
+ return XLSX.utils.sheet_to_json(ws,{defval:'',raw:false});
+}
+function arraysDeep243(obj){const found=[],seen=new Set();function walk(v,path=''){if(!v||typeof v!=='object'||seen.has(v))return;seen.add(v);if(Array.isArray(v)){if(v.length&&v.some(x=>x&&typeof x==='object'))found.push({path,rows:v});v.forEach((x,i)=>walk(x,`${path}[${i}]`));return}Object.entries(v).forEach(([k,x])=>walk(x,path?`${path}.${k}`:k))}walk(obj);return found}
+function pickArray243(obj,names){const direct=names.map(n=>obj?.[n]).find(Array.isArray);if(direct)return direct;const all=arraysDeep243(obj),lower=names.map(x=>x.toLowerCase());return all.find(x=>lower.some(n=>x.path.toLowerCase().endsWith(n)))?.rows||[]}
+function fuelMate243(obj){
+ data.cars ||= []; data.fuelEntries ||= [];const vehicles=pickArray243(obj,['vehicles','vehicle','cars','autos','voertuigen']),fills=pickArray243(obj,['fillups','fillUps','fuelEntries','fills','refuels','tankbeurten']);
+ if(!vehicles.length&&!fills.length)throw new Error('Geen voertuigen of tankbeurten gevonden in deze JSON');
+ const map=new Map();
+ vehicles.forEach((v,i)=>{const raw=v.plate??v.licensePlate??v.kenteken??v.registration??'',mm=v.makeModel??v.make_model??v.vehicleName??'',make=v.make??v.brand??v.merk??String(mm).split(' ')[0]??'',model=v.model??v.handelsbenaming??String(mm).split(' ').slice(1).join(' '),old=String(v.id??v.vehicleId??v.uuid??i),plate=plateImport243(raw),existing=data.cars.find(x=>plate&&plateImport243(x.plate)===plate),c=existing||{id:`imp-car-${Date.now()}-${i}`,isDefault:!!(v.isDefault??v.default??v.primary)};Object.assign(c,{name:(v.name??v.nickname??[make,model].filter(Boolean).join(' ')??'')||plate||`Voertuig ${i+1}`,make,model,year:v.year??v.buildYear??v.bouwjaar??'',plate,tankLiters:num243(v.tankLiters??v.tankCapacity??v.tankSize??v.tankinhoud),owner:v.owner??v.eigenaar??''});if(!existing)data.cars.push(c);map.set(old,c.id)});
+ fills.forEach((f,i)=>{let carId=map.get(String(f.vehicleId??f.carId??f.vehicle_id??f.vehicle??''));if(!carId&&data.cars.length===1)carId=data.cars[0].id;if(!carId)carId=data.cars.find(x=>x.isDefault)?.id||data.cars[0]?.id;if(!carId)return;data.fuelEntries.push(SamenThuisCore.normalizeFuelMateFill(f,carId,`imp-fill-${Date.now()}-${i}`))})
+}
+function sigImport246(x,kind=''){if(!x||typeof x!=='object')return String(x);if(kind==='cars')return plateImport243(x.plate||'')||String(x.id||'');if(kind==='fuelEntries')return [x.carId||'',String(x.date||'').slice(0,10),num243(x.odometer),num243(x.liters||x.volume),num243(x.total||x.totalCost)].join('|');if(kind==='planning')return [x.title||'',x.date||'',x.time||'',x.person||''].join('|').toLowerCase();return String(x.id||[x.title||x.name||'',x.date||x.due||'',x.category||''].join('|')).toLowerCase()}
+function mergeArray246(a,b,kind=''){return SamenThuisCore.mergeUnique(a,b,x=>sigImport246(x,kind))}
+function mergeBackup246(raw){const incoming=typeof migrateData==='function'?migrateData(raw):raw;if(!incoming||typeof incoming!=='object')throw new Error('Ongeldige Samen Thuis back-up');const keys=['planning','meals','groceries','chores','stock','trips','ideas','home','cars','fuelEntries'];keys.forEach(k=>{if(Array.isArray(incoming[k]))data[k]=mergeArray246(data[k],incoming[k],k)});Object.entries(incoming).forEach(([k,v])=>{if(keys.includes(k)||v==null)return;if(v&&typeof v==='object'&&!Array.isArray(v)){data[k]={...v,...((data[k]&&typeof data[k]==='object'&&!Array.isArray(data[k]))?data[k]:{})}}else if(data[k]===undefined||data[k]===null||data[k]==='')data[k]=v})}
+async function runImport243(){
+ if(!importFile243)return toast('Kies eerst een bestand');
+ try{
+  const ext=importFile243.name.split('.').pop().toLowerCase(), text=(ext==='xlsx'||ext==='xls')?'':await importFile243.text();
+  if(importTarget243==='backup'){if(ext!=='json')throw new Error('Voor een volledige back-up is JSON nodig');mergeBackup246(JSON.parse(text));save();render();toast('Back-up samengevoegd · bestaande gegevens behouden');return}
+  if(importTarget243==='budget'){const o=JSON.parse(text);data.budgetV23={...o,...(data.budgetV23||{})};save();render();toast('Budget samengevoegd · bestaande waarden behouden');return}
+  if(importTarget243==='auto'){
+   if(ext==='json'){fuelMate243(JSON.parse(text))}
+   else{const rows=(ext==='xlsx'||ext==='xls')?await rowsFromExcel243(importFile243):csv243(text);data.cars ||= []; data.fuelEntries ||= [];if(!data.cars.length)throw new Error('Voeg eerst een voertuig toe of gebruik een FuelMate JSON-back-up');const car=data.cars.length===1?data.cars[0]:data.cars.find(x=>x.isDefault)||data.cars[0];rows.forEach((r,i)=>{const liters=num243(r.volume||r.liters),total=num243(r.totalCost||r.total);data.fuelEntries.push({id:`csv-fill-${Date.now()}-${i}`,carId:car.id,date:String(r.date||r.datum||'').slice(0,10),odometer:num243(r.odometer||r.kilometerstand),liters,total,pricePerLiter:num243(r.pricePerLiter)||(liters?total/liters:0),fuelGrade:r.grade||r.fuelGrade||'',station:r.station||r.tankstation||'',partialFill:bool243(r.partial||r.partialFill),missedPrevious:bool243(r.missedFill||r.missedPrevious),note:r.note||r.notitie||''})})}
+   data.fuelEntries=mergeArray246([],data.fuelEntries,'fuelEntries');save();render();toast('Auto-informatie samengevoegd · bestaande gegevens behouden');return
+  }
+  const key=arrayKey243(importTarget243);if(!key)throw new Error('Onbekend importdoel');
+  let rows;if(ext==='json'){const o=JSON.parse(text);rows=Array.isArray(o)?o:(Array.isArray(o[key])?o[key]:pickArray243(o,[key,importTarget243]))}else if(ext==='xlsx'||ext==='xls')rows=await rowsFromExcel243(importFile243);else rows=csv243(text);
+  if(!rows.length)throw new Error('Geen regels gevonden');
+  data[key] ||= [];const incomingRows=rows.map(r=>normalize243(importTarget243,r)).filter(r=>r.title);data[key]=mergeArray246(data[key],incomingRows,key);save();render();toast(`${incomingRows.length} regels verwerkt · bestaande gegevens behouden`);
+ }catch(err){console.error(err);toast(err?.message||'Importeren is mislukt')}
+}
+function template243(){
+ const x=IMPORT243[importTarget243],isJson=['backup','budget','auto'].includes(importTarget243);
+ let content=x.example,name=`samen-thuis-${importTarget243}-voorbeeld.${isJson?'json':'csv'}`;
+ if(importTarget243==='backup')content=JSON.stringify({planning:[],meals:[],groceries:[],chores:[],stock:[],trips:[],ideas:[],home:[],cars:[],fuelEntries:[],budgetV23:{}},null,2);
+ if(importTarget243==='auto')content=JSON.stringify({app:'fuelmate',version:1,vehicles:[{id:1,name:'Kees',makeModel:'Seat Ibiza',year:2012,plate:'JB796D',tankLiters:45,isDefault:1}],fillups:[{id:1,vehicleId:1,date:'2026-09-19T11:43:00',odometer:165275,volume:46.4,totalCost:108.44,partial:0,missedFill:0,station:'',grade:0,note:''}]},null,2);
+ const blob=new Blob([content],{type:isJson?'application/json':'text/csv'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)
+}
+function navImport243(){
+ const desktop=document.querySelector('.sidebar nav');if(desktop&&!desktop.querySelector('[data-import243-go]')){const settings=desktop.querySelector('[data-v19-go="settings"],[data-view="settings"]');const b=document.createElement('button');b.className=current==='imports243'?'active nav-item':'nav-item';b.dataset.import243Go='';b.innerHTML='<span>↥</span>Importeren';desktop.insertBefore(b,settings||null)}
+ const scroll=document.querySelector('.mobile-nav-scroll23');if(scroll&&!scroll.querySelector('[data-import243-go]')){const b=document.createElement('button');b.dataset.import243Go='';b.className=current==='imports243'?'active':'';b.innerHTML='<span>↥</span><small>Import</small>';scroll.append(b)}
+}
+const prevRender243=render;render=function(...args){if(current==='imports243'){document.querySelector('#view').innerHTML=renderImport243();updateSyncBadge();requestAnimationFrame(navImport243);return}const r=prevRender243(...args);requestAnimationFrame(navImport243);return r};
+document.addEventListener('click',e=>{
+ if(e.target.closest('[data-import243-go]')){current='imports243';render();return}
+ const j=e.target.closest('[data-import243-jump]');if(j){importTarget243=j.dataset.import243Jump;importFile243=null;render();return}
+ if(e.target.closest('[data-import243-run]')){runImport243();return}
+ if(e.target.closest('[data-import243-template]')){template243();return}
+});
+document.addEventListener('change',e=>{
+ if(e.target.matches('[data-import243-target]')){importTarget243=e.target.value;importFile243=null;render();return}
+ if(e.target.matches('[data-import243-file]')){importFile243=e.target.files?.[0]||null;render();return}
+});
+requestAnimationFrame(navImport243);
+})();
+
+/* build v24.3 · centrale importpagina voor alle app-onderdelen */
+
+/* build v24.5 · fix Auto JSON/Excel importer scope (cars/fuelEntries/plate) */
+
+/* build v24.6 · veilige merge-import */
+
+/* build v24.7 · logische Auto-tabs + statistieken per geselecteerde auto(s) */
+
+
+/* =========================================================
+   SAMEN THUIS v24.8 — LOGISCHE LIQUID-GLASS ONDERNAVIGATIE
+   Volgorde: dagelijks -> huishouden -> geld/auto -> plannen -> beheer.
+   Auto en Import blijven hun bestaande handlers gebruiken.
+   ========================================================= */
+(()=>{'use strict';
+ if(window.__ST248_DOCK__)return;window.__ST248_DOCK__=true;
+ const ORDER248=['today','planning','meals','groceries','stock','chores','home','budget19','auto24','trips','ideas','extra19','imports243','settings'];
+ const LABEL248={today:'Vandaag',planning:'Agenda',meals:'Weekmenu',groceries:'Boodschappen',stock:'Voorraad',chores:'Huishouden',home:'Woning',budget19:'Budget',auto24:'Auto',trips:'Reizen',ideas:'Date ideeën',extra19:'Extra',imports243:'Import',settings:'Instellingen'};
+ function actualKey248(b){if(b.dataset.nav23)return b.dataset.nav23;if(b.hasAttribute('data-v24-auto'))return 'auto24';if(b.hasAttribute('data-import243-go'))return 'imports243';return ''}
+ function arrange248(){
+   const sc=document.querySelector('.mobile-nav-scroll23');if(!sc)return;
+   const buttons=[...sc.querySelectorAll(':scope > button')],map=new Map(buttons.map(b=>[actualKey248(b),b]));
+   ORDER248.forEach(k=>{const b=map.get(k);if(!b)return;b.classList.toggle('active',current===k);const small=b.querySelector('small');if(small)small.textContent=LABEL248[k]||small.textContent;sc.appendChild(b)});
+   sc.dataset.glass248='true';
+ }
+ const base248=render;
+ render=function(...args){const r=base248(...args);requestAnimationFrame(()=>requestAnimationFrame(arrange248));return r};
+ const observer248=new MutationObserver(()=>requestAnimationFrame(arrange248));
+ const start248=()=>{const n=document.querySelector('#mobileNav23');if(n)observer248.observe(n,{childList:true,subtree:true});arrange248()};
+ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start248,{once:true});else start248();
+ requestAnimationFrame(()=>requestAnimationFrame(arrange248));
+})();
+/* build v24.8 · liquid glass dock + logical navigation order */
+
+function getSyncConflict() {
+  return syncConflictStore.get();
+}
+
+function renderSyncConflictCard() {
+  const conflict = getSyncConflict();
+  if (!conflict) return '';
+  const date = value => {
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? 'onbekend' : parsed.toLocaleString('nl-NL');
+  };
+  return `<section class="card settings-card sync-conflict"><div class="card-head"><div><p class="eyebrow">SYNCHRONISATIECONFLICT</p><h2>Beide apparaten zijn gewijzigd</h2></div><span class="tag red">Actie nodig</span></div><p>Er zijn sinds de vorige synchronisatie wijzigingen op beide apparaten. Kies welke volledige versie leidend wordt. De andere versie blijft bewaard in de conflictback-up op dit apparaat totdat de keuze succesvol is gesynchroniseerd.</p><p><strong>Dit apparaat:</strong> ${esc(date(conflict.localUpdatedAt))}<br><strong>Andere apparaat:</strong> ${esc(date(conflict.remoteUpdatedAt))}</p><div class="button-row"><button class="primary" data-sync-conflict-choice="local">Deze apparaatversie gebruiken</button><button class="secondary" data-sync-conflict-choice="remote">Andere apparaatversie gebruiken</button></div></section>`;
+}
+
+async function uploadSyncData(baseUrl, householdId, expectedRemoteRow = null) {
+  const payload = await encryptData(data, syncConfig.householdCode);
+  const row = { id: householdId, payload, updated_at: data.meta.updatedAt };
+  let upload;
+  if (expectedRemoteRow) {
+    const filters = new URLSearchParams({
+      id: `eq.${householdId}`,
+      updated_at: expectedRemoteRow.updated_at ? `eq.${expectedRemoteRow.updated_at}` : 'is.null'
+    });
+    upload = await fetch(`${baseUrl}/rest/v1/household_data?${filters}`, {
+      method: 'PATCH',
+      headers: { ...supabaseHeaders(), Prefer: 'return=representation' },
+      body: JSON.stringify(row)
+    });
+    if (!upload.ok) throw new Error(`Opslaan gaf ${upload.status}`);
+    const updatedRows = await upload.json();
+    if (!SamenThuisCore.conditionalUpdateSucceeded(updatedRows)) throw new Error('De andere versie is ondertussen bijgewerkt. Synchroniseer opnieuw om de wijzigingen te vergelijken.');
+    return;
+  }
+  upload = await fetch(`${baseUrl}/rest/v1/household_data?on_conflict=id`, {
+    method: 'POST', headers: { ...supabaseHeaders(), Prefer: 'resolution=merge-duplicates,return=minimal' },
+    body: JSON.stringify(row)
+  });
+  if (!upload.ok) throw new Error(`Opslaan gaf ${upload.status}`);
+}
+
+document.addEventListener('click', event => {
+  const choice = event.target.closest('[data-sync-conflict-choice]');
+  if (!choice) return;
+  if (syncing) return;
+  const conflict = getSyncConflict();
+  if (!conflict) return;
+  if (!conflict.resolution && !['local', 'remote'].includes(choice.dataset.syncConflictChoice)) {
+    toast('Kies een geldige versie om de synchronisatie te hervatten.');
+    return;
+  }
+  let selection;
+  try {
+    selection = SamenThuisCore.resolveSyncConflict(
+      conflict, choice.dataset.syncConflictChoice, clone, new Date().toISOString()
+    );
+  } catch (error) {
+    toast(error.message);
+    return;
+  }
+  const pending = { ...conflict, resolution: selection.choice, selectedData: clone(selection.data) };
+  if (!syncConflictStore.store(pending)) {
+    toast('De keuze kan niet veilig worden bewaard omdat browseropslag vol is. Maak ruimte en probeer opnieuw.');
+    return;
+  }
+  syncConflictResolution = selection.choice;
+  data = selection.data;
+  save({ touch: false, sync: false });
+  render();
+  syncNow({ manual: true });
+});
