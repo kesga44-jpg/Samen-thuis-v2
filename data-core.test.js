@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { hasConcurrentChanges, mergeUnique, nextDue, normalizeFuelMateFill, preserveUnknownFields, resolveSyncConflict, createConflictStore, sameData, remoteChangedSinceChoice, conditionalUpdateSucceeded } = require('../data-core.js');
+const { hasConcurrentChanges, mergeUnique, nextDue, normalizeFuelMateFill, preserveUnknownFields, resolveSyncConflict, createConflictStore, sameData, remoteChangedSinceChoice, conditionalUpdateSucceeded } = require('./data-core.js');
 
 test('concurrent sync edits are detected after a shared baseline', () => {
   assert.equal(hasConcurrentChanges('2026-10-07T10:00:00Z', '2026-10-07T10:01:00Z', '2026-10-07T09:00:00Z'), true);
