@@ -31,6 +31,12 @@ Anders: open **Supabase → SQL Editor** en voer `supabase/schema.sql` één kee
 
 De beta maakt een ander record-id dan productie, ook wanneer je dezelfde huishoudcode gebruikt.
 
+### Persoonlijke accentkleur en dashboardindeling
+
+Voor synchronisatie van persoonlijke voorkeuren voer je daarnaast `supabase/migrations/20261012000000_personal_preferences.sql` uit via de Supabase SQL Editor. Schakel e-mail/wachtwoordaanmelding in onder **Supabase → Authentication → Providers** en stel de Site URL/redirect-URL in op de gepubliceerde app. Iedere gebruiker meldt zich aan met een eigen account; de huishoudcode blijft uitsluitend voor gedeelde huishoudgegevens.
+
+De migratie maakt een afzonderlijke tabel met RLS-beleid dat alleen de ingelogde gebruiker toestaat zijn eigen voorkeuren te lezen en te wijzigen. Zonder migratie of account blijven de accentkleur en dashboardindeling alleen op dit apparaat bewaard.
+
 ## 4. Prijsfunctie deployen
 
 De supermarktprijzen worden niet rechtstreeks vanuit de browser opgehaald. Hiervoor zit een Supabase Edge Function in:
@@ -49,11 +55,17 @@ De beta gebruikt daarna automatisch:
 
 `<jouw-supabase-url>/functions/v1/grocery-prices`
 
-### PrijsProfeet: volledig gratis
+### PrijsProfeet-configuratie en verificatie
 
-Voor deze versie is **geen betaald PrijsProfeet-abonnement nodig** en ook geen API-key vereist. De Edge Function gebruikt alleen het gratis publieke zoekendpoint. De app toont PrijsProfeet als bron, zoals de gratis API-voorwaarden vereisen.
+De bestaande Edge Function gebruikt het endpoint en de parameters die al in de repository aanwezig waren (`/api/v1/search`, `q`, `page_size` en `promotion_status=active`). De aanbiedingenpagina zoekt alleen na een product- of merkzoekopdracht; de browser verstuurt de aanvraag naar deze Edge Function, niet rechtstreeks naar de aanbieder.
 
-De app gebruikt geen `/match/*` en geen `/price-history` endpoints. In plaats daarvan bewaart Samen Thuis zelf alleen de prijswaarnemingen van producten die jullie daadwerkelijk volgen.
+De officiële documentatie (`https://www.prijsprofeet.nl/supermarkt-aanbiedingen-api/` en `https://www.prijsprofeet.nl/docs`) kon tijdens deze wijziging niet worden opgehaald. Daarom zijn de actuele authenticatie-eisen, API-limieten, gebruiksvoorwaarden en licentie niet onafhankelijk bevestigd. De bestaande Edge Function ondersteunt optioneel `PRIJS_PROFEET_API_KEY` als Supabase secret; voeg alleen een sleutel toe als de provider die voor het gebruikte account vereist. Zet nooit een provider-secret in de frontend of repository en controleer de actuele voorwaarden vóór productiegebruik.
+
+De nieuwe zoekmodus vraagt maximaal 20 resultaten per zoekopdracht op en toont PrijsProfeet als bron. De app gebruikt verder dezelfde bestaande zoekintegratie voor eigen prijswaarnemingen. Dit is geen bevestiging dat een gratis abonnement of onbeperkte toegang beschikbaar is.
+
+### Pepper
+
+Er is geen Pepper-integratie of scraper. De officiële Nederlandse API/feed/partnerdocumentatie en de toepasselijke toegangsvoorwaarden konden niet worden geverifieerd. Aanbiedingen kunnen handmatig aan de bestaande boodschappenlijst worden toegevoegd.
 
 ## 5. Bestaande gegevens kopiëren naar beta
 
@@ -79,6 +91,8 @@ De gegevens worden omgezet naar het beta-schema. Je originele productie-app word
 6. Kies **Prijzen vernieuwen**.
 
 De app toont ook de productmatch. Klopt die niet, druk op het potlood en maak de zoekterm specifieker.
+
+De pagina **Aanbiedingen** zoekt op productnaam of merk, filtert gevonden resultaten op supermarkt/categorie, sorteert op prijs/korting/einddatum en ondersteunt favorieten en toevoegen aan Boodschappen. Als de Edge Function of aanbieder ontbreekt, verschijnt een foutmelding; de app toont geen voorbeelddata als echte aanbiedingen.
 
 ## 7. Automatisch verversen
 

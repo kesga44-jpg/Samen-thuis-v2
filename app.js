@@ -263,6 +263,7 @@ const sections = {
   planning: { label: 'Agenda', icon: '▦' },
   meals: { label: 'Weekmenu', icon: '♨' },
   groceries: { label: 'Boodschappen', icon: '✓' },
+  offers: { label: 'Aanbiedingen', icon: '％' },
   tasks: { label: 'Taken', icon: '☑' },
   chores: { label: 'Huishouden', icon: '⌁' },
   stock: { label: 'Voorraad', icon: '▤' },
@@ -391,6 +392,9 @@ function captureBrainyQuote() {
 }
 
 async function refreshBrainyQuoteRSS() {
+  let cached;
+  try { cached = JSON.parse(localStorage.getItem(QUOTE_KEY) || 'null'); } catch { cached = null; }
+  if (window.SamenThuisQuotes && !window.SamenThuisQuotes.shouldRefresh(cached?.checkedAt)) return;
   try {
     const response = await fetch('https://www.brainyquote.com/link/quotebr.rss', { cache: 'no-store' });
     if (!response.ok) return;
@@ -405,7 +409,7 @@ async function refreshBrainyQuoteRSS() {
     const quote = genericTitle ? description : title;
     const author = genericTitle || description === title ? '' : description;
     const markup = `<blockquote>${esc(quote)}</blockquote>${author ? `<p>${esc(author)}</p>` : ''}`;
-    localStorage.setItem(QUOTE_KEY, JSON.stringify({ date: todayISO(), markup }));
+    localStorage.setItem(QUOTE_KEY, JSON.stringify({ date: todayISO(), checkedAt: new Date().toISOString(), markup }));
     if (current === 'today') render();
   } catch {
     // De officiële Javascript-feed en de laatst bewaarde quote blijven als fallback werken.
@@ -1651,6 +1655,9 @@ render();
 handleInitialAgendaImport();
 setTimeout(captureBrainyQuote, 600);
 refreshBrainyQuoteRSS();
+setInterval(() => {
+  if (document.visibilityState === 'visible') refreshBrainyQuoteRSS();
+}, 24 * 60 * 60 * 1000);
 if (syncConfigured()) syncNow();
 
 ;
@@ -4853,7 +4860,7 @@ applyUi19();
 try{matchMedia('(prefers-color-scheme:dark)').addEventListener('change',()=>ui19.theme==='system'&&applyUi19())}catch(_){}
 
 const pages19=[
- ['today','Today','⌂'],['planning','Agenda','▦'],['meals','Weekmenu','♨'],['groceries','Boodschappen','✓'],['tasks','Taken','☑'],['weather','Weer','☀'],['challenges','Challenges','✦'],
+ ['today','Today','⌂'],['planning','Agenda','▦'],['meals','Weekmenu','♨'],['groceries','Boodschappen','✓'],['offers','Aanbiedingen','％'],['tasks','Taken','☑'],['weather','Weer','☀'],['challenges','Challenges','✦'],
  ['chores','Huishouden','⌁'],['stock','Voorraad','▤'],['programs',"Programma's",'▶'],['trips','Reizen','✈'],['ideas','Date ideeën','♡'],
  ['home','Woning','⌂'],['budget19','Budget','€'],['extra19','Extra','＋'],['settings','Instellingen','⚙']
 ];
@@ -5012,9 +5019,23 @@ function save20(){
   localStorage.setItem(KEY20, JSON.stringify(ui20));
   localStorage.setItem('samenThuisDeviceUiV19', JSON.stringify(ui20));
   apply20();
+  window.dispatchEvent(new Event('samenThuisPreferencesChange'));
 }
 apply20();
 try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => ui20.theme === 'system' && apply20()); } catch(_){}
+window.SamenThuisPersonalUi20 = {
+  get() { return { ...ui20 }; },
+  set(value) {
+    const next = value && typeof value === 'object' ? value : {};
+    ui20 = {
+      theme: ['system', 'light', 'dark'].includes(next.theme) ? next.theme : 'system',
+      accent: ['bluePurple', 'blue', 'purple', 'orange'].includes(next.accent) ? next.accent : 'purple',
+      density: ['comfortable', 'compact'].includes(next.density) ? next.density : 'comfortable',
+      ...(typeof next.accentColor === 'string' && /^#[0-9a-f]{6}$/i.test(next.accentColor) ? { accentColor: next.accentColor } : {})
+    };
+    save20();
+  }
+};
 
 function beautifySettings20(){
   if (typeof current === 'undefined' || current !== 'settings') return;
@@ -5121,7 +5142,7 @@ if(window.__ST_V23__) return; window.__ST_V23__=true;
 
 const NAV23=[
  ['today','⌂','Vandaag'],['planning','▦','Agenda'],['meals','♨','Weekmenu'],
- ['groceries','✓','Boodschappen'],['tasks','☑','Taken'],['stock','▤','Voorraad'],['weather','☀','Weer'],['challenges','✦','Challenges'],['chores','⌁','Huishouden'],
+ ['groceries','✓','Boodschappen'],['offers','％','Aanbiedingen'],['tasks','☑','Taken'],['stock','▤','Voorraad'],['weather','☀','Weer'],['challenges','✦','Challenges'],['chores','⌁','Huishouden'],
  ['home','⌂','Woning'],['budget19','€','Budget'],['programs','▶',"Programma's"],['trips','✈','Reizen'],
  ['ideas','♡','Date ideeën'],['extra19','＋','Extra'],['settings','⚙','Instellingen']
 ];
@@ -5829,6 +5850,7 @@ document.addEventListener('click', event => {
     ['air', 'Pollen en luchtkwaliteit']
   ];
   const DASH_DEFAULTS = DASH_WIDGETS.map(([id]) => id);
+  const dashboardCore = window.SamenThuisDashboard;
   const WEATHER_KEY = 'samenThuisWeatherForecastV25';
   const DEFAULT_LOCATION = { place: 'Rotterdam', lat: 51.9225, lon: 4.47917 };
   const weatherCode25 = {
@@ -5844,6 +5866,7 @@ document.addEventListener('click', event => {
   function loadDashboard25() {
     try {
       const saved = JSON.parse(localStorage.getItem(DASH_KEY) || 'null');
+      if (dashboardCore) return dashboardCore.normalize(saved, DASH_DEFAULTS);
       const order = Array.isArray(saved?.order) ? saved.order.filter(id => DASH_DEFAULTS.includes(id)) : [];
       return {
         order: [...new Set([...order, ...DASH_DEFAULTS])],
@@ -5856,14 +5879,24 @@ document.addEventListener('click', event => {
 
   function saveDashboard25() {
     try { localStorage.setItem(DASH_KEY, JSON.stringify(dashboard25)); } catch (_) {}
+    window.dispatchEvent(new Event('samenThuisPreferencesChange'));
   }
+
+  window.SamenThuisDashboardPreferences25 = {
+    get() { return JSON.parse(JSON.stringify(dashboard25)); },
+    set(value) {
+      dashboard25 = dashboardCore ? dashboardCore.normalize(value, DASH_DEFAULTS) : loadDashboard25();
+      saveDashboard25();
+      applyDashboard25();
+    }
+  };
 
   function dashboardEditor25() {
     const rows = dashboard25.order.map((id, index) => {
       const label = DASH_WIDGETS.find(([widget]) => widget === id)?.[1] || id;
       return `<div class="setting-row dashboard-setting-row25"><label><input type="checkbox" data-dashboard-visible="${id}" ${dashboard25.visible[id] ? 'checked' : ''}> ${esc(label)}</label><span><button type="button" class="secondary" data-dashboard-move="${id}" data-direction="-1" aria-label="${esc(label)} omhoog" ${index === 0 ? 'disabled' : ''}>↑</button> <button type="button" class="secondary" data-dashboard-move="${id}" data-direction="1" aria-label="${esc(label)} omlaag" ${index === dashboard25.order.length - 1 ? 'disabled' : ''}>↓</button></span></div>`;
     }).join('');
-    return `<section class="card settings-card dashboard-editor25"><div class="card-head"><div><p class="eyebrow">DASHBOARD</p><h2>Onderdelen samenstellen</h2></div></div><p class="muted">Kies welke kaarten op Vandaag staan en wijzig de volgorde. Deze weergavevoorkeur geldt alleen op dit apparaat.</p>${rows}<div class="button-row"><button type="button" class="secondary" data-dashboard-reset>Standaardvolgorde herstellen</button></div></section>`;
+    return `<section class="card settings-card dashboard-editor25"><div class="card-head"><div><p class="eyebrow">DASHBOARD</p><h2>Onderdelen samenstellen</h2></div></div><p class="muted">Vink kaarten aan of uit en wijzig de volgorde. Na aanmelden wordt deze indeling ook aan je persoonlijke account gekoppeld.</p>${rows}<div class="button-row"><button type="button" class="secondary" data-dashboard-reset>Standaardvolgorde herstellen</button></div></section>`;
   }
 
   function applyDashboard25() {
@@ -5879,6 +5912,145 @@ document.addEventListener('click', event => {
       node.hidden = !dashboard25.visible[id];
       grid.append(node);
     });
+  }
+
+  let offerQuery25 = '';
+  let offerLoading25 = false;
+  let offerError25 = '';
+  let offerLastRequestAt25 = 0;
+  let offerFavoritesOnly25 = false;
+  let offerFilters25 = { store: '', category: '', sort: 'ending' };
+
+  function offerCore25() { return window.SamenThuisOffers; }
+  function offerList25() {
+    const core = offerCore25();
+    const active = Array.isArray(data.offers25) ? data.offers25 : [];
+    const archived = Array.isArray(data.offerArchive25) ? data.offerArchive25 : [];
+    const scheduled = Array.isArray(data.offerScheduled25) ? data.offerScheduled25 : [];
+    const partition = core.partition(core.dedupe([...active, ...archived, ...scheduled]), new Date());
+    const keepArchive = data.settings?.archiveExpiredOffers !== false;
+    const nextActive = core.dedupe(partition.active);
+    const nextArchive = keepArchive ? core.dedupe(partition.archive) : [];
+    const nextScheduled = core.dedupe(partition.upcoming);
+    if (JSON.stringify([active, archived, scheduled]) !== JSON.stringify([nextActive, nextArchive, nextScheduled])) {
+      data.offers25 = nextActive;
+      data.offerArchive25 = nextArchive;
+      data.offerScheduled25 = nextScheduled;
+      save({ touch: false });
+    }
+    return { active: nextActive, archived: nextArchive, scheduled: nextScheduled };
+  }
+  function offerDate25(value) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(value || ''))) return '';
+    return new Date(`${value}T12:00:00`).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' });
+  }
+  function validOfferUrl25(value) {
+    try {
+      const url = new URL(value);
+      return ['http:', 'https:'].includes(url.protocol) ? url.href : '';
+    } catch (_) { return ''; }
+  }
+  function renderOfferCard25(offer, archived = false) {
+    const core = offerCore25();
+    const key = core.key(offer);
+    const isFavorite = (data.favoriteOffers25 || []).includes(key);
+    const sourceUrl = validOfferUrl25(offer.sourceUrl || '');
+    const original = sourceUrl ? `<a href="${esc(sourceUrl)}" target="_blank" rel="noopener noreferrer">Open oorspronkelijke aanbieding</a>` : '<span class="muted">Geen bronlink beschikbaar</span>';
+    const dates = [offer.validFrom && `vanaf ${offerDate25(offer.validFrom)}`, offer.validTo && `t/m ${offerDate25(offer.validTo)}`].filter(Boolean).join(' · ') || 'Geldigheidsdatums niet opgegeven';
+    const discount = Number.isFinite(Number(offer.discountPercent)) ? ` · ${Math.round(Number(offer.discountPercent))}% korting` : '';
+    return `<article class="card offer-card25"><div class="offer-card-head25"><div><p class="eyebrow">${esc(offer.store || 'Supermarkt')}${offer.category ? ` · ${esc(offer.category)}` : ''}</p><h2>${esc(offer.name)}</h2><p class="muted">${esc(offer.brand || '')}${offer.size ? `${offer.brand ? ' · ' : ''}${esc(offer.size)}` : ''}</p></div><strong class="offer-price25">${new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' }).format(Number(offer.price))}</strong></div>
+      <p>${offer.originalPrice != null ? `Was ${new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' }).format(Number(offer.originalPrice))}` : ''}${discount}</p>
+      <p class="muted">${esc(dates)} · Bron: ${esc(offer.source || 'PrijsProfeet')}</p>
+      <div class="button-row">${original}<button type="button" class="secondary" data-offer-favorite="${esc(key)}">${isFavorite ? '★ Favoriet' : '☆ Favoriet'}</button>${archived ? '' : `<button type="button" class="primary" data-offer-grocery="${esc(key)}">＋ Boodschappenlijst</button>`}</div></article>`;
+  }
+  function renderOffers25() {
+    const { active, archived, scheduled } = offerList25();
+    const favorites = Array.isArray(data.favoriteOffers25) ? data.favoriteOffers25 : [];
+    const queryCache = data.offerSearchCache25 && typeof data.offerSearchCache25 === 'object' ? data.offerSearchCache25 : {};
+    const checkedAt = queryCache[offerQuery25]?.checkedAt || '';
+    const stores = [...new Set(active.map(item => item.store).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'nl'));
+    const categories = [...new Set(active.map(item => item.category).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'nl'));
+    const filtered = active.filter(item => (!offerFilters25.store || item.store === offerFilters25.store)
+      && (!offerFilters25.category || item.category === offerFilters25.category)
+      && (!offerFavoritesOnly25 || favorites.includes(offerCore25().key(item))));
+    const sorters = {
+      price: (a, b) => Number(a.price) - Number(b.price),
+      discount: (a, b) => Number(b.discountPercent || 0) - Number(a.discountPercent || 0),
+      ending: (a, b) => String(a.validTo || '9999-12-31').localeCompare(String(b.validTo || '9999-12-31'))
+    };
+    filtered.sort(sorters[offerFilters25.sort] || sorters.ending);
+    return `<div class="offers-page25"><section class="card offers-toolbar25"><div><p class="eyebrow">ACTUELE SUPERMARKTAANBIEDINGEN</p><h2>Zoek in PrijsProfeet</h2></div>
+      <form class="offer-search25" data-offer-search><label class="field">Product of merk<input name="query" maxlength="100" value="${esc(offerQuery25)}" placeholder="Bijvoorbeeld koffie of wasmiddel" required></label><button class="primary" type="submit" ${offerLoading25 ? 'disabled' : ''}>${offerLoading25 ? 'Laden…' : 'Aanbiedingen zoeken'}</button></form>
+      <p class="muted">Zoeken via de bestaande Supabase Edge Function. Bron: <a href="https://www.prijsprofeet.nl" target="_blank" rel="noopener noreferrer">PrijsProfeet</a>. Er worden geen aanbiedingen verzonnen.</p>
+      ${offerError25 ? `<p class="notice error" role="alert">${esc(offerError25)}</p>` : ''}
+      ${checkedAt ? `<p class="small-note">Laatst opgehaald: ${esc(new Date(checkedAt).toLocaleString('nl-NL'))}</p>` : ''}
+      ${offerLoading25 ? '<p role="status">Aanbiedingen ophalen…</p>' : ''}
+    </section>
+    <section class="card"><div class="offer-filters25">
+      <label>Supermarkt<select data-offer-filter="store"><option value="">Alle supermarkten</option>${stores.map(x => `<option value="${esc(x)}" ${offerFilters25.store === x ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select></label>
+      <label>Categorie<select data-offer-filter="category"><option value="">Alle categorieën</option>${categories.map(x => `<option value="${esc(x)}" ${offerFilters25.category === x ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select></label>
+      <label>Sorteren op<select data-offer-filter="sort"><option value="ending" ${offerFilters25.sort === 'ending' ? 'selected' : ''}>Einddatum</option><option value="price" ${offerFilters25.sort === 'price' ? 'selected' : ''}>Prijs</option><option value="discount" ${offerFilters25.sort === 'discount' ? 'selected' : ''}>Korting</option></select></label>
+      <label class="offer-favorite-filter25"><input type="checkbox" data-offer-favorites ${offerFavoritesOnly25 ? 'checked' : ''}> Favorieten</label>
+      <label class="offer-favorite-filter25"><input type="checkbox" data-offer-archive ${data.settings?.archiveExpiredOffers !== false ? 'checked' : ''}> Verlopen aanbiedingen archiveren</label>
+    </div></section>
+    <div class="offers-list25">${filtered.map(item => renderOfferCard25(item)).join('') || `<section class="card"><p class="muted">${active.length ? 'Geen aanbiedingen voldoen aan deze filters.' : offerQuery25 ? 'Geen actuele aanbiedingen gevonden. Probeer een andere zoekterm.' : 'Zoek op productnaam of merk om actuele aanbiedingen op te halen.'}</p></section>`}</div>
+    ${archived.length ? `<details class="card offer-archive25"><summary>Archief verlopen aanbiedingen (${archived.length})</summary><div class="offers-list25">${archived.map(item => renderOfferCard25(item, true)).join('')}</div></details>` : ''}
+    ${scheduled.length ? `<details class="card offer-archive25"><summary>Binnenkort geldig (${scheduled.length})</summary><div class="offers-list25">${scheduled.map(item => renderOfferCard25(item, true)).join('')}</div></details>` : ''}
+    <p class="small-note">Aanbiedingen kunnen wijzigen. Controleer de geldigheid en prijs bij de oorspronkelijke bron voordat je koopt.</p></div>`;
+  }
+  async function searchOffers25(query) {
+    if (offerLoading25) return;
+    const term = String(query || '').trim();
+    if (!term) { offerError25 = 'Vul een productnaam of merk in om actuele aanbiedingen te zoeken.'; render(); return; }
+    offerQuery25 = term;
+    offerError25 = '';
+    const cache = data.offerSearchCache25 && typeof data.offerSearchCache25 === 'object' ? data.offerSearchCache25 : {};
+    const cached = cache[term];
+    if (cached?.checkedAt && Date.now() - Date.parse(cached.checkedAt) < 20 * 60 * 1000) {
+      data.offers25 = offerCore25().dedupe([...(data.offers25 || []), ...(cached.offers || [])]);
+      render();
+      return;
+    }
+    if (Date.now() - offerLastRequestAt25 < 2000) {
+      offerError25 = 'Wacht even voordat je opnieuw zoekt.';
+      render();
+      return;
+    }
+    offerLastRequestAt25 = Date.now();
+    offerLoading25 = true;
+    render();
+    const controller = typeof AbortController === 'function' ? new AbortController() : null;
+    const timer = controller ? setTimeout(() => controller.abort(), 12000) : null;
+    try {
+      const base = String(syncConfig.projectUrl || DEFAULT_PROJECT_URL).replace(/\/$/, '');
+      const result = await offerCore25().fetchOffers({
+        query: term,
+        url: `${base}/functions/v1/grocery-prices`,
+        headers: { apikey: DEFAULT_PUBLISHABLE_KEY, Authorization: 'Bearer ' + DEFAULT_PUBLISHABLE_KEY },
+        signal: controller?.signal
+      });
+      const offers = result.offers;
+      const merged = offerCore25().dedupe([...(data.offers25 || []), ...(data.offerScheduled25 || []), ...offers]);
+      const partition = offerCore25().partition(merged, new Date());
+      data.offers25 = partition.active;
+      data.offerScheduled25 = partition.upcoming;
+      data.offerArchive25 = data.settings?.archiveExpiredOffers === false
+        ? (data.offerArchive25 || [])
+        : offerCore25().dedupe([...(data.offerArchive25 || []), ...partition.archive]);
+      data.offerSearchCache25 = { ...cache, [term]: { offers, checkedAt: result.checkedAt } };
+      const cacheTerms = Object.keys(data.offerSearchCache25);
+      if (cacheTerms.length > 20) cacheTerms.slice(0, cacheTerms.length - 20).forEach(key => delete data.offerSearchCache25[key]);
+      offerError25 = '';
+      save({ touch: false });
+    } catch (error) {
+      offerError25 = error.name === 'AbortError'
+        ? 'De aanvraag duurde te lang. Probeer het opnieuw.'
+        : `${error.message || 'Aanbiedingen zijn tijdelijk niet beschikbaar.'} De Edge Function grocery-prices moet actief zijn; er is geen actuele aanbieding geladen.`;
+    } finally {
+      if (timer) clearTimeout(timer);
+      offerLoading25 = false;
+      if (current === 'offers') render();
+    }
   }
 
   let editingCollection25 = null;
@@ -6049,6 +6221,168 @@ document.addEventListener('click', event => {
     return `<div class="weather-page25 page-grid"><div data-weather-page-body><p class="muted">Weer laden…</p></div></div>`;
   }
 
+  const AUTH_KEY25 = 'samenThuisPersonalAuthV1';
+  const personalPreferencesCore25 = window.SamenThuisPersonalPreferences;
+  let authSession25 = null;
+  let authNotice25 = '';
+  let authBusy25 = false;
+  let personalPreferencesReady25 = false;
+  let personalSaveTimer25;
+  try { authSession25 = JSON.parse(localStorage.getItem(AUTH_KEY25) || 'null'); } catch (_) {}
+
+  function authBase25() { return String(syncConfig.projectUrl || DEFAULT_PROJECT_URL).replace(/\/$/, ''); }
+  function authHeaders25(token = '') {
+    return { 'Content-Type': 'application/json', apikey: DEFAULT_PUBLISHABLE_KEY, ...(token ? { Authorization: 'Bearer ' + token } : {}) };
+  }
+  async function authRequest25(path, body, token = '') {
+    const response = await fetch(`${authBase25()}${path}`, {
+      method: 'POST', headers: authHeaders25(token), body: JSON.stringify(body || {})
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.msg || payload.message || payload.error_description || payload.error || `Supabase Auth (${response.status})`);
+    return payload;
+  }
+  async function readySession25() {
+    if (!authSession25?.access_token || !authSession25?.refresh_token) return null;
+    if (Number(authSession25.expires_at || 0) > Date.now() + 60000) return authSession25;
+    const next = await authRequest25('/auth/v1/token?grant_type=refresh_token', { refresh_token: authSession25.refresh_token });
+    authSession25 = { ...next, expires_at: Date.now() + Number(next.expires_in || 3600) * 1000 };
+    localStorage.setItem(AUTH_KEY25, JSON.stringify(authSession25));
+    return authSession25;
+  }
+  function uiDefault25() { return { theme: 'system', accent: 'purple', density: 'comfortable' }; }
+  function setPersonalPreferences25(value) {
+    const normalized = personalPreferencesCore25?.normalize(value, DASH_DEFAULTS, dashboardCore) || value || {};
+    window.SamenThuisPersonalUi20?.set(normalized.ui || uiDefault25());
+    window.SamenThuisDashboardPreferences25?.set(normalized.dashboard || dashboardCore?.defaults(DASH_DEFAULTS));
+  }
+  function localAccountPreferences25(userId) {
+    try { return JSON.parse(localStorage.getItem(personalPreferencesCore25.storageKey(userId)) || 'null'); } catch (_) { return null; }
+  }
+  function saveLocalAccountPreferences25(userId) {
+    const preferences = {
+      ui: window.SamenThuisPersonalUi20?.get() || uiDefault25(),
+      dashboard: window.SamenThuisDashboardPreferences25?.get() || dashboardCore?.defaults(DASH_DEFAULTS)
+    };
+    localStorage.setItem(personalPreferencesCore25.storageKey(userId), JSON.stringify(preferences));
+    return preferences;
+  }
+  async function writePersonalPreferences25(preferences) {
+    const session = await readySession25();
+    if (!session?.user?.id) throw new Error('Meld je opnieuw aan om voorkeuren te synchroniseren.');
+    const response = await fetch(`${authBase25()}/rest/v1/personal_preferences?on_conflict=user_id`, {
+      method: 'POST',
+      headers: { ...authHeaders25(session.access_token), Prefer: 'resolution=merge-duplicates,return=minimal' },
+      body: JSON.stringify({
+        user_id: session.user.id, ui_config: preferences.ui,
+        dashboard_config: preferences.dashboard, updated_at: new Date().toISOString()
+      })
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.message || `Persoonlijke voorkeuren opslaan mislukt (${response.status}).`);
+    }
+    localStorage.setItem(personalPreferencesCore25.storageKey(session.user.id), JSON.stringify(preferences));
+  }
+  async function loadPersonalPreferences25() {
+    const session = await readySession25();
+    if (!session?.user?.id) return;
+    const response = await fetch(`${authBase25()}/rest/v1/personal_preferences?select=ui_config,dashboard_config&user_id=eq.${encodeURIComponent(session.user.id)}&limit=1`, {
+      headers: authHeaders25(session.access_token)
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.message || `Voorkeuren ophalen mislukt (${response.status}); controleer de persoonlijke-voorkeurenmigratie.`);
+    }
+    const rows = await response.json();
+    const saved = Array.isArray(rows) ? rows[0] : null;
+    if (saved) setPersonalPreferences25({ ui: saved.ui_config, dashboard: saved.dashboard_config });
+    else {
+      const local = localAccountPreferences25(session.user.id);
+      setPersonalPreferences25(local || { ui: uiDefault25(), dashboard: dashboardCore?.defaults(DASH_DEFAULTS) });
+      await writePersonalPreferences25(saveLocalAccountPreferences25(session.user.id));
+    }
+    personalPreferencesReady25 = true;
+    authNotice25 = 'Persoonlijke voorkeuren zijn geladen en worden per account gesynchroniseerd.';
+    if (current === 'settings') render();
+  }
+  async function authenticate25(action) {
+    if (authBusy25) return;
+    const form = document.querySelector('[data-personal-auth25]');
+    const email = String(form?.elements.email.value || '').trim();
+    const password = String(form?.elements.password.value || '');
+    if (!email || !password) { authNotice25 = 'Vul je e-mailadres en wachtwoord in.'; render(); return; }
+    authBusy25 = true; authNotice25 = '';
+    if (current === 'settings') render();
+    try {
+      const endpoint = action === 'sign-up' ? '/auth/v1/signup' : '/auth/v1/token?grant_type=password';
+      const result = await authRequest25(endpoint, { email, password });
+      if (!result.access_token || !result.refresh_token || !result.user?.id) {
+        authNotice25 = 'Account ontvangen. Bevestig je e-mailadres via de e-mail van Supabase en meld je daarna aan.';
+      } else {
+        authSession25 = { ...result, expires_at: Date.now() + Number(result.expires_in || 3600) * 1000 };
+        localStorage.setItem(AUTH_KEY25, JSON.stringify(authSession25));
+        personalPreferencesReady25 = false;
+        await loadPersonalPreferences25();
+      }
+    } catch (error) { authNotice25 = error.message || 'Aanmelden is mislukt.'; }
+    finally { authBusy25 = false; if (current === 'settings') render(); }
+  }
+  async function restoreAuthCallback25() {
+    const params = new URLSearchParams(String(location.hash || '').replace(/^#/, ''));
+    const accessToken = params.get('access_token'), refreshToken = params.get('refresh_token');
+    if (!accessToken || !refreshToken) return false;
+    const response = await fetch(`${authBase25()}/auth/v1/user`, { headers: authHeaders25(accessToken) });
+    const user = await response.json().catch(() => ({}));
+    if (!response.ok || !user.id) throw new Error(user.message || 'E-mailbevestiging kon niet worden gevalideerd.');
+    authSession25 = {
+      access_token: accessToken, refresh_token: refreshToken, user,
+      expires_at: Date.now() + Number(params.get('expires_in') || 3600) * 1000
+    };
+    localStorage.setItem(AUTH_KEY25, JSON.stringify(authSession25));
+    history.replaceState({}, '', `${location.pathname}${location.search}`);
+    await loadPersonalPreferences25();
+    return true;
+  }
+  async function signOut25() {
+    try {
+      const session = await readySession25();
+      if (session) await authRequest25('/auth/v1/logout', {}, session.access_token);
+    } catch (_) {}
+    authSession25 = null; personalPreferencesReady25 = false;
+    localStorage.removeItem(AUTH_KEY25);
+    authNotice25 = 'Je bent afgemeld. Lokale voorkeuren blijven op dit apparaat staan.';
+    if (current === 'settings') render();
+  }
+  function personalSettings25() {
+    if (current !== 'settings') return;
+    const view = document.querySelector('#view');
+    if (!view || view.querySelector('[data-personal-account25]')) return;
+    const email = authSession25?.user?.email || '';
+    const account = email
+      ? `<p class="muted">Aangemeld als <strong>${esc(email)}</strong>. Je accentkleur en dashboardindeling worden afzonderlijk per account bewaard.</p><button type="button" class="secondary" data-personal-sign-out>Afmelden</button>`
+      : `<form class="form-grid" data-personal-auth25><label class="field">E-mailadres<input type="email" name="email" autocomplete="username" required></label><label class="field">Wachtwoord<input type="password" name="password" autocomplete="current-password" minlength="8" required></label><div class="button-row"><button type="button" class="primary" data-personal-auth="sign-in" ${authBusy25 ? 'disabled' : ''}>Aanmelden</button><button type="button" class="secondary" data-personal-auth="sign-up" ${authBusy25 ? 'disabled' : ''}>Account maken</button></div></form>`;
+    view.insertAdjacentHTML('beforeend', `<section class="card settings-card" data-personal-account25><div class="card-head"><div><p class="eyebrow">PERSOONLIJK ACCOUNT</p><h2>Voorkeuren op al je apparaten</h2></div></div><p class="muted">De huishoudcode blijft alleen voor gedeelde huishoudgegevens. Een persoonlijk Supabase-account scheidt accentkleur en dashboardindeling per gebruiker. Vereist de persoonlijke-voorkeurenmigratie in Supabase.</p>${account}${authNotice25 ? `<p class="notice" role="status">${esc(authNotice25)}</p>` : ''}</section>`);
+  }
+  window.addEventListener('samenThuisPreferencesChange', () => {
+    if (!authSession25?.user?.id || !personalPreferencesReady25) return;
+    clearTimeout(personalSaveTimer25);
+    personalSaveTimer25 = setTimeout(async () => {
+      try { await writePersonalPreferences25(saveLocalAccountPreferences25(authSession25.user.id)); }
+      catch (error) { authNotice25 = error.message || 'Persoonlijke voorkeuren konden niet worden gesynchroniseerd.'; }
+    }, 500);
+  });
+  document.addEventListener('click', event => {
+    const auth = event.target.closest('[data-personal-auth]');
+    if (auth) { authenticate25(auth.dataset.personalAuth); return; }
+    if (event.target.closest('[data-personal-sign-out]')) signOut25();
+  });
+  if (location.hash.includes('access_token=')) {
+    restoreAuthCallback25().catch(error => { authNotice25 = error.message || 'Aanmeldkoppeling kon niet worden voltooid.'; });
+  } else if (authSession25?.user?.id) {
+    loadPersonalPreferences25().catch(error => { authNotice25 = error.message || 'Persoonlijke voorkeuren konden niet worden geladen.'; });
+  }
+
   function render25(...args) {
     if (current === 'tasks' || current === 'programs') {
       document.querySelector('#view').innerHTML = renderCollection25(current);
@@ -6084,6 +6418,17 @@ document.addEventListener('click', event => {
       requestAnimationFrame(() => loadWeatherPage25());
       return;
     }
+    if (current === 'offers') {
+      document.querySelector('#view').innerHTML = renderOffers25();
+      document.querySelector('#pageTitle').textContent = sections.offers.label;
+      document.querySelector('#addBtn').style.display = 'none';
+      document.querySelectorAll('[data-nav23], [data-v19-go]').forEach(button => {
+        const page = button.dataset.nav23 || button.dataset.v19Go;
+        button.classList.toggle('active', page === 'offers');
+      });
+      updateSyncBadge();
+      return;
+    }
     const result = previousRender25(...args);
     requestAnimationFrame(() => {
       applyDashboard25();
@@ -6091,6 +6436,7 @@ document.addEventListener('click', event => {
       if (current === 'settings' && settings && !settings.querySelector('.dashboard-editor25')) {
         settings.insertAdjacentHTML('beforeend', dashboardEditor25());
       }
+      personalSettings25();
     });
     return result;
   }
@@ -6107,6 +6453,32 @@ document.addEventListener('click', event => {
   };
 
   document.addEventListener('click', event => {
+    const favoriteOffer = event.target.closest('[data-offer-favorite]');
+    if (favoriteOffer) {
+      const key = favoriteOffer.dataset.offerFavorite;
+      const favorites = new Set(Array.isArray(data.favoriteOffers25) ? data.favoriteOffers25 : []);
+      if (favorites.has(key)) favorites.delete(key); else favorites.add(key);
+      data.favoriteOffers25 = [...favorites];
+      save({ touch: false }); render(); return;
+    }
+    const addOffer = event.target.closest('[data-offer-grocery]');
+    if (addOffer) {
+      const key = addOffer.dataset.offerGrocery;
+      const offer = [...(data.offers25 || [])].find(item => offerCore25().key(item) === key);
+      if (!offer) { toast('Deze aanbieding is niet meer actief.'); return; }
+      data.groceries ||= [];
+      const duplicate = data.groceries.find(item => !item.done && String(item.title || '').trim().toLowerCase() === String(offer.name).trim().toLowerCase());
+      if (duplicate) { toast('Dit product staat al op de boodschappenlijst.'); return; }
+      data.groceries.push({
+        id: uid(), title: offer.name, category: offer.category || 'Overig', amount: 1, unit: offer.size || '',
+        done: false, note: `Aanbieding bij ${offer.store || 'supermarkt'} · ${offer.price} · controleer de geldigheid`,
+        offerUrl: validOfferUrl25(offer.sourceUrl) || '', source: 'offer'
+      });
+      save(); toast('Toegevoegd aan de boodschappenlijst'); render(); return;
+    }
+    if (event.target.closest('[data-offer-archive]')) return;
+    const submitOffers = event.target.closest('[data-offer-search]');
+    if (submitOffers) return;
     if (event.target.closest('[data-collection-cancel]')) {
       editingCollection25 = null; render(); return;
     }
@@ -6140,10 +6512,13 @@ document.addEventListener('click', event => {
     }
     const move = event.target.closest('[data-dashboard-move]');
     if (move) {
-      const index = dashboard25.order.indexOf(move.dataset.dashboardMove);
-      const next = index + Number(move.dataset.direction);
-      if (index < 0 || next < 0 || next >= dashboard25.order.length) return;
-      [dashboard25.order[index], dashboard25.order[next]] = [dashboard25.order[next], dashboard25.order[index]];
+      if (dashboardCore) dashboard25 = dashboardCore.move(dashboard25, move.dataset.dashboardMove, Number(move.dataset.direction), DASH_DEFAULTS);
+      else {
+        const index = dashboard25.order.indexOf(move.dataset.dashboardMove);
+        const next = index + Number(move.dataset.direction);
+        if (index < 0 || next < 0 || next >= dashboard25.order.length) return;
+        [dashboard25.order[index], dashboard25.order[next]] = [dashboard25.order[next], dashboard25.order[index]];
+      }
       saveDashboard25(); render();
       return;
     }
@@ -6154,15 +6529,36 @@ document.addEventListener('click', event => {
   });
 
   document.addEventListener('change', event => {
+    if (event.target.matches('[data-offer-filter]')) {
+      offerFilters25[event.target.dataset.offerFilter] = event.target.value;
+      render(); return;
+    }
+    if (event.target.matches('[data-offer-favorites]')) {
+      offerFavoritesOnly25 = event.target.checked;
+      render(); return;
+    }
+    if (event.target.matches('[data-offer-archive]')) {
+      data.settings.archiveExpiredOffers = event.target.checked;
+      if (!event.target.checked) data.offerArchive25 = [];
+      else offerList25();
+      save({ touch: false }); render(); return;
+    }
     const toggle = event.target.closest('[data-dashboard-visible]');
     if (!toggle) return;
-    dashboard25.visible[toggle.dataset.dashboardVisible] = toggle.checked;
+    if (dashboardCore) dashboard25 = dashboardCore.setVisible(dashboard25, toggle.dataset.dashboardVisible, toggle.checked, DASH_DEFAULTS);
+    else dashboard25.visible[toggle.dataset.dashboardVisible] = toggle.checked;
     saveDashboard25();
     if (current === 'settings') render();
     else applyDashboard25();
   });
 
   document.addEventListener('submit', event => {
+    const offerForm = event.target.closest('[data-offer-search]');
+    if (offerForm) {
+      event.preventDefault();
+      searchOffers25(new FormData(offerForm).get('query'));
+      return;
+    }
     const collectionForm = event.target.closest('[data-collection-form]');
     if (collectionForm) {
       event.preventDefault();

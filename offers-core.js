@@ -5,7 +5,17 @@
 })(globalThis, function () {
   const TZ = 'Europe/Amsterdam';
   const dayInTz = (now, tz = TZ) => new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }).format(now);
-  const isDate = s => /^\d{4}-\d{2}-\d{2}$/.test(String(s || ''));
+  const isDate = s => {
+    const value = String(s || '');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+    const date = new Date(`${value}T00:00:00Z`);
+    return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value;
+  };
+  const dateOnly = value => {
+    const text = String(value || '');
+    const date = text.slice(0, 10);
+    return (text === date || /^\d{4}-\d{2}-\d{2}T/.test(text)) && isDate(date) ? date : '';
+  };
 
   // Date-only validity is inclusive: an offer ending on 2026-10-12 is active the whole of that day (Amsterdam time).
   // Offers without a validTo are treated as "unknown end" and stay active; no deadline is invented.
@@ -16,9 +26,14 @@
     return true;
   }
   function partition(offers, now, tz) {
-    const active = [], archive = [];
-    (offers || []).forEach(o => (isActive(o, now, tz) ? active : archive).push(o));
-    return { active, archive };
+    const active = [], archive = [], upcoming = [];
+    const today = dayInTz(now || new Date(), tz || TZ);
+    (offers || []).forEach(offer => {
+      if (isActive(offer, now, tz)) active.push(offer);
+      else if (isDate(offer.validFrom) && offer.validFrom > today) upcoming.push(offer);
+      else archive.push(offer);
+    });
+    return { active, archive, upcoming };
   }
   const norm = s => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
   function key(o) {
@@ -34,5 +49,43 @@
     });
     return [...map.values()];
   }
-  return { isActive, partition, dedupe, key, dayInTz };
+
+  function finiteOrNull(value) {
+    if (value == null || value === '') return null;
+    const number = Number(value);
+    return Number.isFinite(number) ? number : null;
+  }
+
+  async function fetchOffers({ query, url, headers = {}, fetchImpl = globalThis.fetch, signal } = {}) {
+    const term = String(query || '').trim();
+    if (!term) throw new Error('Vul een productnaam of merk in.');
+    if (!url) throw new Error('De aanbiedingenbron is niet geconfigureerd.');
+    if (typeof fetchImpl !== 'function') throw new Error('Aanbiedingen ophalen is niet beschikbaar in deze browser.');
+    const response = await fetchImpl(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...headers },
+      body: JSON.stringify({ search: term.slice(0, 100) }),
+      ...(signal ? { signal } : {})
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.error || `Aanbiedingen ophalen mislukt (${response.status}).`);
+    if (!Array.isArray(payload.offers)) throw new Error('De aanbiedingenbron gaf geen geldig aanbod terug.');
+    const offers = payload.offers.filter(item => item && String(item.name || '').trim() && finiteOrNull(item.price) != null)
+      .map(item => ({
+        ...item,
+        name: String(item.name).trim(),
+        brand: String(item.brand || ''),
+        store: String(item.store || ''),
+        price: finiteOrNull(item.price),
+        originalPrice: finiteOrNull(item.originalPrice),
+        discountPercent: finiteOrNull(item.discountPercent),
+        validFrom: dateOnly(item.validFrom),
+        validTo: dateOnly(item.validTo),
+        source: String(item.source || payload.source || 'PrijsProfeet'),
+        checkedAt: payload.checkedAt || new Date().toISOString()
+      }));
+    return { offers: dedupe(offers), source: String(payload.source || 'PrijsProfeet'), checkedAt: payload.checkedAt || new Date().toISOString() };
+  }
+
+  return { isActive, partition, dedupe, key, dayInTz, fetchOffers };
 });
