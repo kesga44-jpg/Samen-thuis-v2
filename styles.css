@@ -1688,23 +1688,3 @@ html[data-theme20="dark"] .mobile-nav-scroll23>button.active,html[data-theme19="
   .weather-day25 span:last-child{grid-column:2}
   .weather-location25 .button-row{flex-wrap:wrap}
 }
-
-/* Vrij instelbare accentkleur: alle variabelen worden door applyCustomAccent() gezet (zie app.js) */
-:root[data-accent20="custom"]{accent-color:var(--blue)}
-:root[data-accent20="custom"] .st-glass20 .primary,
-:root[data-accent20="custom"] .st-glass20 button.primary,
-:root[data-accent20="custom"] button.primary{
-  background:var(--blue)!important;color:var(--accent-on,#fff)!important;border-color:var(--blue)!important;
-}
-:root[data-accent20="custom"] button.primary:hover{background:var(--accent-hover,var(--blue))!important}
-:root[data-accent20="custom"] :focus-visible{outline:2px solid var(--blue);outline-offset:2px;box-shadow:0 0 0 4px var(--accent-ring,transparent)}
-:root[data-accent20="custom"] input[type="color"][data-st-accent]{width:56px;height:36px;padding:2px;cursor:pointer}
-
-/* Quotes: alleen quote + auteur, rustige overgang */
-.quote-card .quote-content{transition:opacity .6s ease}
-.quote-card .quote-content.is-fading{opacity:0}
-.quote-card .quote-author{margin:10px 0 0;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Segoe UI",sans-serif;font-size:.86rem;color:#806c5d}
-@media (prefers-reduced-motion:reduce){.quote-card .quote-content{transition:none}}
-:root[data-accent20="custom"] .nav-item.active,
-:root[data-accent20="custom"] .mobile-nav23 button.active,
-:root[data-accent20="custom"] .mobile-nav-scroll23>button.active{background:var(--blue)!important;color:var(--accent-on,#fff)!important}
