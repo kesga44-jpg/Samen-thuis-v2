@@ -263,9 +263,12 @@ const sections = {
   planning: { label: 'Agenda', icon: '▦' },
   meals: { label: 'Weekmenu', icon: '♨' },
   groceries: { label: 'Boodschappen', icon: '✓' },
+  tasks: { label: 'Taken', icon: '☑' },
   chores: { label: 'Huishouden', icon: '⌁' },
   stock: { label: 'Voorraad', icon: '▤' },
   weather: { label: 'Weer', icon: '☀' },
+  challenges: { label: 'Challenges', icon: '✦' },
+  programs: { label: "Programma's", icon: '▶' },
   ideas: { label: 'Samen doen', icon: '♡' },
   home: { label: 'Woning', icon: '⌂' },
   trips: { label: 'Reizen', icon: '✈' },
@@ -4850,8 +4853,8 @@ applyUi19();
 try{matchMedia('(prefers-color-scheme:dark)').addEventListener('change',()=>ui19.theme==='system'&&applyUi19())}catch(_){}
 
 const pages19=[
- ['today','Today','⌂'],['planning','Agenda','▦'],['meals','Weekmenu','♨'],['groceries','Boodschappen','✓'],['weather','Weer','☀'],
- ['chores','Huishouden','⌁'],['stock','Voorraad','▤'],['trips','Reizen','✈'],['ideas','Date ideeën','♡'],
+ ['today','Today','⌂'],['planning','Agenda','▦'],['meals','Weekmenu','♨'],['groceries','Boodschappen','✓'],['tasks','Taken','☑'],['weather','Weer','☀'],['challenges','Challenges','✦'],
+ ['chores','Huishouden','⌁'],['stock','Voorraad','▤'],['programs',"Programma's",'▶'],['trips','Reizen','✈'],['ideas','Date ideeën','♡'],
  ['home','Woning','⌂'],['budget19','Budget','€'],['extra19','Extra','＋'],['settings','Instellingen','⚙']
 ];
 try{
@@ -5097,8 +5100,8 @@ if(window.__ST_V23__) return; window.__ST_V23__=true;
 
 const NAV23=[
  ['today','⌂','Vandaag'],['planning','▦','Agenda'],['meals','♨','Weekmenu'],
- ['groceries','✓','Boodschappen'],['stock','▤','Voorraad'],['weather','☀','Weer'],['chores','⌁','Huishouden'],
- ['home','⌂','Woning'],['budget19','€','Budget'],['trips','✈','Reizen'],
+ ['groceries','✓','Boodschappen'],['tasks','☑','Taken'],['stock','▤','Voorraad'],['weather','☀','Weer'],['challenges','✦','Challenges'],['chores','⌁','Huishouden'],
+ ['home','⌂','Woning'],['budget19','€','Budget'],['programs','▶',"Programma's"],['trips','✈','Reizen'],
  ['ideas','♡','Date ideeën'],['extra19','＋','Extra'],['settings','⚙','Instellingen']
 ];
 
@@ -5637,8 +5640,8 @@ requestAnimationFrame(navImport243);
    ========================================================= */
 (()=>{'use strict';
  if(window.__ST248_DOCK__)return;window.__ST248_DOCK__=true;
- const ORDER248=['today','planning','meals','groceries','stock','weather','chores','home','budget19','auto24','trips','ideas','extra19','imports243','settings'];
- const LABEL248={today:'Vandaag',planning:'Agenda',meals:'Weekmenu',groceries:'Boodschappen',stock:'Voorraad',weather:'Weer',chores:'Huishouden',home:'Woning',budget19:'Budget',auto24:'Auto',trips:'Reizen',ideas:'Date ideeën',extra19:'Extra',imports243:'Import',settings:'Instellingen'};
+ const ORDER248=['today','planning','meals','groceries','tasks','stock','weather','challenges','chores','home','budget19','auto24','programs','trips','ideas','extra19','imports243','settings'];
+ const LABEL248={today:'Vandaag',planning:'Agenda',meals:'Weekmenu',groceries:'Boodschappen',tasks:'Taken',stock:'Voorraad',weather:'Weer',challenges:'Challenges',chores:'Huishouden',home:'Woning',budget19:'Budget',auto24:'Auto',programs:"Programma's",trips:'Reizen',ideas:'Date ideeën',extra19:'Extra',imports243:'Import',settings:'Instellingen'};
  function actualKey248(b){if(b.dataset.nav23)return b.dataset.nav23;if(b.hasAttribute('data-v24-auto'))return 'auto24';if(b.hasAttribute('data-import243-go'))return 'imports243';return ''}
  function arrange248(){
    const sc=document.querySelector('.mobile-nav-scroll23');if(!sc)return;
@@ -5793,6 +5796,52 @@ document.addEventListener('click', event => {
     });
   }
 
+  let editingCollection25 = null;
+  function collectionItems25(name) {
+    if (!Array.isArray(data[name])) data[name] = [];
+    else if (data[name].some(item => !item || typeof item !== 'object' || Array.isArray(item))) {
+      data[name] = data[name].filter(item => item && typeof item === 'object' && !Array.isArray(item));
+    }
+    return data[name];
+  }
+
+  function safeLink25(value) {
+    try {
+      const url = new URL(value, location.href);
+      return ['http:', 'https:'].includes(url.protocol) ? url.href : '';
+    } catch (_) { return ''; }
+  }
+
+  function renderCollection25(name) {
+    const tasks = name === 'tasks';
+    const label = tasks ? 'Taak' : 'Programma';
+    const items = collectionItems25(name);
+    const old = editingCollection25?.collection === name
+      ? items.find(item => item.id === editingCollection25.id) || null : null;
+    const form = tasks
+      ? `<label class="field">Taak<input name="title" maxlength="120" value="${esc(old?.title || '')}" placeholder="Bijv. vuilnis buitenzetten" required></label>
+        <label class="field">Categorie<input name="category" maxlength="50" value="${esc(old?.category || '')}" placeholder="Bijv. Huishouden"></label>
+        <label class="field">Voor wie?<select name="person">${['Samen', 'Kees', 'Daphne'].map(person => `<option ${old?.person === person ? 'selected' : ''}>${person}</option>`).join('')}</select></label>
+        <label class="field">Uiterste datum<input name="due" type="date" value="${esc(old?.due || '')}"></label>`
+      : `<label class="field">Naam<input name="title" maxlength="120" value="${esc(old?.title || '')}" placeholder="Bijv. zwemles of concert" required></label>
+        <label class="field">Soort<input name="category" maxlength="50" value="${esc(old?.category || '')}" placeholder="Bijv. Sport, cultuur of tv"></label>
+        <label class="field">Datum<input name="date" type="date" value="${esc(old?.date || '')}"></label>
+        <label class="field">Link (optioneel)<input name="url" type="url" maxlength="500" value="${esc(old?.url || '')}" placeholder="https://…"></label>
+        <label class="field">Notitie<textarea name="note" maxlength="500">${esc(old?.note || '')}</textarea></label>`;
+    const ordered = [...items].sort((a, b) => Number(Boolean(a.done)) - Number(Boolean(b.done))
+      || String(a.due || a.date || '').localeCompare(String(b.due || b.date || '')));
+    const rows = ordered.map(item => {
+      const detail = tasks
+        ? [item.category, item.person, item.due && `Uiterlijk ${item.due}`].filter(Boolean).join(' · ')
+        : [item.category, item.date, item.note].filter(Boolean).join(' · ');
+      const link = !tasks && safeLink25(item.url)
+        ? `<a href="${esc(safeLink25(item.url))}" target="_blank" rel="noopener noreferrer">Open link</a>` : '';
+      return `<article class="card collection-item25 ${item.done ? 'is-done' : ''}"><div><h2>${esc(item.title || label)}</h2><p class="muted">${esc(detail || (item.done ? 'Afgerond' : 'Nog geen details'))}</p>${link}</div><div class="button-row"><button type="button" class="secondary" data-collection-toggle="${name}" data-item-id="${esc(item.id)}">${item.done ? 'Opnieuw openen' : 'Afronden'}</button><button type="button" class="secondary" data-collection-edit="${name}" data-item-id="${esc(item.id)}">Bewerken</button><button type="button" class="secondary" data-collection-delete="${name}" data-item-id="${esc(item.id)}">Verwijderen</button></div></article>`;
+    }).join('');
+    const heading = tasks ? 'Taken' : "Programma's";
+    return `<div class="collection-page25"><section class="card settings-card"><div class="card-head"><div><p class="eyebrow">SAMEN THUIS</p><h2>${heading}</h2></div></div><form class="form-grid compact-form" data-collection-form="${name}">${form}<div class="button-row"><button class="primary" type="submit">${old ? 'Wijzigingen opslaan' : `${label} toevoegen`}</button>${old ? '<button class="secondary" type="button" data-collection-cancel>Annuleren</button>' : ''}</div></form></section><div class="collection-list25">${rows || `<section class="card"><p class="muted">Nog geen ${tasks ? 'open taken' : 'programma’s'}.</p></section>`}</div></div>`;
+  }
+
   function weatherLocation25() {
     const settings = data.settings || {};
     const lat = settings.weatherLat === '' || settings.weatherLat == null ? NaN : Number(settings.weatherLat);
@@ -5916,6 +5965,28 @@ document.addEventListener('click', event => {
   }
 
   function render25(...args) {
+    if (current === 'tasks' || current === 'programs') {
+      document.querySelector('#view').innerHTML = renderCollection25(current);
+      document.querySelector('#pageTitle').textContent = sections[current].label;
+      document.querySelector('#addBtn').style.display = 'none';
+      document.querySelectorAll('[data-nav23], [data-v19-go]').forEach(button => {
+        const page = button.dataset.nav23 || button.dataset.v19Go;
+        button.classList.toggle('active', page === current);
+      });
+      updateSyncBadge();
+      return;
+    }
+    if (current === 'challenges' && typeof window.SamenThuisRenderChallenges25 === 'function') {
+      window.SamenThuisRenderChallenges25();
+      document.querySelector('#pageTitle').textContent = sections.challenges.label;
+      document.querySelector('#addBtn').style.display = 'none';
+      document.querySelectorAll('[data-nav23], [data-v19-go]').forEach(button => {
+        const page = button.dataset.nav23 || button.dataset.v19Go;
+        button.classList.toggle('active', page === 'challenges');
+      });
+      updateSyncBadge();
+      return;
+    }
     if (current === 'weather') {
       document.querySelector('#view').innerHTML = renderWeather25();
       document.querySelector('#pageTitle').textContent = sections.weather.label;
@@ -5941,8 +6012,36 @@ document.addEventListener('click', event => {
 
   const previousRender25 = render;
   render = render25;
+  window.__ST_V26_INTEGRATED__ = true;
+  window.SamenThuisChallengeStore = {
+    get() { return data.challengeDataV26 ? clone(data.challengeDataV26) : null; },
+    save(value, { initialize = false } = {}) {
+      data.challengeDataV26 = clone(value);
+      save({ touch: !initialize, sync: true });
+    }
+  };
 
   document.addEventListener('click', event => {
+    if (event.target.closest('[data-collection-cancel]')) {
+      editingCollection25 = null; render(); return;
+    }
+    const collectionAction = event.target.closest('[data-collection-toggle], [data-collection-edit], [data-collection-delete]');
+    if (collectionAction) {
+      const name = collectionAction.dataset.collectionToggle || collectionAction.dataset.collectionEdit || collectionAction.dataset.collectionDelete;
+      const items = collectionItems25(name);
+      const item = items.find(entry => entry.id === collectionAction.dataset.itemId);
+      if (!item) return;
+      if (collectionAction.hasAttribute('data-collection-toggle')) item.done = !item.done;
+      else if (collectionAction.hasAttribute('data-collection-edit')) editingCollection25 = { collection: name, id: item.id };
+      else {
+        if (!confirm(`“${item.title}” verwijderen?`)) return;
+        data[name] = items.filter(entry => entry.id !== item.id);
+      }
+      if (collectionAction.hasAttribute('data-collection-delete') && !data[name].some(entry => entry.id === item.id)) {
+        editingCollection25 = null;
+      }
+      save(); render(); return;
+    }
     if (event.target.closest('[data-weather-refresh]')) { loadWeatherPage25(true); return; }
     if (event.target.closest('[data-weather-geolocate]')) {
       if (!navigator.geolocation) { toast('Locatiebepaling wordt niet door deze browser ondersteund.'); return; }
@@ -5979,6 +6078,24 @@ document.addEventListener('click', event => {
   });
 
   document.addEventListener('submit', event => {
+    const collectionForm = event.target.closest('[data-collection-form]');
+    if (collectionForm) {
+      event.preventDefault();
+      const name = collectionForm.dataset.collectionForm;
+      const fields = Object.fromEntries(new FormData(collectionForm));
+      const items = collectionItems25(name);
+      const existing = editingCollection25?.collection === name
+        ? items.find(item => item.id === editingCollection25.id) : null;
+      const item = name === 'tasks'
+        ? { ...existing, id: existing?.id || id(), title: String(fields.title || '').trim(), category: String(fields.category || '').trim(), person: String(fields.person || 'Samen'), due: String(fields.due || ''), done: existing?.done === true }
+        : { ...existing, id: existing?.id || id(), title: String(fields.title || '').trim(), category: String(fields.category || '').trim(), date: String(fields.date || ''), url: String(fields.url || '').trim(), note: String(fields.note || '').trim(), done: existing?.done === true };
+      if (!item.title) return;
+      const index = items.findIndex(entry => entry.id === item.id);
+      if (index < 0) items.unshift(item); else items[index] = item;
+      editingCollection25 = null;
+      save(); render(); toast(`${name === 'tasks' ? 'Taak' : 'Programma'} opgeslagen`);
+      return;
+    }
     const form = event.target.closest('[data-weather-location]');
     if (!form) return;
     event.preventDefault();

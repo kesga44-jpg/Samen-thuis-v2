@@ -7,12 +7,16 @@
 - Streaks, voortgang en verdiende punten per challenge.
 - Een puntenpot en puntenhistorie.
 - Beloningen beheren en punten inwisselen, met standaardideeën zoals massage, date-avond, ontbijt op bed, vrije tijd en een verrassing.
-- Gegevens worden apart opgeslagen in `samenThuisChallengesV26`; bestaande appgegevens en huishoudhistorie worden niet aangepast.
+- In de primaire app worden challenges, punten en beloningen in `challengeDataV26` in de bestaande gegevensstructuur opgeslagen, zodat back-up en synchronisatie ze meenemen. Als losse add-on gebruikt de module `samenThuisChallengesV26`.
+
+## Integratie in Samen-thuis-v2
+
+De hoofdapp laadt deze module automatisch. De pagina verschijnt in de bestaande navigatie en gebruikt de primaire app-opslag, back-up en versleutelde synchronisatie. Eerder lokaal opgeslagen add-on-gegevens worden bij het laden overgenomen. De module kan ook nog zelfstandig aan een oudere app worden toegevoegd; dan blijft de aparte localStorage-sleutel in gebruik.
 
 ## Belangrijk over v16
 Deze update verandert de bestaande v16-huishoudlogica niet. Het is een losse add-on. Gebruik v16 als functionele referentie en maak vóór publicatie een back-up.
 
-## Installeren
+## Los installeren in een oudere app
 1. Maak een back-up van Samen Thuis en werk bij voorkeur eerst op een aparte GitHub-branch.
 2. Upload `samen-thuis-update-v26-challenges.js` naar de hoofdmap naast `index.html` en `app.js`.
 3. Open `index.html` en voeg vlak vóór `</body>` deze regel toe:

@@ -9,11 +9,12 @@ De primaire applicatie blijft leidend: de aanvullende repository gebruikt ES-mod
 - **Luchtkwaliteit en pollen:** Open-Meteo Air Quality API (`https://air-quality-api.open-meteo.com/v1/air-quality`). Dashboard toont AQI, fijnstof en pollen, met cache en foutmelding.
 - **Kenteken/voertuiggegevens:** RDW Open Data (`https://opendata.rdw.nl/resource/m9d7-ebf2.json`). Voertuigscherm kan gegevens ophalen op basis van een kenteken; tankbeurten, voertuiggegevens en statistieken worden lokaal bijgehouden.
 - **Synchronisatie:** Supabase REST API via de bestaande project-URL en publishable key. Synchronisatie gebruikt encryptie en conflictcontrole in de bestaande code. Configureer de bijbehorende huishoudcode/instellingen in de app.
+- **Challenges en beloningen:** De bestaande challenge-uitbreiding is aangesloten op de primaire navigatie en de hoofdgegevensstructuur. Punten en voortgang gaan daardoor mee in de bestaande JSON-back-up en versleutelde synchronisatie.
 - **PDF-import:** PDF.js via jsDelivr CDN.
 
 ## Bestaande onderdelen
 
-De hoofdrepository bevat onder meer Vandaag, Agenda, Weekmenu, Boodschappen, Huishouden, Voorraad, Samen doen/Date ideeën, Woning, Reizen, Instellingen, import/synchronisatie, Budget en Auto/brandstof. Dashboardkaarten kunnen per apparaat worden verborgen en geordend via Instellingen. De aanvullende repository biedt ook taken-, challenge- en programmafuncties; deze zijn geen nieuwe afzonderlijke pagina's in deze integratie, omdat de primaire app gegevens voor huishoudtaken en samen-doen al op haar eigen manier beheert.
+De hoofdrepository bevat onder meer Vandaag, Agenda, Weekmenu, Boodschappen, Taken, Huishouden, Challenges, Programma's, Voorraad, Samen doen/Date ideeën, Woning, Reizen, Instellingen, import/synchronisatie, Budget en Auto/brandstof. Dashboardkaarten kunnen per apparaat worden verborgen en geordend via Instellingen. De primaire huishoudplanning en ideeën blijven behouden; acties en prijsvolging blijven onder de bestaande boodschappen-/auto-onderdelen.
 
 ## Verificatie uitgevoerd
 
