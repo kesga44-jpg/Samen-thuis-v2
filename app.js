@@ -4994,6 +4994,18 @@ function apply20(){
   html.dataset.density19 = ui20.density || 'comfortable';
   html.dataset.density20 = ui20.density || 'comfortable';
   html.style.colorScheme = dark ? 'dark' : 'light';
+  const hex = /^#[0-9a-f]{6}$/i.test(ui20.accentColor || '') ? ui20.accentColor : '';
+  ['--blue','--blue-soft','--dark-accent-text'].forEach(v => html.style.removeProperty(v));
+  if (hex) {
+    const [r, g, b] = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16));
+    const mix = (t, k) => '#' + [r, g, b].map(c => Math.round(c + (t - c) * k).toString(16).padStart(2, '0')).join('');
+    const lum = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+    // Keep accent text readable: darken very light colours on light themes, lighten dark colours on dark themes.
+    html.style.setProperty('--blue', dark ? mix(255, lum < 0.5 ? 0.45 : 0) : mix(0, lum > 0.65 ? 0.45 : 0));
+    html.style.setProperty('--blue-soft', mix(255, 0.88));
+    html.style.setProperty('--dark-accent-text', mix(255, lum < 0.6 ? 0.55 : 0.2));
+    html.dataset.accent20 = html.dataset.accent19 = 'custom';
+  }
   document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark ? '#081b2d' : '#eef3f9');
 }
 function save20(){
@@ -5013,7 +5025,16 @@ function beautifySettings20(){
   const accent = box.querySelector('[data-v19-accent]');
   const density = box.querySelector('[data-v19-density]');
   if(theme){ theme.value=ui20.theme; theme.onchange=()=>{ui20.theme=theme.value;save20()}; }
-  if(accent){ accent.value=ui20.accent; accent.onchange=()=>{ui20.accent=accent.value;save20()}; }
+  if(accent){ accent.value=ui20.accent; accent.onchange=()=>{ui20.accent=accent.value;delete ui20.accentColor;save20()}; }
+  if(accent && !box.querySelector('[data-accent-color]')){
+    const label = document.createElement('label');
+    label.innerHTML = 'Eigen accentkleur (dit apparaat) <input type="color" data-accent-color> <button type="button" data-accent-reset class="secondary">Standaard</button>';
+    accent.closest('label')?.after(label);
+    const input = label.querySelector('input');
+    input.value = /^#[0-9a-f]{6}$/i.test(ui20.accentColor || '') ? ui20.accentColor : '#7057d9';
+    input.oninput = () => { ui20.accentColor = input.value; save20(); };
+    label.querySelector('[data-accent-reset]').onclick = () => { delete ui20.accentColor; save20(); };
+  }
   if(density){ density.value=ui20.density; density.onchange=()=>{ui20.density=density.value;save20()}; }
 }
 
@@ -5161,7 +5182,7 @@ function calcBudget23(){
  const saving=b.goals.reduce((s,x)=>s+n23(x.monthly),0);
  const investing=n23(b.investing),house=n23(b.houseBudget),income=K+D,contribution=income*rate;
  const needed=fixed+house+saving+investing,remainder=contribution-needed;
- const saved=b.goals.reduce((s,x)=>s+n23(x.current),0),targets=b.goals.reduce((s,x)=>s+n23(x.target),0);
+ const saved=b.goals.reduce((s,x)=>s+goalBalance23(x),0),targets=b.goals.reduce((s,x)=>s+n23(x.target),0);
  return {b,K,D,rate,fixed,saving,investing,house,income,contribution,needed,remainder,saved,targets,
   kContribution:K*rate,dContribution:D*rate,kPersonal:K*(1-rate),dPersonal:D*(1-rate),
   neededPct:income?needed/income*100:0};
@@ -5172,8 +5193,11 @@ function deadlineMonths23(deadline){
  if(Number.isNaN(d.getTime()))return null;
  return Math.max(0,Math.ceil((d-now)/(30.4375*86400000)));
 }
+const SAV23=()=>globalThis.SamenThuisSavings;
+function goalBalance23(g){return SAV23()?SAV23().balance(g):n23(g.current)}
+function today23(){const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`}
 function goalStatus23(g){
- const left=Math.max(0,n23(g.target)-n23(g.current)),m=n23(g.monthly);
+ const left=Math.max(0,n23(g.target)-goalBalance23(g)),m=n23(g.monthly);
  const months=m>0?Math.ceil(left/m):null,deadline=deadlineMonths23(g.deadline);
  return {left,months,deadline,enough:deadline==null||left===0||(m>0&&months<=deadline)};
 }
@@ -5193,18 +5217,49 @@ function projection23(g){
  const coords=points.map((p,i)=>`${pad+(w-2*pad)*(p.m/months)},${h-pad-(h-2*pad)*(p.v/max)}`).join(' ');
  return `<svg class="projection23" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><line x1="${pad}" y1="${h-pad}" x2="${w-pad}" y2="${h-pad}"/><line x1="${pad}" y1="${pad}" x2="${w-pad}" y2="${pad}" class="target23"/><polyline points="${coords}"/></svg>`;
 }
+const KIND23={fixed:'Vast doelbedrag',recurring:'Terugkerende rekening',buffer:'Noodbuffer'};
+function goalDetail23(g){
+ const S=SAV23();if(!S)return '';
+ const st=S.status(g,today23()),actual=S.actualInPeriod(g,today23(),st.frequency);
+ const diff=S.round(actual-st.planned),label=S.FREQUENCIES[st.frequency].toLowerCase();
+ const dep=(g.deposits||[]).slice(-3).reverse().map(x=>`<li>${esc(x.date)} · ${eur23(x.amount)}${x.note?' · '+esc(x.note):''}</li>`).join('');
+ return `<div class="goal-extra23">
+  <p><small>${esc(KIND23[g.kind]||KIND23.fixed)} · ${g.scope==='personal'?'Persoonlijk':'Gezamenlijk'} · prioriteit ${n23(g.priority)||3}${g.paused?' · gepauzeerd':''}</small></p>
+  <p>Gepland per periode (${label}): <b>${eur23(st.planned)}</b> · Werkelijk deze periode: <b>${eur23(actual)}</b> · Verschil gepland/werkelijk: <b class="${diff<0?'warn23':'ok23'}">${eur23(diff)}</b></p>
+  ${st.required!=null&&st.state!=='reached'?`<p>Benodigd per periode voor de deadline: <b>${eur23(st.required)}</b>${st.moments!=null?` (${st.moments} inlegmomenten)`:''}</p>`:''}
+  ${st.expectedEnd?`<p>Verwachte einddatum bij huidig ritme: <b>${esc(st.expectedEnd)}</b></p>`:''}
+  ${st.state==='expired'?'<p class="warn23">Deadline is verstreken — pas deadline, doelbedrag of prioriteit aan.</p>':''}
+  ${st.state==='behind'?`<p class="warn23">Achterstand ten opzichte van de spaarplanning: ${eur23(st.behind)} (geen schuld en geen negatief banksaldo). ${st.required!=null?`Nodig per periode om de deadline te halen: ${eur23(st.required)}.`:''}</p>`:''}
+  ${st.state==='active'&&!st.feasible&&st.required!=null?`<p class="warn23">Niet haalbaar met huidige inleg; benodigd ${eur23(st.required)} per periode.</p>`:''}
+  <p><button data-sav-deposit="${esc(g.id)}">+ Storting registreren</button> <button data-sav-pause="${esc(g.id)}">${g.paused?'Hervatten':'Pauzeren'}</button></p>
+  ${dep?`<ul class="muted">${dep}</ul>`:''}
+ </div>`;
+}
+function savingsPlan23(c){
+ const S=SAV23();if(!S)return '';
+ const b=c.b,available=c.contribution-c.fixed-c.house-c.investing;
+ const p=S.propose(b.goals,Math.max(0,available),today23());
+ const rows=p.rows.map(r=>`<tr><td>${esc(r.title)}</td><td>${eur23(r.need)}</td><td><input inputmode="decimal" data-sav-prop="${esc(r.id)}" value="${r.proposed}"></td><td>${esc(r.reason)}${r.behind?` · achterstand ${eur23(r.behind)}`:''}</td></tr>`).join('');
+ return `<section class="budget-sheet23"><header><div><small>SLIM SPAREN</small><h2>Verdeling beschikbaar spaarbedrag</h2></div></header>
+  <div class="calc23"><span>Beschikbaar om te sparen (afdracht − vaste lasten − huisbudget − beleggen) <b>${eur23(Math.max(0,available))}</b></span><span>Totaal benodigde inleg actieve doelen (per maand) <b>${eur23(p.totalNeed)}</b></span><span>Ingestelde maandinleg (huidig budget) <b>${eur23(c.saving)}</b></span>
+  <span class="total23">${p.shortfall>0?`Gewenste inleg is ${eur23(p.shortfall)} hoger dan beschikbaar`:`Voldoende beschikbaar, ${eur23(p.leftover)} over`}</span></div>
+  <div style="overflow-x:auto"><table class="sav-table23"><thead><tr><th>Doel</th><th>Nodig/maand</th><th>Voorstel</th><th>Toelichting</th></tr></thead><tbody>${rows}</tbody></table></div>
+  <p><button class="primary" data-sav-apply>Voorstel opslaan als maandinleg</button></p>
+  <p class="muted">Dit is een planning: er worden geen betalingen of overboekingen uitgevoerd en theoretische besparingen tellen niet als ontvangen geld.</p></section>`;
+}
 function renderBudget23(){
  const c=calcBudget23(),b=c.b;
  const goals=b.goals.map((g,i)=>{
   const st=goalStatus23(g);
   return `<article class="light-surface23 goal-card23">
    <header><div><small>SPAARDOEL</small><h3>${esc(g.title)}</h3><p>${esc(g.deadline||'Geen deadline')}</p></div><div><button data-budget23-goal="${i}">Bewerk</button><button class="danger23" data-budget23-delgoal="${i}">×</button></div></header>
-   <div class="goal-visual23">${donut23(g.current,g.target,g.title)}<div><b>${eur23(g.current)} / ${eur23(g.target)}</b><span>Nog nodig ${eur23(st.left)}</span><span>${n23(g.monthly)>0?`${eur23(g.monthly)} per maand`:'Geen maandbedrag'}</span><span class="${st.enough?'ok23':'warn23'}">${st.months===0?'Doel bereikt':st.months?`Verwacht over ${st.months} maanden`:'Geen prognose'}${st.deadline!=null?` · ${st.enough?'op schema':'inleg te laag voor deadline'}`:''}</span></div></div>
+   <div class="goal-visual23">${donut23(goalBalance23(g),g.target,g.title)}<div><b>${eur23(goalBalance23(g))} / ${eur23(g.target)}</b><span>Nog nodig ${eur23(st.left)}</span><span>${n23(g.monthly)>0?`${eur23(g.monthly)} per maand`:'Geen maandbedrag'}</span><span class="${st.enough?'ok23':'warn23'}">${st.months===0?'Doel bereikt':st.months?`Verwacht over ${st.months} maanden`:'Geen prognose'}${st.deadline!=null?` · ${st.enough?'op schema':'inleg te laag voor deadline'}`:''}</span></div></div>
+   ${goalDetail23(g)}
    ${projection23(g)}
   </article>`;
  }).join('');
  const fixed=b.fixed.map((x,i)=>`<div class="light-surface23 fixed-row23"><div><b>${esc(x.title)}</b><small>${x.period==='jaar'?'Jaarlijks':x.period==='kwartaal'?'Per kwartaal':'Maandelijks'} · ${eur23(monthlyFixed23(x))}/mnd</small></div><strong>${eur23(x.amount)}</strong><button data-budget23-fixed="${i}">Bewerk</button><button class="danger23" data-budget23-delfixed="${i}">×</button></div>`).join('');
- const goalBars=b.goals.map(g=>({label:g.title,value:n23(g.current),value2:Math.max(0,n23(g.target)-n23(g.current))}));
+ const goalBars=b.goals.map(g=>({label:g.title,value:goalBalance23(g),value2:Math.max(0,n23(g.target)-goalBalance23(g))}));
  const money=[{label:'Vaste lasten',value:c.fixed},{label:'Huisbudget',value:c.house},{label:'Sparen',value:c.saving},{label:'Beleggen',value:c.investing},{label:'Resterend',value:Math.max(0,c.remainder)}];
  const house=b.houseCategories.map((x,i)=>`<label>${esc(x.title)}<input inputmode="decimal" data-budget23-house="${i}" value="${n23(x.amount)}"></label>`).join('');
  return `<div class="budget23">
@@ -5229,6 +5284,8 @@ function renderBudget23(){
   </section>
 
   <section class="budget-sheet23"><header><div><small>SPAARDOELEN & PROGNOSE</small><h2>Voortgang</h2></div><button class="primary" data-budget23-addgoal>+ Spaardoel</button></header><div class="goals23">${goals}</div></section>
+
+  ${savingsPlan23(c)}
 
   <section class="budget-grid23">
    <article class="budget-sheet23"><header><div><small>SPAARGELD PER DOEL</small><h2>Gespaard versus nog nodig</h2></div></header><div class="legend23"><span><i></i>Gespaard</span><span><em></em>Nog nodig</span></div>${bars23(goalBars,true)}</article>
@@ -5258,8 +5315,33 @@ function editGoal23(i){
  const currentAmount=prompt('Huidig gespaard',g.current);if(currentAmount===null)return;
  const monthly=prompt('Maandelijkse inleg',g.monthly);if(monthly===null)return;
  const deadline=prompt('Deadline (YYYY-MM-DD), "Jaarlijks" of leeg',g.deadline||'');if(deadline===null)return;
- const item={...g,title:title.trim()||'Spaardoel',target:n23(target),current:n23(currentAmount),monthly:n23(monthly),deadline:deadline.trim(),recurring:/jaarlijks/i.test(deadline)};
+ const freq=prompt('Inlegfrequentie: weekly, monthly, quarterly of yearly',g.frequency||'monthly');if(freq===null)return;
+ const prio=prompt('Prioriteit (1 = hoogst, 5 = laagst)',g.priority||3);if(prio===null)return;
+ const scope=prompt('Gezamenlijk of persoonlijk? (gezamenlijk/persoonlijk)',g.scope==='personal'?'persoonlijk':'gezamenlijk');if(scope===null)return;
+ const kind=prompt('Type: fixed (doelbedrag), recurring (terugkerende rekening) of buffer (noodbuffer)',g.kind||'fixed');if(kind===null)return;
+ const dl=deadline.trim();
+ if(dl&&dl!=='Jaarlijks'&&!/^\d{4}-\d{2}-\d{2}$/.test(dl)){alert('Ongeldige deadline; gebruik YYYY-MM-DD.');return}
+ const item={...g,title:title.trim()||'Spaardoel',target:Math.max(0,n23(target)),current:n23(currentAmount),monthly:Math.max(0,n23(monthly)),deadline:dl,recurring:/jaarlijks/i.test(dl),
+  frequency:['weekly','monthly','quarterly','yearly'].includes(freq.trim())?freq.trim():'monthly',priority:Math.min(5,Math.max(1,Math.round(n23(prio))||3)),
+  scope:/pers/i.test(scope)?'personal':'shared',kind:['fixed','recurring','buffer'].includes(kind.trim())?kind.trim():'fixed',
+  startDate:g.startDate||(dl&&dl!=='Jaarlijks'?today23():''),startAmount:g.startAmount??n23(currentAmount),deposits:Array.isArray(g.deposits)?g.deposits:[]};
  if(i==null)b.goals.push(item);else b.goals[i]=item;save();render();
+}
+function addSavingsDeposit23(goalId){
+ const g=budget23().goals.find(x=>x.id===goalId);if(!g||!SAV23())return;
+ const amount=prompt(`Bedrag storting in "${g.title}" (negatief = opname)`,'');if(amount===null)return;
+ const date=prompt('Datum (YYYY-MM-DD)',today23());if(date===null)return;
+ const note=prompt('Omschrijving (optioneel)','');if(note===null)return;
+ try{
+  const r=SAV23().addDeposit(g,{amount:n23(amount),date:date.trim(),note});
+  if(!r.added)alert('Deze storting is al geregistreerd.');
+  save();render();
+ }catch(err){alert(err.message)}
+}
+function applySavingsProposal23(){
+ const b=budget23();
+ document.querySelectorAll('[data-sav-prop]').forEach(inp=>{const g=b.goals.find(x=>x.id===inp.dataset.savProp);if(g)g.monthly=Math.max(0,n23(inp.value))});
+ save();render();
 }
 function mobileNav23(){
  document.querySelectorAll('#dock21,#dock219,.dock21,.dock219,[data-v19-moremenu]').forEach(x=>x.remove());
@@ -5289,6 +5371,9 @@ document.addEventListener('click',e=>{
  if(e.target.closest('[data-budget23-addfixed]')){editFixed23(null);return}
  const ef=e.target.closest('[data-budget23-fixed]');if(ef){editFixed23(Number(ef.dataset.budget23Fixed));return}
  const df=e.target.closest('[data-budget23-delfixed]');if(df&&confirm('Deze vaste last verwijderen?')){budget23().fixed.splice(Number(df.dataset.budget23Delfixed),1);save();render();return}
+ const sd=e.target.closest('[data-sav-deposit]');if(sd){addSavingsDeposit23(sd.dataset.savDeposit);return}
+ const sp=e.target.closest('[data-sav-pause]');if(sp){const g=budget23().goals.find(x=>x.id===sp.dataset.savPause);if(g){g.paused=!g.paused;save();render()}return}
+ if(e.target.closest('[data-sav-apply]')){applySavingsProposal23();return}
  if(e.target.closest('[data-budget23-addgoal]')){editGoal23(null);return}
  const eg=e.target.closest('[data-budget23-goal]');if(eg){editGoal23(Number(eg.dataset.budget23Goal));return}
  const dg=e.target.closest('[data-budget23-delgoal]');if(dg&&confirm('Dit spaardoel verwijderen?')){budget23().goals.splice(Number(dg.dataset.budget23Delgoal),1);save();render();return}

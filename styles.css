@@ -1688,3 +1688,9 @@ html[data-theme20="dark"] .mobile-nav-scroll23>button.active,html[data-theme19="
   .weather-day25 span:last-child{grid-column:2}
   .weather-location25 .button-row{flex-wrap:wrap}
 }
+
+/* Slim sparen */
+.goal-extra23{margin-top:10px;display:grid;gap:4px}.goal-extra23 p{margin:0}.goal-extra23 ul{margin:4px 0 0;padding-left:18px;font-size:.72rem}
+.sav-table23{width:100%;border-collapse:collapse;font-size:.85rem}.sav-table23 th,.sav-table23 td{padding:6px;text-align:left;border-bottom:1px solid rgba(128,128,128,.25)}
+.sav-table23 input{width:90px}
+@media (max-width:640px){.goals23{grid-template-columns:1fr}}
