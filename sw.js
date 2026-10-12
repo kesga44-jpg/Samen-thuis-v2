@@ -1,5 +1,5 @@
-const CACHE='samen-thuis-v26-1-accent';
-const ASSETS=['./','./index.html','./css/tokens.css?v=249','./css/base.css?v=249','./css/layout.css?v=249','./css/components.css?v=249','./styles.css?v=250','./data-core.js?v=249','./household-core.js?v=261','./app.js?v=252','./samen-thuis-update-v26-challenges.js?v=260','./manifest.webmanifest','./icon.svg'];
+const CACHE='samen-thuis-v25-1-integrated';
+const ASSETS=['./','./index.html','./css/tokens.css?v=249','./css/base.css?v=249','./css/layout.css?v=249','./css/components.css?v=249','./styles.css?v=250','./data-core.js?v=249','./app.js?v=251','./samen-thuis-update-v26-challenges.js?v=260','./manifest.webmanifest','./icon.svg'];
 
 self.addEventListener('install',event=>{
   event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS)).then(()=>self.skipWaiting()));

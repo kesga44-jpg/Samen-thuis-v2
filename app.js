@@ -374,37 +374,22 @@ function renderDailyQuestion() {
   </section>`;
 }
 
-const QUOTE_POOL_KEY = 'samenThuisQuotePoolV1';
-const QUOTE_ROTATE_MS = 90000;
-function readQuotePool() {
-  try {
-    const pool = JSON.parse(localStorage.getItem(QUOTE_POOL_KEY) || '[]');
-    return Array.isArray(pool) ? pool.filter(q => q && q.text && q.author) : [];
-  } catch { return []; }
-}
-// Alleen quotes met bekende auteur worden bewaard; de pool groeit met de dagelijkse BrainyQuote-feed.
-function addQuoteToPool(text, author) {
-  text = String(text || '').replace(/\s+/g, ' ').trim();
-  author = String(author || '').replace(/\s+/g, ' ').trim();
-  if (text.length < 12 || !author) return;
-  const pool = readQuotePool();
-  if (pool.some(q => q.text === text)) return;
-  pool.push({ text, author, added: todayISO() });
-  localStorage.setItem(QUOTE_POOL_KEY, JSON.stringify(pool.slice(-60)));
-}
 function captureBrainyQuote() {
   const source = document.querySelector('#brainyQuoteSource');
   if (!source) return;
   const copy = source.cloneNode(true);
-  copy.querySelectorAll('script,style').forEach(node => node.remove());
-  const link = [...copy.querySelectorAll('a')].find(a => /more quotes/i.test(a.textContent));
-  if (link) link.remove();
-  const authorLink = copy.querySelector('a');
-  const author = authorLink?.textContent;
-  authorLink?.remove();
-  addQuoteToPool(copy.textContent, author);
-  if (current === 'today') render();
+  copy.querySelectorAll('script').forEach(script => script.remove());
+  copy.querySelectorAll('a').forEach(link => {
+    if (link.textContent.trim().toLowerCase() === 'more quotes') link.remove();
+  });
+  const quoteText = copy.textContent.replace(/\s+/g, ' ').trim();
+  const markup = `<blockquote>${esc(quoteText)}</blockquote>`;
+  if (quoteText.length > 12) {
+    localStorage.setItem(QUOTE_KEY, JSON.stringify({ date: todayISO(), markup }));
+    if (current === 'today') render();
+  }
 }
+
 async function refreshBrainyQuoteRSS() {
   try {
     const response = await fetch('https://www.brainyquote.com/link/quotebr.rss', { cache: 'no-store' });
@@ -415,48 +400,26 @@ async function refreshBrainyQuoteRSS() {
     const title = item.querySelector('title')?.textContent?.trim() || '';
     const descriptionHtml = item.querySelector('description')?.textContent || '';
     const description = new DOMParser().parseFromString(descriptionHtml, 'text/html').body.textContent.trim();
+    if (!title && !description) return;
     const genericTitle = /^(today'?s )?quote/i.test(title);
     const quote = genericTitle ? description : title;
     const author = genericTitle || description === title ? '' : description;
-    addQuoteToPool(quote, author);
+    const markup = `<blockquote>${esc(quote)}</blockquote>${author ? `<p>${esc(author)}</p>` : ''}`;
+    localStorage.setItem(QUOTE_KEY, JSON.stringify({ date: todayISO(), markup }));
     if (current === 'today') render();
   } catch {
-    // De bewaarde quotes blijven bruikbaar zonder verbinding.
+    // De officiële Javascript-feed en de laatst bewaarde quote blijven als fallback werken.
   }
 }
-// Migreer de oude enkelvoudige cache (alleen als daar een auteur in staat).
-function migrateOldQuote() {
-  try {
-    const old = JSON.parse(localStorage.getItem(QUOTE_KEY) || 'null');
-    if (!old?.markup) return;
-    const box = document.createElement('div');
-    box.innerHTML = old.markup;
-    addQuoteToPool(box.querySelector('blockquote')?.textContent, box.querySelector('p')?.textContent);
-  } catch {}
-}
-setTimeout(migrateOldQuote, 0);
-function quoteMarkup(q) {
-  return `<blockquote>${esc(q.text)}</blockquote><p class="quote-author">${esc(q.author)}</p>`;
-}
+
 function renderQuote() {
-  const pool = readQuotePool();
-  const idx = window.SamenThuisHousehold.quoteIndex(Date.now(), pool.length, QUOTE_ROTATE_MS);
-  const quote = idx >= 0
-    ? `<div class="quote-content" data-quote-box data-quote-idx="${idx}">${quoteMarkup(pool[idx])}</div>`
+  let cache;
+  try { cache = JSON.parse(localStorage.getItem(QUOTE_KEY) || 'null'); } catch { cache = null; }
+  const quote = cache?.markup
+    ? `<div class="quote-content">${cache.markup}</div>`
     : '<p class="quote-offline">De quote wordt opgehaald zodra er verbinding is.</p>';
-  return `<section class="card quote-card"><div>${quote}</div><a href="https://www.brainyquote.com/link/quotebr.rss" target="_blank" rel="noopener">Bron: BrainyQuote RSS</a></section>`;
+  return `<section class="card quote-card"><div><p class="eyebrow">Quote of the day</p>${quote}</div><a href="https://www.brainyquote.com/link/quotebr.rss" target="_blank" rel="noopener">Bron: BrainyQuote RSS</a></section>`;
 }
-setInterval(() => {
-  const box = document.querySelector('[data-quote-box]');
-  if (!box || document.hidden) return;
-  const pool = readQuotePool();
-  const idx = window.SamenThuisHousehold.quoteIndex(Date.now(), pool.length, QUOTE_ROTATE_MS);
-  if (idx < 0 || String(idx) === box.dataset.quoteIdx) return;
-  box.dataset.quoteIdx = idx;
-  box.classList.add('is-fading');
-  // Quote en auteur worden samen vervangen, zodat ze altijd bij elkaar blijven.
-  setTimeout(() => { box.innerHTML = quoteMarkup(pool[idx]); box.classList.remove('is-fading'); }, 600);
-}, 5000);
 
 function tripFolderById(folderId) {
   return data.tripFolders.find(folder => folder.id === folderId);
@@ -4948,12 +4911,11 @@ function extraPage19(){
 function settingsPanel19(){
  if(current!=='settings')return;
  const v=document.querySelector('#view');if(!v||v.querySelector('[data-v19-device-settings]'))return;
- v.insertAdjacentHTML('afterbegin',`<section class="card device-settings19" data-v19-device-settings><div class="card-head"><div><p class="eyebrow">DIT APPARAAT</p><h2>Thema & weergave</h2></div><span class="tag">Niet gedeeld</span></div><p class="muted">Deze instellingen blijven alleen op dit apparaat. Kies hierboven wie dit apparaat gebruikt: de accentkleur wordt per profiel op dit apparaat bewaard en overschrijft de kleur van de ander niet. Er zijn geen accounts, dus dit is niet gesynchroniseerd.</p>
+ v.insertAdjacentHTML('afterbegin',`<section class="card device-settings19" data-v19-device-settings><div class="card-head"><div><p class="eyebrow">DIT APPARAAT</p><h2>Thema & weergave</h2></div><span class="tag">Niet gedeeld</span></div><p class="muted">Deze instellingen blijven alleen op dit apparaat. Daphne kan op haar telefoon dus een ander thema gebruiken.</p>
  <div class="settings-grid19"><label>Thema<select data-v19-theme><option value="system">Systeem</option><option value="light">Licht</option><option value="dark">Donker</option></select></label>
- <label>Profiel op dit apparaat<select data-st-profile><option value="">Geen profiel</option><option value="Kees">Kees</option><option value="Daphne">Daphne</option></select></label>
- <label>Accentkleur<input type="color" data-st-accent aria-label="Accentkleur"></label>
+ <label>Accent<select data-v19-accent><option value="bluePurple">Blauw / paars</option><option value="blue">Blauw</option><option value="purple">Paars</option><option value="orange">Oranje</option></select></label>
  <label>Weergave<select data-v19-density><option value="comfortable">Ruim</option><option value="compact">Compact</option></select></label></div></section>`);
- v.querySelector('[data-v19-theme]').value=ui19.theme;initAccentControls(v);v.querySelector('[data-v19-density]').value=ui19.density;
+ v.querySelector('[data-v19-theme]').value=ui19.theme;v.querySelector('[data-v19-accent]').value=ui19.accent;v.querySelector('[data-v19-density]').value=ui19.density;
 }
 function editBudget19(index=null){
  data.budget ||= {income:0,expenses:[]}; data.budget.expenses ||= [];
@@ -5033,7 +4995,6 @@ function apply20(){
   html.dataset.density20 = ui20.density || 'comfortable';
   html.style.colorScheme = dark ? 'dark' : 'light';
   document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark ? '#081b2d' : '#eef3f9');
-  applyCustomAccent();
 }
 function save20(){
   localStorage.setItem(KEY20, JSON.stringify(ui20));
@@ -5042,58 +5003,6 @@ function save20(){
 }
 apply20();
 try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => ui20.theme === 'system' && apply20()); } catch(_){}
-
-/* Vrij instelbare accentkleur: per profiel op dit apparaat, afgeleid via SamenThuisHousehold.deriveAccent */
-var ACCENT_KEY = 'samenThuisAccentV1';
-var LEGACY_ACCENTS = { purple:'#7057d9', blue:'#246ca6', orange:'#d56e38', bluePurple:'#5f63d8' };
-function readAccentStore() {
-  try {
-    const x = JSON.parse(localStorage.getItem(ACCENT_KEY) || 'null');
-    if (x && typeof x === 'object') return { profile: x.profile || '', colors: x.colors || {} };
-  } catch (_) {}
-  return { profile: '', colors: {} };
-}
-function currentAccent() {
-  const store = readAccentStore();
-  const stored = store.colors[store.profile];
-  const H = window.SamenThuisHousehold;
-  if (H.isHex(stored)) return stored;
-  return LEGACY_ACCENTS[ui20.accent] || H.DEFAULT_ACCENT;
-}
-function applyCustomAccent() {
-  const H = window.SamenThuisHousehold;
-  if (!H) return;
-  const a = H.deriveAccent(currentAccent());
-  const html = document.documentElement, set = (k, v) => html.style.setProperty(k, v);
-  html.dataset.accent20 = 'custom';
-  html.dataset.accent19 = 'custom';
-  set('--blue', a.base); set('--blue-soft', a.soft); set('--accent-hover', a.hover);
-  set('--accent-on', a.onAccent); set('--accent-ring', a.ring); set('--dark-accent-text', a.darkText);
-}
-function initAccentControls(root) {
-  const store = readAccentStore();
-  const profile = root.querySelector('[data-st-profile]'), picker = root.querySelector('[data-st-accent]');
-  if (!profile || !picker) return;
-  profile.value = store.profile;
-  picker.value = currentAccent();
-}
-document.addEventListener('input', e => {
-  if (!e.target.matches?.('[data-st-accent]')) return;
-  const store = readAccentStore();
-  store.colors[store.profile] = e.target.value;
-  localStorage.setItem(ACCENT_KEY, JSON.stringify(store));
-  applyCustomAccent();
-});
-document.addEventListener('change', e => {
-  if (!e.target.matches?.('[data-st-profile]')) return;
-  const store = readAccentStore();
-  store.profile = e.target.value;
-  localStorage.setItem(ACCENT_KEY, JSON.stringify(store));
-  applyCustomAccent();
-  const picker = document.querySelector('[data-st-accent]');
-  if (picker) picker.value = currentAccent();
-});
-applyCustomAccent();
 
 function beautifySettings20(){
   if (typeof current === 'undefined' || current !== 'settings') return;
