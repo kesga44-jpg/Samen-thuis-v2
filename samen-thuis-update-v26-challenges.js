@@ -19,7 +19,7 @@
   const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const safeParse = () => {
     try {
-      const x = JSON.parse(localStorage.getItem(KEY) || '{}');
+      const x = window.SamenThuisChallengeStore?.get?.() || JSON.parse(localStorage.getItem(KEY) || '{}');
       return {
         challenges: Array.isArray(x.challenges) ? x.challenges : [],
         rewards: Array.isArray(x.rewards) ? x.rewards : defaultRewards(),
@@ -42,7 +42,13 @@
   let state = safeParse();
   let activeFilter = 'Alles';
   let draftEditing = null;
-  function save() { localStorage.setItem(KEY, JSON.stringify(state)); }
+  function save(options) {
+    if (window.__ST_V26_INTEGRATED__ && window.SamenThuisChallengeStore) {
+      window.SamenThuisChallengeStore.save(state, options);
+      return;
+    }
+    localStorage.setItem(KEY, JSON.stringify(state));
+  }
   function balance() { return state.balance; }
 
   function dateDiff(a,b) {
@@ -119,6 +125,7 @@
     state.rewards = state.rewards.filter(x=>x.id!==id); save(); renderPage();
   }
   function addNav() {
+    if (window.__ST_V26_INTEGRATED__) return;
     const navs = document.querySelectorAll('.sidebar nav,.side-nav,.nav-list,.mobile-nav,.bottom-nav');
     navs.forEach(nav => {
       if (nav.querySelector('[data-st26-nav]')) return;
@@ -182,7 +189,7 @@
       <div data-st26-panel="history" hidden>
         <div class="st26-card"><h2>Puntenhistorie</h2>${state.ledger.length?`<div class="st26-history">${state.ledger.map(x=>`<div><span><b>${esc(x.title)}</b><small>${esc(x.date)} · ${x.kind==='verdiend'?'Punten verdiend':'Beloning ingewisseld'}</small></span><strong class="${x.points<0?'st26-negative':'st26-positive'}">${x.points>0?'+':''}${x.points} ★</strong></div>`).join('')}</div>`:'<p>Nog geen puntenbewegingen.</p>'}</div>
       </div>
-      <p class="st26-note">Punten en streaks gelden voor alle soorten challenges. Per challenge kan je maar één keer per dag punten verdienen. Deze uitbreiding bewaart haar gegevens apart en verandert bestaande huishoudtaken en hun historie niet.</p>
+      <p class="st26-note">Punten en streaks gelden voor alle soorten challenges. Per challenge kan je maar één keer per dag punten verdienen. ${window.__ST_V26_INTEGRATED__?'Challenges, punten en beloningen maken deel uit van de bestaande back-up en synchronisatie.':'Deze uitbreiding bewaart haar gegevens apart en verandert bestaande huishoudtaken en hun historie niet.'}</p>
     </section>`;
     view.querySelectorAll('[data-st26-tab]').forEach(b=>b.addEventListener('click',()=>{
       view.querySelectorAll('[data-st26-tab]').forEach(x=>x.classList.toggle('is-active',x===b));
@@ -227,6 +234,7 @@
     document.head.appendChild(s);
   }
   const baseRender = typeof render === 'function' ? render : null;
+  window.SamenThuisRenderChallenges25 = renderPage;
   if (baseRender) {
     render = function(...args) {
       const result = baseRender.apply(this,args);
@@ -252,6 +260,6 @@
   }, true);
   // Add a standalone entry point without altering the app's existing page list.
   document.addEventListener('DOMContentLoaded', () => { style(); addNav(); });
-  save();
+  save({ initialize: true });
   console.info('Samen Thuis v26 Challenges geladen');
 })();

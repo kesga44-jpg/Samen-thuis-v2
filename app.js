@@ -263,8 +263,12 @@ const sections = {
   planning: { label: 'Agenda', icon: '▦' },
   meals: { label: 'Weekmenu', icon: '♨' },
   groceries: { label: 'Boodschappen', icon: '✓' },
+  tasks: { label: 'Taken', icon: '☑' },
   chores: { label: 'Huishouden', icon: '⌁' },
   stock: { label: 'Voorraad', icon: '▤' },
+  weather: { label: 'Weer', icon: '☀' },
+  challenges: { label: 'Challenges', icon: '✦' },
+  programs: { label: "Programma's", icon: '▶' },
   ideas: { label: 'Samen doen', icon: '♡' },
   home: { label: 'Woning', icon: '⌂' },
   trips: { label: 'Reizen', icon: '✈' },
@@ -4805,17 +4809,18 @@ function data18(){
 function html18(){
  const s=data18(),date=new Intl.DateTimeFormat('nl-NL',{weekday:'long',day:'numeric',month:'long'}).format(new Date());
  return `<section class="dash18" data-dash18><header class="dh18"><div><p class="eyebrow">Jullie thuis, in één oogopslag</p><h2>Vandaag</h2><p>${date}</p></div><div class="people18"><span>K</span><span>D</span></div></header><div class="dg18">
- <section class="weather18" data-weather18>Weer ophalen…</section>
- <section class="today18"><div class="ct18"><strong>Vandaag</strong><span>${s.chores} taken</span></div><div class="stats18"><button data-view="chores"><b>${s.chores}</b><small>Huishouden</small></button><button data-view="groceries"><b>${s.groceries}</b><small>Boodschappen</small></button><button data-view="stock"><b>${s.low}</b><small>Bijna op</small></button></div><div class="meal18"><small>🍽️ VANAVOND</small><strong>${esc(s.dinner?.title||'Nog geen avondeten gepland')}</strong></div></section>
- <section class="agenda18"><div class="ct18"><strong>Komende afspraken</strong><button class="text-btn" data-view="planning">Alles →</button></div>${s.agenda.length?s.agenda.map(x=>`<div class="ar18"><time>${esc(x.date===todayISO()?(x.time||'Hele dag'):new Intl.DateTimeFormat('nl-NL',{weekday:'short',day:'numeric'}).format(parseDate(x.date)))}</time><div><strong>${esc(x.title)}</strong><small>${esc(x.person||'')}</small></div></div>`).join(''):'<p class="muted">Geen komende afspraken.</p>'}</section>
- <section class="outfit18" data-outfit18><span>👕</span><div><strong>Wat trek je aan?</strong><p>Weeradvies laden…</p></div></section></div></section>`
+ <section class="weather18" data-weather18 data-widget18="weather">Weer ophalen…</section>
+ <section class="today18" data-widget18="overview"><div class="ct18"><strong>Vandaag</strong><span>${s.chores} taken</span></div><div class="stats18"><button data-view="chores"><b>${s.chores}</b><small>Huishouden</small></button><button data-view="groceries"><b>${s.groceries}</b><small>Boodschappen</small></button><button data-view="stock"><b>${s.low}</b><small>Bijna op</small></button></div><div class="meal18"><small>🍽️ VANAVOND</small><strong>${esc(s.dinner?.title||'Nog geen avondeten gepland')}</strong></div></section>
+ <section class="agenda18" data-widget18="agenda"><div class="ct18"><strong>Komende afspraken</strong><button class="text-btn" data-view="planning">Alles →</button></div>${s.agenda.length?s.agenda.map(x=>`<div class="ar18"><time>${esc(x.date===todayISO()?(x.time||'Hele dag'):new Intl.DateTimeFormat('nl-NL',{weekday:'short',day:'numeric'}).format(parseDate(x.date)))}</time><div><strong>${esc(x.title)}</strong><small>${esc(x.person||'')}</small></div></div>`).join(''):'<p class="muted">Geen komende afspraken.</p>'}</section>
+ <section class="outfit18" data-outfit18 data-widget18="outfit"><span>👕</span><div><strong>Wat trek je aan?</strong><p>Weeradvies laden…</p></div></section></div></section>`
 }
 async function weather18(force=false){
  const box=document.querySelector('[data-weather18]');if(!box)return;
- try{let w=null;if(!force)try{let c=JSON.parse(localStorage.getItem(WC)||'null');if(c&&Date.now()-c.t<1800000)w=c.w}catch(_){}
- if(!w){let q=new URLSearchParams({latitude:LOC.lat,longitude:LOC.lon,current:'temperature_2m,apparent_temperature,weather_code,precipitation,wind_speed_10m',hourly:'temperature_2m,weather_code,precipitation_probability',daily:'temperature_2m_max,temperature_2m_min,precipitation_probability_max',timezone:'Europe/Amsterdam',forecast_days:'5'});let r=await fetch('https://api.open-meteo.com/v1/forecast?'+q,{cache:'no-store'});if(!r.ok)throw 0;w=await r.json();localStorage.setItem(WC,JSON.stringify({t:Date.now(),w}))}
+ const settings=data.settings||{},savedLat=settings.weatherLat===''||settings.weatherLat==null?NaN:Number(settings.weatherLat),savedLon=settings.weatherLon===''||settings.weatherLon==null?NaN:Number(settings.weatherLon),loc={name:settings.weatherPlace||LOC.name,lat:Number.isFinite(savedLat)&&savedLat>=-90&&savedLat<=90?savedLat:LOC.lat,lon:Number.isFinite(savedLon)&&savedLon>=-180&&savedLon<=180?savedLon:LOC.lon},key=`${loc.lat},${loc.lon}`;
+ try{let w=null;if(!force)try{let c=JSON.parse(localStorage.getItem(WC)||'null');if(c&&c.key===key&&Date.now()-c.t<1800000)w=c.w}catch(_){}
+ if(!w){let q=new URLSearchParams({latitude:loc.lat,longitude:loc.lon,current:'temperature_2m,apparent_temperature,weather_code,precipitation,wind_speed_10m',hourly:'temperature_2m,weather_code,precipitation_probability',daily:'temperature_2m_max,temperature_2m_min,precipitation_probability_max',timezone:'Europe/Amsterdam',forecast_days:'5'});let r=await fetch('https://api.open-meteo.com/v1/forecast?'+q,{cache:'no-store'});if(!r.ok)throw 0;w=await r.json();localStorage.setItem(WC,JSON.stringify({t:Date.now(),key,w}))}
  let c=w.current,d=w.daily,h=w.hourly,n=new Date(),i=h.time.findIndex(t=>new Date(t)>=new Date(n.getFullYear(),n.getMonth(),n.getDate(),n.getHours()));if(i<0)i=0;let ids=Array.from({length:6},(_,k)=>i+k).filter(k=>k<h.time.length);
- box.innerHTML=`<div class="wm18"><div><small>⌖ ${LOC.name}</small><div class="temp18"><span>${wi(c.weather_code)}</span><strong>${Math.round(c.temperature_2m)}°</strong></div><p>${wt(c.weather_code)} · voelt als ${Math.round(c.apparent_temperature)}°</p></div><div class="wf18"><b>${Math.round(d.temperature_2m_max[0])}° / ${Math.round(d.temperature_2m_min[0])}°</b><span>☂ ${Math.round(d.precipitation_probability_max[0]||0)}%</span><span>↗ ${Math.round(c.wind_speed_10m||0)} km/u</span></div></div><div class="hours18">${ids.map(k=>`<div><small>${h.time[k].slice(11,16)}</small><b>${wi(h.weather_code[k])}</b><strong>${Math.round(h.temperature_2m[k])}°</strong><small>${Math.round(h.precipitation_probability[k]||0)}%</small></div>`).join('')}</div><button class="wr18" data-wr18>↻</button>`;
+ box.innerHTML=`<div class="wm18"><div><small>⌖ ${esc(loc.name)}</small><div class="temp18"><span>${wi(c.weather_code)}</span><strong>${Math.round(c.temperature_2m)}°</strong></div><p>${wt(c.weather_code)} · voelt als ${Math.round(c.apparent_temperature)}°</p></div><div class="wf18"><b>${Math.round(d.temperature_2m_max[0])}° / ${Math.round(d.temperature_2m_min[0])}°</b><span>☂ ${Math.round(d.precipitation_probability_max[0]||0)}%</span><span>↗ ${Math.round(c.wind_speed_10m||0)} km/u</span></div></div><div class="hours18">${ids.map(k=>`<div><small>${h.time[k].slice(11,16)}</small><b>${wi(h.weather_code[k])}</b><strong>${Math.round(h.temperature_2m[k])}°</strong><small>${Math.round(h.precipitation_probability[k]||0)}%</small></div>`).join('')}</div><button class="wr18" data-wr18>↻</button>`;
  let o=document.querySelector('[data-outfit18]');if(o)o.innerHTML=`<span>👕</span><div><strong>Wat trek je aan?</strong><p>${outfit(w).map(esc).join(' · ')}</p><small>Gebaseerd op temperatuur, regen en wind.</small></div>`
  }catch(_){box.innerHTML='<strong>Weer tijdelijk niet beschikbaar</strong><p><button class="text-btn" data-wr18>Opnieuw proberen</button></p>'}
 }
@@ -4848,8 +4853,8 @@ applyUi19();
 try{matchMedia('(prefers-color-scheme:dark)').addEventListener('change',()=>ui19.theme==='system'&&applyUi19())}catch(_){}
 
 const pages19=[
- ['today','Today','⌂'],['planning','Agenda','▦'],['meals','Weekmenu','♨'],['groceries','Boodschappen','✓'],
- ['chores','Huishouden','⌁'],['stock','Voorraad','▤'],['trips','Reizen','✈'],['ideas','Date ideeën','♡'],
+ ['today','Today','⌂'],['planning','Agenda','▦'],['meals','Weekmenu','♨'],['groceries','Boodschappen','✓'],['tasks','Taken','☑'],['weather','Weer','☀'],['challenges','Challenges','✦'],
+ ['chores','Huishouden','⌁'],['stock','Voorraad','▤'],['programs',"Programma's",'▶'],['trips','Reizen','✈'],['ideas','Date ideeën','♡'],
  ['home','Woning','⌂'],['budget19','Budget','€'],['extra19','Extra','＋'],['settings','Instellingen','⚙']
 ];
 try{
@@ -5095,8 +5100,8 @@ if(window.__ST_V23__) return; window.__ST_V23__=true;
 
 const NAV23=[
  ['today','⌂','Vandaag'],['planning','▦','Agenda'],['meals','♨','Weekmenu'],
- ['groceries','✓','Boodschappen'],['stock','▤','Voorraad'],['chores','⌁','Huishouden'],
- ['home','⌂','Woning'],['budget19','€','Budget'],['trips','✈','Reizen'],
+ ['groceries','✓','Boodschappen'],['tasks','☑','Taken'],['stock','▤','Voorraad'],['weather','☀','Weer'],['challenges','✦','Challenges'],['chores','⌁','Huishouden'],
+ ['home','⌂','Woning'],['budget19','€','Budget'],['programs','▶',"Programma's"],['trips','✈','Reizen'],
  ['ideas','♡','Date ideeën'],['extra19','＋','Extra'],['settings','⚙','Instellingen']
 ];
 
@@ -5485,7 +5490,7 @@ function nav24(){const desktop=document.querySelector('.sidebar nav');if(desktop
 const AQ24='stAirQualityV24';
 function level24(v){v=num24(v);return v>=50?'Hoog':v>=10?'Verhoogd':v>0?'Laag':'Zeer laag'}
 function aqiText24(v){v=num24(v);return v<=20?'Goed':v<=40?'Redelijk':v<=60?'Matig':v<=80?'Slecht':'Zeer slecht'}
-async function air24(force=false){if(current!=='today')return;const dash=document.querySelector('[data-dash18]');if(!dash)return;let card=dash.querySelector('[data-air24]');if(!card){card=document.createElement('section');card.className='air24';card.dataset.air24='';const grid=dash.querySelector('.dg18');grid?.append(card)}if(!card)return;card.innerHTML='<strong>Pollen & luchtkwaliteit</strong><p class="muted">Open-Meteo ophalen…</p>';try{let q=null;if(!force)try{const c=JSON.parse(localStorage.getItem(AQ24)||'null');if(c&&Date.now()-c.t<1800000)q=c.q}catch(_){}if(!q){const u=new URL('https://air-quality-api.open-meteo.com/v1/air-quality');u.searchParams.set('latitude','51.9225');u.searchParams.set('longitude','4.47917');u.searchParams.set('current','european_aqi,pm2_5,pm10,nitrogen_dioxide,ozone,alder_pollen,birch_pollen,grass_pollen,mugwort_pollen,ragweed_pollen');u.searchParams.set('timezone','Europe/Amsterdam');const r=await fetch(u,{cache:'no-store'});if(!r.ok)throw 0;q=await r.json();localStorage.setItem(AQ24,JSON.stringify({t:Date.now(),q}))}const c=q.current||{};const pol=[['Gras',c.grass_pollen],['Berk',c.birch_pollen],['Els',c.alder_pollen],['Bijvoet',c.mugwort_pollen],['Ambrosia',c.ragweed_pollen]].sort((a,b)=>num24(b[1])-num24(a[1]));card.innerHTML=`<div class="air-head24"><div><small>OPEN-METEO · ROTTERDAM</small><h3>Pollen & luchtkwaliteit</h3></div><button data-air24-refresh>↻</button></div><div class="aqi24"><span class="aqi-badge24">AQI ${Math.round(num24(c.european_aqi))}</span><div><strong>${aqiText24(c.european_aqi)}</strong><small>PM2.5 ${num24(c.pm2_5).toFixed(1)} · PM10 ${num24(c.pm10).toFixed(1)} µg/m³</small></div></div><div class="pollen-grid24">${pol.map(([n,v])=>`<div><span>${n}</span><b>${level24(v)}</b><small>${num24(v).toFixed(1)} gr/m³</small></div>`).join('')}</div><p class="air-note24">Indicatie van omgevingswaarden; geen persoonlijk medisch advies.</p>`}catch(_){card.innerHTML='<strong>Pollen & luchtkwaliteit</strong><p>Gegevens tijdelijk niet beschikbaar. <button class="text-btn" data-air24-refresh>Opnieuw</button></p>'}}
+async function air24(force=false){if(current!=='today')return;const dash=document.querySelector('[data-dash18]');if(!dash)return;let card=dash.querySelector('[data-air24]');if(!card){card=document.createElement('section');card.className='air24';card.dataset.air24='';card.dataset.widget18='air';const grid=dash.querySelector('.dg18');grid?.append(card)}if(!card)return;card.innerHTML='<strong>Pollen & luchtkwaliteit</strong><p class="muted">Open-Meteo ophalen…</p>';try{const loc=window.SamenThuisWeatherLocation25?.()||{place:'Rotterdam',lat:51.9225,lon:4.47917},key=`${loc.lat},${loc.lon}`;let q=null;if(!force)try{const c=JSON.parse(localStorage.getItem(AQ24)||'null');if(c&&c.key===key&&Date.now()-c.t<1800000)q=c.q}catch(_){}if(!q){const u=new URL('https://air-quality-api.open-meteo.com/v1/air-quality');u.searchParams.set('latitude',String(loc.lat));u.searchParams.set('longitude',String(loc.lon));u.searchParams.set('current','european_aqi,pm2_5,pm10,nitrogen_dioxide,ozone,alder_pollen,birch_pollen,grass_pollen,mugwort_pollen,ragweed_pollen');u.searchParams.set('timezone','Europe/Amsterdam');const r=await fetch(u,{cache:'no-store'});if(!r.ok)throw 0;q=await r.json();localStorage.setItem(AQ24,JSON.stringify({t:Date.now(),key,q}))}const c=q.current||{};const pol=[['Gras',c.grass_pollen],['Berk',c.birch_pollen],['Els',c.alder_pollen],['Bijvoet',c.mugwort_pollen],['Ambrosia',c.ragweed_pollen]].sort((a,b)=>num24(b[1])-num24(a[1]));card.innerHTML=`<div class="air-head24"><div><small>OPEN-METEO · ${esc(loc.place.toUpperCase())}</small><h3>Pollen & luchtkwaliteit</h3></div><button data-air24-refresh>↻</button></div><div class="aqi24"><span class="aqi-badge24">AQI ${Math.round(num24(c.european_aqi))}</span><div><strong>${aqiText24(c.european_aqi)}</strong><small>PM2.5 ${num24(c.pm2_5).toFixed(1)} · PM10 ${num24(c.pm10).toFixed(1)} µg/m³</small></div></div><div class="pollen-grid24">${pol.map(([n,v])=>`<div><span>${n}</span><b>${level24(v)}</b><small>${num24(v).toFixed(1)} gr/m³</small></div>`).join('')}</div><p class="air-note24">Indicatie van omgevingswaarden; geen persoonlijk medisch advies.</p>`}catch(_){card.innerHTML='<strong>Pollen & luchtkwaliteit</strong><p>Gegevens tijdelijk niet beschikbaar. <button class="text-btn" data-air24-refresh>Opnieuw</button></p>'}}
 const baseRender24=render;render=function(...args){if(current==='auto24'){document.querySelector('#view').innerHTML=autoPage24();updateSyncBadge();requestAnimationFrame(nav24);return}const r=baseRender24(...args);requestAnimationFrame(()=>{nav24();air24()});return r};
 document.addEventListener('click',e=>{if(e.target.closest('[data-v24-auto]')){current='auto24';render();return}const t=e.target.closest('[data-auto24-tab]');if(t){autoTab24=t.dataset.auto24Tab;render();return}const ed=e.target.closest('[data-auto24-edit]');if(ed){autoTab24='add';document.querySelector('#view').innerHTML=`<div class="auto24"><header class="auto-head24"><div><p class="eyebrow">AUTO & BRANDSTOF</p><h1>Tankbeurt bewerken</h1></div></header>${tabs24()}<section class="auto-body24">${fillForm24(data.fuelEntries.find(x=>x.id===ed.dataset.auto24Edit))}</section></div>`;return}const del=e.target.closest('[data-auto24-delete]');if(del&&confirm('Tankbeurt verwijderen?')){data.fuelEntries=data.fuelEntries.filter(x=>x.id!==del.dataset.auto24Delete);save();autoTab24='fills';render();return}const ca=e.target.closest('[data-auto24-car]');if(ca){editCar24(ca.dataset.auto24Car);return}if(e.target.closest('[data-auto24-newcar]')){editCar24();return}const dc=e.target.closest('[data-auto24-deletecar]');if(dc){deleteCar24(dc.dataset.auto24Deletecar);return}const p=e.target.closest('[data-auto24-period]');if(p){statsPeriod24=p.dataset.auto24Period;render();return}if(e.target.closest('[data-auto24-allcars]')){statsCars24=[];render();return}const sc=e.target.closest('[data-auto24-statcar]');if(sc){const id=sc.dataset.auto24Statcar;const currentIds=selectedCars24();if(sc.checked){statsCars24=[...new Set([...currentIds,id])]}else{statsCars24=currentIds.filter(x=>x!==id);if(!statsCars24.length){sc.checked=true;toast('Selecteer minimaal één auto');return}}render();return}if(e.target.closest('[data-air24-refresh]'))air24(true)});
 document.addEventListener('submit',e=>{const f=e.target.closest('[data-fuel24-form]');if(!f)return;e.preventDefault();const fd=new FormData(f),lit=num24(fd.get('liters'));let total=num24(fd.get('total')),price=num24(fd.get('pricePerLiter'));if(!total&&price&&lit)total=price*lit;if(!price&&total&&lit)price=total/lit;const old=data.fuelEntries.find(x=>x.id===f.dataset.editId)||{};const item={...old,id:old.id||id24(),carId:String(fd.get('carId')),date:String(fd.get('date')),odometer:num24(fd.get('odometer')),liters:lit,total,pricePerLiter:price,fuelGrade:String(fd.get('fuelGrade')),station:String(fd.get('station')||''),partialFill:fd.has('partialFill'),missedPrevious:fd.has('missedPrevious'),note:String(fd.get('note')||'')};if(old.id)Object.assign(old,item);else data.fuelEntries.push(item);save();autoTab24='fills';render();toast('Tankbeurt opgeslagen')});
@@ -5635,8 +5640,8 @@ requestAnimationFrame(navImport243);
    ========================================================= */
 (()=>{'use strict';
  if(window.__ST248_DOCK__)return;window.__ST248_DOCK__=true;
- const ORDER248=['today','planning','meals','groceries','stock','chores','home','budget19','auto24','trips','ideas','extra19','imports243','settings'];
- const LABEL248={today:'Vandaag',planning:'Agenda',meals:'Weekmenu',groceries:'Boodschappen',stock:'Voorraad',chores:'Huishouden',home:'Woning',budget19:'Budget',auto24:'Auto',trips:'Reizen',ideas:'Date ideeën',extra19:'Extra',imports243:'Import',settings:'Instellingen'};
+ const ORDER248=['today','planning','meals','groceries','tasks','stock','weather','challenges','chores','home','budget19','auto24','programs','trips','ideas','extra19','imports243','settings'];
+ const LABEL248={today:'Vandaag',planning:'Agenda',meals:'Weekmenu',groceries:'Boodschappen',tasks:'Taken',stock:'Voorraad',weather:'Weer',challenges:'Challenges',chores:'Huishouden',home:'Woning',budget19:'Budget',auto24:'Auto',programs:"Programma's",trips:'Reizen',ideas:'Date ideeën',extra19:'Extra',imports243:'Import',settings:'Instellingen'};
  function actualKey248(b){if(b.dataset.nav23)return b.dataset.nav23;if(b.hasAttribute('data-v24-auto'))return 'auto24';if(b.hasAttribute('data-import243-go'))return 'imports243';return ''}
  function arrange248(){
    const sc=document.querySelector('.mobile-nav-scroll23');if(!sc)return;
@@ -5723,3 +5728,391 @@ document.addEventListener('click', event => {
   render();
   syncNow({ manual: true });
 });
+
+/* v25 · standalone forecast page and device-local dashboard editor */
+(() => {
+  'use strict';
+  if (window.__ST_V25_INTEGRATION__) return;
+  window.__ST_V25_INTEGRATION__ = true;
+
+  const DASH_KEY = 'samenThuisDashboardWidgetsV25';
+  const DASH_WIDGETS = [
+    ['weather', 'Weer en uurstrook'],
+    ['overview', 'Vandaagstatistieken en diner'],
+    ['agenda', 'Komende afspraken'],
+    ['outfit', 'Kledingadvies'],
+    ['air', 'Pollen en luchtkwaliteit']
+  ];
+  const DASH_DEFAULTS = DASH_WIDGETS.map(([id]) => id);
+  const WEATHER_KEY = 'samenThuisWeatherForecastV25';
+  const DEFAULT_LOCATION = { place: 'Rotterdam', lat: 51.9225, lon: 4.47917 };
+  const weatherCode25 = {
+    0: 'Helder', 1: 'Overwegend helder', 2: 'Half bewolkt', 3: 'Bewolkt',
+    45: 'Mist', 48: 'Rijpmist', 51: 'Lichte motregen', 53: 'Motregen',
+    55: 'Zware motregen', 61: 'Lichte regen', 63: 'Regen', 65: 'Zware regen',
+    71: 'Lichte sneeuw', 73: 'Sneeuw', 75: 'Zware sneeuw', 80: 'Lichte buien',
+    81: 'Buien', 82: 'Zware buien', 95: 'Onweer', 96: 'Onweer met hagel',
+    99: 'Zwaar onweer met hagel'
+  };
+  let dashboard25 = loadDashboard25();
+
+  function loadDashboard25() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(DASH_KEY) || 'null');
+      const order = Array.isArray(saved?.order) ? saved.order.filter(id => DASH_DEFAULTS.includes(id)) : [];
+      return {
+        order: [...new Set([...order, ...DASH_DEFAULTS])],
+        visible: Object.fromEntries(DASH_DEFAULTS.map(id => [id, saved?.visible?.[id] !== false]))
+      };
+    } catch (_) {
+      return { order: [...DASH_DEFAULTS], visible: Object.fromEntries(DASH_DEFAULTS.map(id => [id, true])) };
+    }
+  }
+
+  function saveDashboard25() {
+    try { localStorage.setItem(DASH_KEY, JSON.stringify(dashboard25)); } catch (_) {}
+  }
+
+  function dashboardEditor25() {
+    const rows = dashboard25.order.map((id, index) => {
+      const label = DASH_WIDGETS.find(([widget]) => widget === id)?.[1] || id;
+      return `<div class="setting-row dashboard-setting-row25"><label><input type="checkbox" data-dashboard-visible="${id}" ${dashboard25.visible[id] ? 'checked' : ''}> ${esc(label)}</label><span><button type="button" class="secondary" data-dashboard-move="${id}" data-direction="-1" aria-label="${esc(label)} omhoog" ${index === 0 ? 'disabled' : ''}>↑</button> <button type="button" class="secondary" data-dashboard-move="${id}" data-direction="1" aria-label="${esc(label)} omlaag" ${index === dashboard25.order.length - 1 ? 'disabled' : ''}>↓</button></span></div>`;
+    }).join('');
+    return `<section class="card settings-card dashboard-editor25"><div class="card-head"><div><p class="eyebrow">DASHBOARD</p><h2>Onderdelen samenstellen</h2></div></div><p class="muted">Kies welke kaarten op Vandaag staan en wijzig de volgorde. Deze weergavevoorkeur geldt alleen op dit apparaat.</p>${rows}<div class="button-row"><button type="button" class="secondary" data-dashboard-reset>Standaardvolgorde herstellen</button></div></section>`;
+  }
+
+  function applyDashboard25() {
+    const grid = document.querySelector('[data-dash18] .dg18');
+    if (!grid) return;
+    const nodes = new Map([...grid.children].map(node => {
+      const id = node.dataset.widget18 || (node.matches('[data-air24]') ? 'air' : '');
+      return [id, node];
+    }).filter(([id]) => id));
+    dashboard25.order.forEach(id => {
+      const node = nodes.get(id);
+      if (!node) return;
+      node.hidden = !dashboard25.visible[id];
+      grid.append(node);
+    });
+  }
+
+  let editingCollection25 = null;
+  function collectionItems25(name) {
+    if (!Array.isArray(data[name])) data[name] = [];
+    else if (data[name].some(item => !item || typeof item !== 'object' || Array.isArray(item))) {
+      data[name] = data[name].filter(item => item && typeof item === 'object' && !Array.isArray(item));
+    }
+    return data[name];
+  }
+
+  function safeLink25(value) {
+    try {
+      const url = new URL(value, location.href);
+      return ['http:', 'https:'].includes(url.protocol) ? url.href : '';
+    } catch (_) { return ''; }
+  }
+
+  function renderCollection25(name) {
+    const tasks = name === 'tasks';
+    const label = tasks ? 'Taak' : 'Programma';
+    const items = collectionItems25(name);
+    const old = editingCollection25?.collection === name
+      ? items.find(item => item.id === editingCollection25.id) || null : null;
+    const form = tasks
+      ? `<label class="field">Taak<input name="title" maxlength="120" value="${esc(old?.title || '')}" placeholder="Bijv. vuilnis buitenzetten" required></label>
+        <label class="field">Categorie<input name="category" maxlength="50" value="${esc(old?.category || '')}" placeholder="Bijv. Huishouden"></label>
+        <label class="field">Voor wie?<select name="person">${['Samen', 'Kees', 'Daphne'].map(person => `<option ${old?.person === person ? 'selected' : ''}>${person}</option>`).join('')}</select></label>
+        <label class="field">Uiterste datum<input name="due" type="date" value="${esc(old?.due || '')}"></label>`
+      : `<label class="field">Naam<input name="title" maxlength="120" value="${esc(old?.title || '')}" placeholder="Bijv. zwemles of concert" required></label>
+        <label class="field">Soort<input name="category" maxlength="50" value="${esc(old?.category || '')}" placeholder="Bijv. Sport, cultuur of tv"></label>
+        <label class="field">Datum<input name="date" type="date" value="${esc(old?.date || '')}"></label>
+        <label class="field">Link (optioneel)<input name="url" type="url" maxlength="500" value="${esc(old?.url || '')}" placeholder="https://…"></label>
+        <label class="field">Notitie<textarea name="note" maxlength="500">${esc(old?.note || '')}</textarea></label>`;
+    const ordered = [...items].sort((a, b) => Number(Boolean(a.done)) - Number(Boolean(b.done))
+      || String(a.due || a.date || '').localeCompare(String(b.due || b.date || '')));
+    const rows = ordered.map(item => {
+      const detail = tasks
+        ? [item.category, item.person, item.due && `Uiterlijk ${item.due}`].filter(Boolean).join(' · ')
+        : [item.category, item.date, item.note].filter(Boolean).join(' · ');
+      const link = !tasks && safeLink25(item.url)
+        ? `<a href="${esc(safeLink25(item.url))}" target="_blank" rel="noopener noreferrer">Open link</a>` : '';
+      return `<article class="card collection-item25 ${item.done ? 'is-done' : ''}"><div><h2>${esc(item.title || label)}</h2><p class="muted">${esc(detail || (item.done ? 'Afgerond' : 'Nog geen details'))}</p>${link}</div><div class="button-row"><button type="button" class="secondary" data-collection-toggle="${name}" data-item-id="${esc(item.id)}">${item.done ? 'Opnieuw openen' : 'Afronden'}</button><button type="button" class="secondary" data-collection-edit="${name}" data-item-id="${esc(item.id)}">Bewerken</button><button type="button" class="secondary" data-collection-delete="${name}" data-item-id="${esc(item.id)}">Verwijderen</button></div></article>`;
+    }).join('');
+    const heading = tasks ? 'Taken' : "Programma's";
+    return `<div class="collection-page25"><section class="card settings-card"><div class="card-head"><div><p class="eyebrow">SAMEN THUIS</p><h2>${heading}</h2></div></div><form class="form-grid compact-form" data-collection-form="${name}">${form}<div class="button-row"><button class="primary" type="submit">${old ? 'Wijzigingen opslaan' : `${label} toevoegen`}</button>${old ? '<button class="secondary" type="button" data-collection-cancel>Annuleren</button>' : ''}</div></form></section><div class="collection-list25">${rows || `<section class="card"><p class="muted">Nog geen ${tasks ? 'open taken' : 'programma’s'}.</p></section>`}</div></div>`;
+  }
+
+  function weatherLocation25() {
+    const settings = data.settings || {};
+    const lat = settings.weatherLat === '' || settings.weatherLat == null ? NaN : Number(settings.weatherLat);
+    const lon = settings.weatherLon === '' || settings.weatherLon == null ? NaN : Number(settings.weatherLon);
+    return {
+      place: typeof settings.weatherPlace === 'string' && settings.weatherPlace.trim()
+        ? settings.weatherPlace.trim().slice(0, 80) : DEFAULT_LOCATION.place,
+      lat: Number.isFinite(lat) && lat >= -90 && lat <= 90 ? lat : DEFAULT_LOCATION.lat,
+      lon: Number.isFinite(lon) && lon >= -180 && lon <= 180 ? lon : DEFAULT_LOCATION.lon
+    };
+  }
+  window.SamenThuisWeatherLocation25 = weatherLocation25;
+
+  function validForecast25(forecast) {
+    const daily = forecast?.daily;
+    const hourly = forecast?.hourly;
+    return Number.isFinite(forecast?.current?.temperature_2m)
+      && Array.isArray(daily?.time) && daily.time.length >= 1
+      && ['weather_code', 'temperature_2m_max', 'temperature_2m_min', 'precipitation_probability_max', 'precipitation_sum']
+        .every(key => Array.isArray(daily[key]) && daily[key].length === daily.time.length)
+      && Array.isArray(hourly?.time) && hourly.time.length >= 1
+      && ['temperature_2m', 'precipitation'].every(key => Array.isArray(hourly[key]) && hourly[key].length === hourly.time.length);
+  }
+
+  async function getForecast25(force = false) {
+    const location = weatherLocation25();
+    const locationKey = `${location.lat},${location.lon}`;
+    let cache = null;
+    try { cache = JSON.parse(localStorage.getItem(WEATHER_KEY) || 'null'); } catch (_) {}
+    const cached = cache?.location === locationKey && validForecast25(cache.data) ? cache : null;
+    if (!force && cached && Date.now() - cached.savedAt < 30 * 60 * 1000) return { ...cached, stale: false };
+    if (!navigator.onLine) {
+      if (cached) return { ...cached, stale: true };
+      throw new Error('Geen internetverbinding en geen opgeslagen verwachting beschikbaar.');
+    }
+    const query = new URLSearchParams({
+      latitude: String(location.lat), longitude: String(location.lon), timezone: 'auto', forecast_days: '7',
+      current: 'temperature_2m,apparent_temperature,relative_humidity_2m,wind_speed_10m,weather_code',
+      daily: 'weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum',
+      hourly: 'temperature_2m,precipitation'
+    });
+    const controller = typeof AbortController === 'function' ? new AbortController() : null;
+    const timer = controller ? setTimeout(() => controller.abort(), 10000) : null;
+    try {
+      const response = await fetch(`https://api.open-meteo.com/v1/forecast?${query}`, {
+        cache: 'no-store', ...(controller ? { signal: controller.signal } : {})
+      });
+      if (!response.ok) throw new Error(`Weer ophalen mislukt (${response.status}).`);
+      const forecast = await response.json();
+      if (!validForecast25(forecast)) throw new Error('De weerservice gaf onvolledige gegevens terug.');
+      const result = { location: locationKey, savedAt: Date.now(), data: forecast, stale: false };
+      try { localStorage.setItem(WEATHER_KEY, JSON.stringify(result)); } catch (_) {}
+      return result;
+    } catch (error) {
+      if (cached) return { ...cached, stale: true };
+      throw error;
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+  }
+
+  function chart25(title, labels, high, low, rain, suffix) {
+    if (labels.length < 2 || !high.every(Number.isFinite)) return '';
+    const width = 680, height = 280, left = 44, right = 40, top = 20, bottom = 46;
+    const innerWidth = width - left - right, innerHeight = height - top - bottom;
+    const temps = [...high, ...(low || [])].filter(Number.isFinite);
+    const min = Math.floor(Math.min(...temps) - 1), max = Math.ceil(Math.max(...temps) + 1);
+    const maxRain = Math.max(1, ...rain.map(value => Number.isFinite(value) ? value : 0));
+    const x = index => left + innerWidth * (index / (labels.length - 1));
+    const y = value => top + innerHeight - ((value - min) / (max - min || 1)) * innerHeight;
+    const rainY = value => top + innerHeight - (Math.max(0, value || 0) / maxRain) * innerHeight;
+    const polyline = values => values.every(Number.isFinite)
+      ? `<polyline points="${values.map((value, index) => `${x(index).toFixed(1)},${y(value).toFixed(1)}`).join(' ')}"/>` : '';
+    const bars = rain.map((value, index) => {
+      const barY = rainY(value);
+      return `<rect x="${(x(index) - Math.min(18, innerWidth / labels.length * .28)).toFixed(1)}" y="${barY.toFixed(1)}" width="${Math.min(36, innerWidth / labels.length * .56).toFixed(1)}" height="${(top + innerHeight - barY).toFixed(1)}" rx="3"/>`;
+    }).join('');
+    const step = Math.max(1, Math.ceil(labels.length / 8));
+    const ticks = labels.map((label, index) => index % step === 0
+      ? `<text x="${x(index).toFixed(1)}" y="${height - 20}" text-anchor="middle">${esc(label)}</text>` : '').join('');
+    return `<section class="card weather-chart25"><div class="card-head"><h2>${esc(title)}</h2></div><div class="weather-svg25"><svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${esc(title)}"><line x1="${left}" y1="${top + innerHeight}" x2="${width - right}" y2="${top + innerHeight}"/><g class="weather-rain25">${bars}</g><g class="weather-low25">${polyline(low || [])}</g><g class="weather-high25">${polyline(high)}</g>${ticks}<text x="${left}" y="${height - 2}">— temperatuur °C · ▮ neerslag mm</text></svg></div><p class="small-note">${esc(suffix)}</p></section>`;
+  }
+
+  function weatherMarkup25(forecast) {
+    const { current: now, daily, hourly } = forecast;
+    const days = daily.time.map((date, index) => `<li class="list-item weather-day25"><strong>${esc(new Date(`${date}T12:00:00`).toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'short' }))}</strong><span>${esc(weatherCode25[daily.weather_code[index]] || 'Onbekend')}</span><span>${Math.round(daily.temperature_2m_min[index])}° – ${Math.round(daily.temperature_2m_max[index])}°</span><span>${Math.round(daily.precipitation_probability_max[index] || 0)}% · ${Number(daily.precipitation_sum[index] || 0).toFixed(1)} mm</span></li>`).join('');
+    const today = todayISO();
+    const start = Math.max(0, hourly.time.findIndex(time => time >= `${today}T${new Date().getHours().toString().padStart(2, '0')}:00`));
+    const indices = Array.from({ length: 24 }, (_, index) => start + index).filter(index => index < hourly.time.length);
+    const hourlyLabels = indices.map(index => hourly.time[index].slice(11, 16));
+    const hourlyTemps = indices.map(index => hourly.temperature_2m[index]);
+    const hourlyRain = indices.map(index => hourly.precipitation[index]);
+    const dailyLabels = daily.time.map(date => new Date(`${date}T12:00:00`).toLocaleDateString('nl-NL', { weekday: 'short' }));
+    const condition = weatherCode25[now.weather_code] || 'Onbekend';
+    const location = weatherLocation25();
+    return `<section class="card weather-current25"><div class="card-head"><div><p class="eyebrow">${esc(location.place)}</p><h2>Weer</h2></div><button type="button" class="secondary" data-weather-refresh>↻ Vernieuwen</button></div><p class="weather-now"><strong>${Math.round(now.temperature_2m)}°C</strong> ${esc(condition)}</p><p class="muted">Voelt als ${Math.round(now.apparent_temperature)}° · wind ${Math.round(now.wind_speed_10m)} km/u · luchtvochtigheid ${Math.round(now.relative_humidity_2m)}%</p></section>
+      ${chart25('Komende 7 dagen', dailyLabels, daily.temperature_2m_max, daily.temperature_2m_min, daily.precipitation_sum, 'Maximaal en minimaal temperatuurverloop met verwachte neerslag.')}
+      ${chart25('Komende 24 uur', hourlyLabels, hourlyTemps, [], hourlyRain, 'Uurlijkse temperatuur en neerslag.')}
+      <section class="card weather-days25"><div class="card-head"><h2>7-daagse verwachting</h2></div><ul class="weather-list25">${days}</ul></section>
+      <section class="card settings-card"><div class="card-head"><div><p class="eyebrow">LOCATIE</p><h2>Weerlocatie aanpassen</h2></div></div><form class="form-grid weather-location25" data-weather-location><label class="field">Plaats<input name="place" maxlength="80" value="${esc(location.place)}" required></label><label class="field">Breedtegraad<input name="lat" type="number" step="any" min="-90" max="90" value="${location.lat}" required></label><label class="field">Lengtegraad<input name="lon" type="number" step="any" min="-180" max="180" value="${location.lon}" required></label><div class="button-row"><button class="primary" type="submit">Locatie opslaan</button><button class="secondary" type="button" data-weather-geolocate>Mijn locatie</button></div></form><p class="small-note">Weergegevens worden lokaal 30 minuten gecachet. Locatie-instellingen worden met de bestaande appgegevens gesynchroniseerd.</p></section>
+      <p class="small-note weather-cache-note25" data-weather-cache-note></p>`;
+  }
+
+  async function loadWeatherPage25(force = false) {
+    const box = document.querySelector('[data-weather-page-body]');
+    if (!box) return;
+    box.innerHTML = '<p class="muted">Weer laden…</p>';
+    try {
+      const result = await getForecast25(force);
+      if (!box.isConnected) return;
+      box.innerHTML = weatherMarkup25(result.data);
+      const note = box.querySelector('[data-weather-cache-note]');
+      if (note) note.textContent = `${result.stale ? 'Offline of tijdelijk niet bereikbaar · laatst opgeslagen verwachting' : 'Bijgewerkt'} · ${new Date(result.savedAt).toLocaleString('nl-NL')}`;
+    } catch (error) {
+      if (box.isConnected) box.innerHTML = `<section class="card"><p>${esc(error.message || 'Het weer kan nu niet worden geladen.')}</p><button type="button" class="secondary" data-weather-refresh>Opnieuw proberen</button></section>`;
+    }
+  }
+
+  function renderWeather25() {
+    return `<div class="weather-page25 page-grid"><div data-weather-page-body><p class="muted">Weer laden…</p></div></div>`;
+  }
+
+  function render25(...args) {
+    if (current === 'tasks' || current === 'programs') {
+      document.querySelector('#view').innerHTML = renderCollection25(current);
+      document.querySelector('#pageTitle').textContent = sections[current].label;
+      document.querySelector('#addBtn').style.display = 'none';
+      document.querySelectorAll('[data-nav23], [data-v19-go]').forEach(button => {
+        const page = button.dataset.nav23 || button.dataset.v19Go;
+        button.classList.toggle('active', page === current);
+      });
+      updateSyncBadge();
+      return;
+    }
+    if (current === 'challenges' && typeof window.SamenThuisRenderChallenges25 === 'function') {
+      window.SamenThuisRenderChallenges25();
+      document.querySelector('#pageTitle').textContent = sections.challenges.label;
+      document.querySelector('#addBtn').style.display = 'none';
+      document.querySelectorAll('[data-nav23], [data-v19-go]').forEach(button => {
+        const page = button.dataset.nav23 || button.dataset.v19Go;
+        button.classList.toggle('active', page === 'challenges');
+      });
+      updateSyncBadge();
+      return;
+    }
+    if (current === 'weather') {
+      document.querySelector('#view').innerHTML = renderWeather25();
+      document.querySelector('#pageTitle').textContent = sections.weather.label;
+      document.querySelector('#addBtn').style.display = 'none';
+      document.querySelectorAll('[data-nav23], [data-v19-go]').forEach(button => {
+        const page = button.dataset.nav23 || button.dataset.v19Go;
+        button.classList.toggle('active', page === 'weather');
+      });
+      updateSyncBadge();
+      requestAnimationFrame(() => loadWeatherPage25());
+      return;
+    }
+    const result = previousRender25(...args);
+    requestAnimationFrame(() => {
+      applyDashboard25();
+      const settings = document.querySelector('#view .settings-grid');
+      if (current === 'settings' && settings && !settings.querySelector('.dashboard-editor25')) {
+        settings.insertAdjacentHTML('beforeend', dashboardEditor25());
+      }
+    });
+    return result;
+  }
+
+  const previousRender25 = render;
+  render = render25;
+  window.__ST_V26_INTEGRATED__ = true;
+  window.SamenThuisChallengeStore = {
+    get() { return data.challengeDataV26 ? clone(data.challengeDataV26) : null; },
+    save(value, { initialize = false } = {}) {
+      data.challengeDataV26 = clone(value);
+      save({ touch: !initialize, sync: true });
+    }
+  };
+
+  document.addEventListener('click', event => {
+    if (event.target.closest('[data-collection-cancel]')) {
+      editingCollection25 = null; render(); return;
+    }
+    const collectionAction = event.target.closest('[data-collection-toggle], [data-collection-edit], [data-collection-delete]');
+    if (collectionAction) {
+      const name = collectionAction.dataset.collectionToggle || collectionAction.dataset.collectionEdit || collectionAction.dataset.collectionDelete;
+      const items = collectionItems25(name);
+      const item = items.find(entry => entry.id === collectionAction.dataset.itemId);
+      if (!item) return;
+      if (collectionAction.hasAttribute('data-collection-toggle')) item.done = !item.done;
+      else if (collectionAction.hasAttribute('data-collection-edit')) editingCollection25 = { collection: name, id: item.id };
+      else {
+        if (!confirm(`“${item.title}” verwijderen?`)) return;
+        data[name] = items.filter(entry => entry.id !== item.id);
+      }
+      if (collectionAction.hasAttribute('data-collection-delete') && !data[name].some(entry => entry.id === item.id)) {
+        editingCollection25 = null;
+      }
+      save(); render(); return;
+    }
+    if (event.target.closest('[data-weather-refresh]')) { loadWeatherPage25(true); return; }
+    if (event.target.closest('[data-weather-geolocate]')) {
+      if (!navigator.geolocation) { toast('Locatiebepaling wordt niet door deze browser ondersteund.'); return; }
+      navigator.geolocation.getCurrentPosition(position => {
+        const form = document.querySelector('[data-weather-location]');
+        if (!form) return;
+        form.elements.lat.value = position.coords.latitude.toFixed(5);
+        form.elements.lon.value = position.coords.longitude.toFixed(5);
+      }, () => toast('Je locatie kon niet worden opgehaald.'), { timeout: 10000, maximumAge: 300000 });
+      return;
+    }
+    const move = event.target.closest('[data-dashboard-move]');
+    if (move) {
+      const index = dashboard25.order.indexOf(move.dataset.dashboardMove);
+      const next = index + Number(move.dataset.direction);
+      if (index < 0 || next < 0 || next >= dashboard25.order.length) return;
+      [dashboard25.order[index], dashboard25.order[next]] = [dashboard25.order[next], dashboard25.order[index]];
+      saveDashboard25(); render();
+      return;
+    }
+    if (event.target.closest('[data-dashboard-reset]')) {
+      dashboard25 = { order: [...DASH_DEFAULTS], visible: Object.fromEntries(DASH_DEFAULTS.map(id => [id, true])) };
+      saveDashboard25(); render();
+    }
+  });
+
+  document.addEventListener('change', event => {
+    const toggle = event.target.closest('[data-dashboard-visible]');
+    if (!toggle) return;
+    dashboard25.visible[toggle.dataset.dashboardVisible] = toggle.checked;
+    saveDashboard25();
+    if (current === 'settings') render();
+    else applyDashboard25();
+  });
+
+  document.addEventListener('submit', event => {
+    const collectionForm = event.target.closest('[data-collection-form]');
+    if (collectionForm) {
+      event.preventDefault();
+      const name = collectionForm.dataset.collectionForm;
+      const fields = Object.fromEntries(new FormData(collectionForm));
+      const items = collectionItems25(name);
+      const existing = editingCollection25?.collection === name
+        ? items.find(item => item.id === editingCollection25.id) : null;
+      const item = name === 'tasks'
+        ? { ...existing, id: existing?.id || id(), title: String(fields.title || '').trim(), category: String(fields.category || '').trim(), person: String(fields.person || 'Samen'), due: String(fields.due || ''), done: existing?.done === true }
+        : { ...existing, id: existing?.id || id(), title: String(fields.title || '').trim(), category: String(fields.category || '').trim(), date: String(fields.date || ''), url: String(fields.url || '').trim(), note: String(fields.note || '').trim(), done: existing?.done === true };
+      if (!item.title) return;
+      const index = items.findIndex(entry => entry.id === item.id);
+      if (index < 0) items.unshift(item); else items[index] = item;
+      editingCollection25 = null;
+      save(); render(); toast(`${name === 'tasks' ? 'Taak' : 'Programma'} opgeslagen`);
+      return;
+    }
+    const form = event.target.closest('[data-weather-location]');
+    if (!form) return;
+    event.preventDefault();
+    const values = new FormData(form);
+    const lat = Number(values.get('lat')), lon = Number(values.get('lon'));
+    const place = String(values.get('place') || '').trim();
+    if (!place || !Number.isFinite(lat) || lat < -90 || lat > 90 || !Number.isFinite(lon) || lon < -180 || lon > 180) {
+      toast('Controleer de plaats en coördinaten.');
+      return;
+    }
+    data.settings ||= {};
+    data.settings.weatherPlace = place.slice(0, 80);
+    data.settings.weatherLat = lat;
+    data.settings.weatherLon = lon;
+    save();
+    try { localStorage.removeItem(WEATHER_KEY); } catch (_) {}
+    render();
+    toast('Weerlocatie opgeslagen');
+  });
+})();

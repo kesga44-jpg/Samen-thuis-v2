@@ -1663,3 +1663,28 @@ html[data-theme19="dark"] .auto-tabs24,html[data-theme19="dark"] .fill24,html[da
 html[data-theme20="dark"] .mobile-nav23,html[data-theme19="dark"] .mobile-nav23{background:rgba(231,237,246,.74)!important;border-color:rgba(255,255,255,.42)!important}
 html[data-theme20="dark"] .mobile-nav-scroll23>button,html[data-theme20="dark"] .mobile-nav-scroll23>button *,html[data-theme19="dark"] .mobile-nav-scroll23>button,html[data-theme19="dark"] .mobile-nav-scroll23>button *{color:#17243a!important;-webkit-text-fill-color:#17243a!important}
 html[data-theme20="dark"] .mobile-nav-scroll23>button.active,html[data-theme19="dark"] .mobile-nav-scroll23>button.active{background:rgba(255,255,255,.76)!important;color:#0d1d33!important;-webkit-text-fill-color:#0d1d33!important}
+
+.weather-page25{display:block}
+.weather-page25 [data-weather-page-body]{display:grid;gap:16px}
+.weather-current25 .weather-now{font-size:1.15rem}
+.weather-svg25{width:100%;overflow-x:auto}
+.weather-svg25 svg{display:block;width:100%;min-width:440px;height:auto;overflow:visible}
+.weather-svg25 svg line{stroke:var(--line,#dbe3ed);stroke-width:1}
+.weather-svg25 svg text{fill:var(--muted,#64748b);font:12px system-ui,sans-serif}
+.weather-svg25 svg>text:last-child{font-size:11px}
+.weather-high25 polyline{fill:none;stroke:var(--blue,#315f86);stroke-width:3;stroke-linecap:round;stroke-linejoin:round}
+.weather-low25 polyline{fill:none;stroke:var(--purple,#7654a5);stroke-width:2;stroke-dasharray:5 4}
+.weather-rain25 rect{fill:var(--blue,#315f86);opacity:.22}
+.weather-list25{display:grid;gap:8px;padding:0;list-style:none}
+.weather-day25{display:grid;grid-template-columns:minmax(130px,1.4fr) repeat(3,minmax(80px,1fr));align-items:center;gap:10px}
+.weather-cache-note25{margin:0}
+.dashboard-setting-row25>span{display:flex;gap:4px}
+.dashboard-setting-row25 button{min-width:38px;padding:5px 9px}
+.dashboard-setting-row25 button:disabled{opacity:.45;cursor:not-allowed}
+.dashboard-setting-row25 label{display:flex;align-items:center;gap:8px}
+@media(max-width:700px){
+  .weather-day25{grid-template-columns:1fr auto;gap:5px 12px}
+  .weather-day25 strong{grid-column:1/-1}
+  .weather-day25 span:last-child{grid-column:2}
+  .weather-location25 .button-row{flex-wrap:wrap}
+}
