@@ -7,6 +7,9 @@
 - Streaks, voortgang en verdiende punten per challenge.
 - Een puntenpot en puntenhistorie.
 - Beloningen beheren en punten inwisselen, met standaardideeën zoals massage, date-avond, ontbijt op bed, vrije tijd en een verrassing.
+- Elkaar uitdagen met voorstel, acceptatie/afwijzing, voortgangsbevestiging door de andere deelnemer en een eenmalige beloning bij afronding.
+- Gezamenlijke activiteiten voorstellen, accepteren en door alle deelnemers als voltooid bevestigen.
+- Persoonlijke beloningen inwisselen met afwijzing/annulering en terugbetaling; gezamenlijke beloningen vragen afzonderlijk bevestigde bijdragen en kunnen daarna worden ingepland en afgerond.
 - In de primaire app worden challenges, punten en beloningen in `challengeDataV26` in de bestaande gegevensstructuur opgeslagen, zodat back-up en synchronisatie ze meenemen. Als losse add-on gebruikt de module `samenThuisChallengesV26`.
 
 ## Integratie in Samen-thuis-v2
@@ -28,5 +31,7 @@ Deze update verandert de bestaande v16-huishoudlogica niet. Het is een losse add
 
 ## Testnotities / beperkingen
 - Dit is een add-on voor de bestaande Samen Thuis-app en is bedoeld voor de v25.x appstructuur die in de projectbestanden is teruggevonden. Ik kon het bestaande ZIP-bestand niet als ruwe bestanden openen in deze sessie; controleer daarom de installatie op een aparte branch vóór je publiceert.
-- De add-on bewaart challenges en punten lokaal op het apparaat. Automatische synchronisatie tussen twee telefoons vereist een expliciete koppeling met de bestaande synchronisatielaag en is in deze eerste add-on niet geactiveerd.
+- Als losse add-on worden challenges en punten lokaal bewaard. In de primaire app maken ze deel uit van de bestaande versleutelde huishoudsynchronisatie en back-up.
 - Punten hebben geen geldwaarde. Spreek samen af wat beloningen kosten en betekenen.
+- De primaire app bewaart de ledger en voorstellen in de bestaande versleutelde huishoudgegevens. Bestaande saldo's worden eenmalig als controleerbare openingsboeking overgezet; er wordt geen tweede saldo bijgehouden.
+- Het bestaande puntensysteem gebruikt één gedeelde huishoud-pot en de bestaande huishoudcode, niet per-deelnemer geauthenticeerde saldi. De bevestigingsknoppen zijn workflowbevestigingen en vormen op zichzelf geen beveiligde identiteit of transactionele databaseboeking. Voor persoonlijke saldi of harde server-side autorisatie is een aparte Supabase-puntenmigratie en accountkoppeling nodig; die moet vóór productie worden uitgerold.

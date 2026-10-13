@@ -5,8 +5,16 @@
 })(globalThis, function () {
   // [id, label, standaard zichtbaar]. Verborgen widgets blijven bestaan en zijn via Instellingen weer in te schakelen.
   const CATALOG = [
+    ['travelActions', 'Belangrijkste reisacties', true],
+    ['dailyQuestion', 'Vraag van vandaag', true],
+    ['todayStats', 'Huishoudenstatistieken', true],
+    ['todayChores', 'Vandaag in huis', true],
+    ['todayAgenda', 'Op de agenda · vandaag', true],
+    ['todayGroceries', 'Boodschappen · vandaag', true],
+    ['lowStock', 'Bijna op', true],
+    ['upcomingChores', 'Huishouden · binnenkort', true],
     ['weather', 'Weer en uurstrook', true],
-    ['overview', 'Vandaagstatistieken en diner', true],
+    ['household', 'Huishouden · vandaagoverzicht', true],
     ['agenda', 'Agenda · komende afspraken', true],
     ['outfit', 'Kledingadvies', true],
     ['air', 'Pollen en luchtkwaliteit', true],
@@ -16,7 +24,7 @@
     ['savings', 'Spaardoelen en potjes', false],
     ['car', 'Auto-informatie', false],
     ['tasks', 'Taken', false],
-    ['groceries', 'Boodschappen', false]
+    ['groceries', 'Boodschappenlijst', false]
   ];
 
   function defaults(widgetIds) {
@@ -28,12 +36,17 @@
     const base = defaults(widgetIds);
     const valid = new Set(base.order);
     const defaultsVisible = defaultVisibleIds ? new Set(defaultVisibleIds) : valid;
-    const order = Array.isArray(saved?.order) ? saved.order.filter(id => valid.has(id)) : [];
+    const aliases = { overview: 'household' };
+    const order = Array.isArray(saved?.order)
+      ? saved.order.map(id => aliases[id] || id).filter(id => valid.has(id))
+      : [];
     return {
       order: [...new Set([...order, ...base.order])],
       visible: Object.fromEntries(base.order.map(id => [id, Object.hasOwn(saved?.visible || {}, id)
         ? saved.visible[id] !== false
-        : defaultsVisible.has(id)]))
+        : Object.hasOwn(saved?.visible || {}, Object.keys(aliases).find(oldId => aliases[oldId] === id))
+          ? saved.visible[Object.keys(aliases).find(oldId => aliases[oldId] === id)] !== false
+          : defaultsVisible.has(id)]))
     };
   }
 
