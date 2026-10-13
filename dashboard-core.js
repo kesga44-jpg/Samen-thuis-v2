@@ -3,6 +3,22 @@
   if (typeof module === 'object' && module.exports) module.exports = core;
   root.SamenThuisDashboard = core;
 })(globalThis, function () {
+  // [id, label, standaard zichtbaar]. Verborgen widgets blijven bestaan en zijn via Instellingen weer in te schakelen.
+  const CATALOG = [
+    ['weather', 'Weer en uurstrook', true],
+    ['overview', 'Vandaagstatistieken en diner', true],
+    ['agenda', 'Agenda · komende afspraken', true],
+    ['outfit', 'Kledingadvies', true],
+    ['air', 'Pollen en luchtkwaliteit', true],
+    ['quote', 'Quote van de dag', true],
+    ['chalkboard', 'Krijtbord · berichten voor elkaar', true],
+    ['budget', 'Budgetoverzicht', false],
+    ['savings', 'Spaardoelen en potjes', false],
+    ['car', 'Auto-informatie', false],
+    ['tasks', 'Taken', false],
+    ['groceries', 'Boodschappen', false]
+  ];
+
   function defaults(widgetIds) {
     const ids = [...new Set(widgetIds || [])];
     return { order: ids, visible: Object.fromEntries(ids.map(id => [id, true])) };
@@ -36,5 +52,5 @@
     return next;
   }
 
-  return { defaults, normalize, move, setVisible };
+  return { CATALOG, defaults, normalize, move, setVisible };
 });

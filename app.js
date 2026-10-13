@@ -460,7 +460,7 @@ function renderToday() {
   const todayPlanning = data.planning.filter(item => item.date === todayISO() && calendarById(item.calendarId).visible !== false);
   return `<section class="card welcome"><div><p class="eyebrow welcome-eyebrow">Jullie thuis, in één oogopslag</p><h2>Fijn dat jullie er zijn.</h2><p>${meal ? `Vanavond staat <strong>${esc(meal.title)}</strong> op het menu.` : 'Plan samen wat er vanavond op tafel komt.'}</p></div><div class="date-chip">${fmtDate(todayISO(), { weekday: 'long', day: 'numeric', month: 'long' })}</div></section>
     ${renderTravelActions()}
-    <div class="today-dailies">${renderDailyQuestion()}${renderQuote()}</div>
+    <div class="today-dailies single">${renderDailyQuestion()}</div>
     <div class="stat-row"><div class="stat"><strong>${pending.length}</strong><span>huishoudtaken vandaag</span></div><div class="stat"><strong>${unbought.length}</strong><span>boodschappen open</span></div><div class="stat"><strong>${low.length}</strong><span>producten bijna op</span></div><div class="stat"><strong>${todayPlanning.length}</strong><span>agenda-items vandaag</span></div></div>
     <div class="grid two">
       <section class="card"><div class="card-head"><h2>Vandaag in huis</h2><button class="text-btn" data-view="chores">Hele week</button></div><div class="list">${todayChores.length ? todayChores.map(({ chore }) => choreOccurrenceRow(chore, todayISO())).join('') : empty('Vandaag geen huishoudtaken')}</div></section>
@@ -3609,7 +3609,6 @@ console.info('Samen Thuis update 13.1 geladen');
   });
 
   save({touch:false});
-  toast('Samen Thuis v13.1 geladen');
 })();
 
 ;
@@ -4126,7 +4125,6 @@ Reizen: [reizen] | [reis] | [map/onderdeel] | [titel] | [type] | [omschrijving] 
   },true);
 
   save({touch:false});
-  toast('Samen Thuis v14.1 geladen');
 })();
 
 ;
@@ -4409,7 +4407,6 @@ console.info('Samen Thuis update 15.0 geladen');
   },true);
 
   save({touch:false});
-  toast('Samen Thuis v15 geladen');
 })();
 
 ;
@@ -4792,7 +4789,6 @@ console.info('Samen Thuis update 16.0 geladen');
 
   // One initial render is needed so existing screens immediately use the new logic.
   render();
-  toast('Samen Thuis v16 geladen');
 })();
 
 ;
@@ -5874,34 +5870,9 @@ document.addEventListener('click', event => {
   window.__ST_V25_INTEGRATION__ = true;
 
   const DASH_KEY = 'samenThuisDashboardWidgetsV25';
-  const DASH_WIDGETS = [
-    ['weather', 'Weer en uurstrook'],
-    ['overview', 'Vandaagstatistieken en diner'],
-    ['agenda', 'Komende afspraken'],
-    ['outfit', 'Kledingadvies'],
-    ['air', 'Pollen en luchtkwaliteit'],
-    ['tab-dashboard', 'Dashboardoverzicht'],
-    ['tab-agenda', 'Agenda · afspraken'],
-    ['tab-tasks', 'Taken · openstaand'],
-    ['tab-groceries', 'Boodschappen · openstaand'],
-    ['tab-stock', 'Voorraad · meldingen'],
-    ['tab-offers', 'Aanbiedingen'],
-    ['tab-budget19', 'Budget · overzicht'],
-    ['tab-meals', 'Weekmenu · vandaag'],
-    ['tab-chores', 'Huishouden · binnenkort'],
-    ['tab-challenges', 'Challenges'],
-    ['tab-weather', 'Weer'],
-    ['tab-programs', "Programma's"],
-    ['tab-ideas', 'Date ideeën'],
-    ['tab-home', 'Woning · open punten'],
-    ['tab-trips', 'Reizen · volgende actie'],
-    ['tab-auto24', 'Auto · voertuigen'],
-    ['tab-extra19', 'Extra'],
-    ['tab-imports243', 'Importeren'],
-    ['tab-settings', 'Instellingen']
-  ];
+  const DASH_WIDGETS = window.SamenThuisDashboard.CATALOG.map(([id, label]) => [id, label]);
   const DASH_DEFAULTS = DASH_WIDGETS.map(([id]) => id);
-  const DASH_DEFAULT_VISIBLE = ['weather', 'overview', 'agenda', 'outfit', 'air'];
+  const DASH_DEFAULT_VISIBLE = window.SamenThuisDashboard.CATALOG.filter(([, , visible]) => visible).map(([id]) => id);
   const dashboardCore = window.SamenThuisDashboard;
   const WEATHER_KEY = 'samenThuisWeatherForecastV25';
   const DEFAULT_LOCATION = { place: 'Rotterdam', lat: 51.9225, lon: 4.47917 };
@@ -5954,36 +5925,36 @@ document.addEventListener('click', event => {
     }).join('');
     const preview = dashboard25.order.filter(id => dashboard25.visible[id]).map(id =>
       `<li>${esc(DASH_WIDGETS.find(([widget]) => widget === id)?.[1] || id)}</li>`).join('');
-    return `<section class="card settings-card dashboard-editor25"><div class="card-head"><div><p class="eyebrow">DASHBOARD</p><h2>Onderdelen samenstellen</h2></div></div><p class="muted">Kies compacte onderdelen van alle bestaande pagina's. Verberg, toon of verplaats ze; de bestaande dashboardkaarten blijven beschikbaar. Zonder account worden voorkeuren alleen op dit apparaat bewaard.</p><div class="dashboard-preview25"><strong>Voorbeeld van je dashboard (${dashboard25.order.filter(id => dashboard25.visible[id]).length} onderdelen)</strong><ol>${preview || '<li>Geen onderdelen geselecteerd</li>'}</ol></div>${rows}<div class="button-row"><button type="button" class="secondary" data-dashboard-reset>Standaardindeling herstellen</button></div></section>`;
+    return `<section class="card settings-card dashboard-editor25"><div class="card-head"><div><p class="eyebrow">DASHBOARD</p><h2>Onderdelen samenstellen</h2></div></div><p class="muted">Zet dashboardonderdelen aan of uit en verplaats ze. Verborgen onderdelen blijven bestaan en pagina's en navigatie veranderen niet. Zonder account worden voorkeuren alleen op dit apparaat bewaard.</p><div class="dashboard-preview25"><strong>Voorbeeld van je dashboard (${dashboard25.order.filter(id => dashboard25.visible[id]).length} onderdelen)</strong><ol>${preview || '<li>Geen onderdelen geselecteerd</li>'}</ol></div>${rows}<div class="button-row"><button type="button" class="secondary" data-dashboard-reset>Standaardindeling herstellen</button></div></section>`;
   }
 
-  function dashboardPageWidget25(widgetId) {
-    const pages = {
-      'tab-dashboard': ['today', 'Dashboard', `${(data.planning || []).filter(item => item.date >= todayISO()).length} komende afspraken`],
-      'tab-agenda': ['planning', 'Agenda', `${(data.planning || []).filter(item => item.date >= todayISO()).length} komende afspraken`],
-      'tab-tasks': ['tasks', 'Taken', `${(data.tasks || []).filter(item => !item.done).length} open taken`],
-      'tab-groceries': ['groceries', 'Boodschappen', `${(data.groceries || []).filter(item => !item.done).length} boodschappen open`],
-      'tab-stock': ['stock', 'Voorraad', `${(data.stock || []).filter(item => Number(item.min ?? item.minimum ?? 0) > 0 && Number(item.amount || 0) <= Number(item.min ?? item.minimum ?? 0)).length} producten op of onder minimum`],
-      'tab-offers': ['offers', 'Aanbiedingen', `${(data.offers25 || []).length} bewaarde aanbiedingen`],
-      'tab-budget19': ['budget19', 'Budget', data.budgetV23?.financialLedger
-        ? `Huishoudsaldo ${moneyLedger25(ledgerCore25.availableCashCents(ledgerCore25.normalize(data.budgetV23.financialLedger)))} · zie potjes en planning`
-        : 'Bekijk planning, potjes en spaardoelen'],
-      'tab-meals': ['meals', 'Weekmenu', (data.meals || []).find(item => item.date === todayISO() && /avond/i.test(item.type || item.mealType || ''))?.title || 'Geen diner voor vandaag gepland'],
-      'tab-chores': ['chores', 'Huishouden', `${(data.chores || []).filter(item => !item.done).length} open huishoudtaken`],
-      'tab-challenges': ['challenges', 'Challenges', 'Bekijk de gezamenlijke challenges'],
-      'tab-weather': ['weather', 'Weer', data.settings?.weatherPlace || data.settings?.weatherCity || 'Weer en verwachting'],
-      'tab-programs': ['programs', "Programma's", `${(data.programs || []).filter(item => !item.done).length} programma's`],
-      'tab-ideas': ['ideas', 'Date ideeën', `${(data.ideas || []).length} ideeën`],
-      'tab-home': ['home', 'Woning', `${(data.home || []).filter(item => !item.done).length} open woningpunten`],
-      'tab-trips': ['trips', 'Reizen', `${(data.trips || []).filter(item => !item.done).length} open reisacties`],
-      'tab-auto24': ['auto24', 'Auto', `${(data.cars || []).length} voertuigen · ${(data.fuelEntries || []).length} tankbeurten`],
-      'tab-extra19': ['extra19', 'Extra', 'Open handige hulpmiddelen'],
-      'tab-imports243': ['imports243', 'Importeren', 'Gegevens importeren of een back-up herstellen'],
-      'tab-settings': ['settings', 'Instellingen', 'Beheer voorkeuren en synchronisatie']
-    };
-    const [page, title, detail] = pages[widgetId] || ['today', 'Dashboard', ''];
-    return `<section class="dashboard-page-widget25 card" data-widget18="${widgetId}"><div><p class="eyebrow">SNEL NAAR</p><h3>${esc(title)}</h3><p>${esc(detail)}</p></div><a class="secondary" href="#/${page}" data-v19-go="${page}" aria-label="Open ${esc(title)}">Open →</a></section>`;
+  function dashboardCard25(id, eyebrow, title, detail, page) {
+    return `<section class="dashboard-page-widget25 card" data-widget18="${id}"><div><p class="eyebrow">${esc(eyebrow)}</p><h3>${esc(title)}</h3>${detail ? `<p>${esc(detail)}</p>` : ''}</div><a class="secondary" href="#/${page}" data-v19-go="${page}" aria-label="Open ${esc(title)}">Open →</a></section>`;
   }
+
+  function dashboardListCard25(id, eyebrow, title, page, rows, emptyText) {
+    const list = rows.length ? `<ul class="dashboard-mini-list25">${rows.map(row => `<li>${esc(row)}</li>`).join('')}</ul>` : `<p>${esc(emptyText)}</p>`;
+    return `<section class="dashboard-page-widget25 card" data-widget18="${id}"><div><p class="eyebrow">${esc(eyebrow)}</p><h3>${esc(title)}</h3>${list}</div><a class="secondary" href="#/${page}" data-v19-go="${page}" aria-label="Open ${esc(title)}">Open →</a></section>`;
+  }
+
+  const dashboardBuilders25 = {
+    quote: () => `<div class="dashboard-quote25" data-widget18="quote">${renderQuote()}</div>`,
+    chalkboard: () => chalkboardMarkup25(),
+    budget: () => dashboardCard25('budget', 'BUDGET', 'Budgetoverzicht', data.budgetV23?.financialLedger
+      ? `Huishoudsaldo ${moneyLedger25(ledgerCore25.availableCashCents(ledgerCore25.normalize(data.budgetV23.financialLedger)))}`
+      : 'Bekijk planning, potjes en spaardoelen', 'budget19'),
+    savings: () => dashboardListCard25('savings', 'SPAREN', 'Spaardoelen en potjes', 'budget19',
+      (data.budgetV23?.goals || []).slice(0, 4).map(goal => {
+        const saved = window.SamenThuisSavings?.balance(goal) ?? Number(goal.current || 0);
+        return `${goal.title || 'Spaardoel'} · ${new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' }).format(Number(saved) || 0)}`;
+      }), 'Nog geen spaardoelen'),
+    car: () => dashboardCard25('car', 'AUTO', 'Auto',
+      `${(data.cars || []).length} voertuigen · ${(data.fuelEntries || []).length} tankbeurten`, 'auto24'),
+    tasks: () => dashboardListCard25('tasks', 'TAKEN', 'Taken', 'tasks',
+      (data.tasks || []).filter(item => !item.done).slice(0, 4).map(item => item.title || 'Taak'), 'Geen openstaande taken'),
+    groceries: () => dashboardListCard25('groceries', 'BOODSCHAPPEN', 'Boodschappen', 'groceries',
+      (data.groceries || []).filter(item => !item.done).slice(0, 4).map(item => item.title || 'Boodschap'), 'De lijst is leeg')
+  };
 
   function applyDashboard25() {
     const grid = document.querySelector('[data-dash18] .dg18');
@@ -5992,9 +5963,9 @@ document.addEventListener('click', event => {
       const id = node.dataset.widget18 || (node.matches('[data-air24]') ? 'air' : '');
       return [id, node];
     }).filter(([id]) => id));
-    DASH_WIDGETS.filter(([id]) => id.startsWith('tab-')).forEach(([id]) => {
-      if (nodes.has(id)) return;
-      grid.insertAdjacentHTML('beforeend', dashboardPageWidget25(id));
+    Object.keys(dashboardBuilders25).forEach(id => {
+      if (nodes.has(id) || !dashboard25.visible[id]) return;
+      grid.insertAdjacentHTML('beforeend', dashboardBuilders25[id]());
       const node = grid.querySelector(`[data-widget18="${id}"]`);
       if (node) nodes.set(id, node);
     });
@@ -6004,6 +5975,7 @@ document.addEventListener('click', event => {
       node.hidden = !dashboard25.visible[id];
       grid.append(node);
     });
+    if (dashboard25.visible.chalkboard) refreshChalkboard25(false);
   }
 
   let ledgerMonth25 = todayISO().slice(0, 7);
@@ -6965,6 +6937,168 @@ document.addEventListener('click', event => {
   } else if (authSession25?.user?.id) {
     loadPersonalPreferences25().catch(error => { authNotice25 = error.message || 'Persoonlijke voorkeuren konden niet worden geladen.'; });
   }
+
+  /* Digitaal krijtbord · berichten per huishouden via Supabase (RLS) */
+  const chalkCore25 = window.SamenThuisChalkboard;
+  const chalk25 = { uid: '', status: 'idle', household: null, role: '', messages: [], error: '', notice: '', loadedAt: 0, busy: false, formError: '' };
+
+  async function chalkRequest25(path, options = {}) {
+    const session = await readySession25();
+    if (!session?.user?.id) throw new Error('Meld je aan via Instellingen om het krijtbord te gebruiken.');
+    const response = await fetch(`${authBase25()}${path}`, {
+      ...options, headers: { ...authHeaders25(session.access_token), ...(options.headers || {}) }
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.message || `Krijtbord is niet bereikbaar (${response.status}).`);
+    }
+    return response.status === 204 ? null : response.json().catch(() => null);
+  }
+
+  function chalkMessageHtml25(message) {
+    const mine = message.user_id === authSession25?.user?.id;
+    const removable = chalkCore25.canDelete(message, authSession25?.user?.id, chalk25.role);
+    return `<li class="chalk-message25"><p>${esc(message.body)}</p><footer><span>${mine ? 'Jij' : esc(message.author_name)} · <time datetime="${esc(message.created_at)}">${esc(chalkCore25.formatWhen(message.created_at))}</time></span>${removable ? `<button type="button" class="chalk-delete25" data-chalk-delete="${esc(message.id)}" aria-label="Verwijder bericht van ${esc(message.author_name)}">Wissen</button>` : ''}</footer></li>`;
+  }
+
+  function chalkInner25() {
+    const head = `<header class="chalk-head25"><div><p class="eyebrow">THUIS OP DE MUUR</p><h3>Ons krijtbord ♡</h3></div>`;
+    if (chalk25.status === 'signedout') {
+      return `${head}</header><p class="chalk-empty25">Meld je aan met je persoonlijke account om berichtjes voor elkaar achter te laten.</p><a class="chalk-button25" href="#/settings" data-v19-go="settings">Naar Instellingen</a>`;
+    }
+    if (chalk25.status === 'idle' || chalk25.status === 'loading') return `${head}</header><p class="chalk-empty25" role="status">Krijtbord laden…</p>`;
+    if (chalk25.status === 'error') {
+      return `${head}</header><p class="chalk-error25" role="alert">${esc(chalk25.error)}</p><button type="button" class="chalk-button25" data-chalk-retry>Opnieuw proberen</button>`;
+    }
+    if (chalk25.status === 'nohousehold') {
+      return `${head}</header><p class="chalk-empty25">Maak een huishouden aan of voeg je toe met de code van je huisgenoot.</p><form class="chalk-form25" data-chalk-create><label for="chalkHouseName">Naam van jullie huishouden</label><input id="chalkHouseName" name="name" maxlength="80" required placeholder="Bijv. Samen Thuis"><button class="chalk-button25">Huishouden aanmaken</button></form><form class="chalk-form25" data-chalk-join><label for="chalkJoinCode">Of join met een code</label><input id="chalkJoinCode" name="code" maxlength="20" required autocomplete="off"><button class="chalk-button25">Toevoegen</button></form>${chalk25.formError ? `<p class="chalk-error25" role="alert">${esc(chalk25.formError)}</p>` : ''}`;
+    }
+    const messages = chalkCore25.sortMessages(chalk25.messages);
+    const list = messages.length
+      ? `<ul class="chalk-list25" tabindex="0" aria-label="Berichten, nieuwste bovenaan">${messages.map(chalkMessageHtml25).join('')}</ul>`
+      : '<p class="chalk-empty25">Het krijtbord is nog leeg. Schrijf jullie eerste lieve berichtje ♡</p>';
+    return `${head}<button type="button" class="chalk-button25" data-chalk-open>Laat een berichtje achter</button></header><p class="chalk-notice25" role="status" aria-live="polite">${esc(chalk25.notice)}</p>${list}<p class="chalk-code25">${esc(chalk25.household?.name || '')} · code om huisgenoten toe te voegen: <strong>${esc(chalk25.household?.join_code || '')}</strong></p>`;
+  }
+
+  function chalkboardMarkup25() {
+    return `<section class="chalkboard25 card" data-widget18="chalkboard" aria-label="Krijtbord">${chalkInner25()}</section>`;
+  }
+
+  function paintChalkboard25() {
+    document.querySelectorAll('[data-widget18="chalkboard"]').forEach(node => { node.innerHTML = chalkInner25(); });
+  }
+
+  async function refreshChalkboard25(force = true) {
+    const userId = authSession25?.user?.id || '';
+    if (chalk25.uid !== userId) Object.assign(chalk25, { uid: userId, status: 'idle', household: null, role: '', messages: [], notice: '', loadedAt: 0 });
+    if (!userId) { chalk25.status = 'signedout'; paintChalkboard25(); return; }
+    if (chalk25.busy) return;
+    if (!force && chalk25.status === 'ready' && Date.now() - chalk25.loadedAt < 60000) return;
+    chalk25.busy = true;
+    if (chalk25.status !== 'ready') { chalk25.status = 'loading'; paintChalkboard25(); }
+    try {
+      const uid = encodeURIComponent(authSession25.user.id);
+      const rows = await chalkRequest25(`/rest/v1/household_members?select=role,households(id,name,join_code)&user_id=eq.${uid}&order=joined_at.asc&limit=1`);
+      const membership = rows?.[0];
+      if (!membership?.households) { chalk25.status = 'nohousehold'; chalk25.household = null; chalk25.messages = []; return; }
+      chalk25.household = membership.households; chalk25.role = membership.role;
+      chalk25.messages = await chalkRequest25(`/rest/v1/chalkboard_messages?select=id,user_id,author_name,body,created_at&household_id=eq.${encodeURIComponent(chalk25.household.id)}&order=created_at.desc&limit=50`) || [];
+      chalk25.status = 'ready'; chalk25.loadedAt = Date.now();
+    } catch (error) {
+      chalk25.status = 'error'; chalk25.error = error.message || 'Het krijtbord kon niet worden geladen.';
+    } finally {
+      chalk25.busy = false; paintChalkboard25();
+    }
+  }
+
+  function chalkDialog25() {
+    let dialog = document.querySelector('#chalkDialog');
+    if (dialog) return dialog;
+    dialog = document.createElement('dialog');
+    dialog.id = 'chalkDialog';
+    dialog.className = 'chalk-dialog25';
+    dialog.innerHTML = `<form id="chalkForm" novalidate><div class="dialog-head"><div><p class="eyebrow">KRIJTBORD</p><h2>Laat een berichtje achter</h2></div><button type="button" class="icon-btn" data-chalk-close aria-label="Sluiten">×</button></div><div class="field"><label for="chalkText">Je bericht</label><textarea id="chalkText" name="text" rows="4" placeholder="Ik hoop dat je een fijne dag hebt ❤️" aria-describedby="chalkCount chalkFormError"></textarea><small id="chalkCount" class="chalk-count25">0 / ${chalkCore25.MAX_LENGTH}</small><p id="chalkFormError" class="chalk-error25" role="alert"></p></div><div class="dialog-actions"><button type="button" class="secondary" data-chalk-close>Annuleren</button><button type="submit" class="primary">Plaats bericht</button></div></form>`;
+    document.body.append(dialog);
+    return dialog;
+  }
+
+  async function postChalkMessage25(form) {
+    const field = form.elements.text, errorNode = form.querySelector('#chalkFormError');
+    const result = chalkCore25.validateMessage(field.value);
+    if (!result.ok) { errorNode.textContent = result.error; field.focus(); return; }
+    const submit = form.querySelector('[type="submit"]');
+    submit.disabled = true; errorNode.textContent = '';
+    try {
+      const session = await readySession25();
+      const saved = await chalkRequest25('/rest/v1/chalkboard_messages', {
+        method: 'POST', headers: { Prefer: 'return=representation' },
+        body: JSON.stringify({ household_id: chalk25.household.id, user_id: session.user.id, author_name: chalkCore25.authorName(session.user), body: result.value })
+      });
+      if (!saved?.length) throw new Error('Het bericht is niet opgeslagen.');
+      chalk25.messages = [saved[0], ...chalk25.messages].slice(0, 50);
+      chalk25.notice = 'Je berichtje hangt op het krijtbord ♡';
+      field.value = '';
+      document.querySelector('#chalkDialog')?.close();
+      paintChalkboard25(); toast('Bericht geplaatst op het krijtbord.');
+    } catch (error) {
+      errorNode.textContent = `Het bericht is niet geplaatst: ${error.message || 'onbekende fout'}. Je tekst is bewaard; probeer het opnieuw.`;
+    } finally { submit.disabled = false; }
+  }
+
+  async function deleteChalkMessage25(id) {
+    const message = chalk25.messages.find(item => item.id === id);
+    if (!message || !chalkCore25.canDelete(message, authSession25?.user?.id, chalk25.role)) return;
+    if (!confirm('Dit bericht van het krijtbord wissen?')) return;
+    try {
+      const removed = await chalkRequest25(`/rest/v1/chalkboard_messages?id=eq.${encodeURIComponent(id)}`, { method: 'DELETE', headers: { Prefer: 'return=representation' } });
+      if (!removed?.length) throw new Error('Je hebt geen rechten om dit bericht te wissen.');
+      chalk25.messages = chalk25.messages.filter(item => item.id !== id);
+      chalk25.notice = 'Bericht gewist.';
+      paintChalkboard25();
+    } catch (error) {
+      chalk25.notice = `Wissen mislukt: ${error.message || 'onbekende fout'}`;
+      paintChalkboard25();
+    }
+  }
+
+  async function joinOrCreateHousehold25(form, kind) {
+    chalk25.formError = '';
+    try {
+      if (kind === 'create') await chalkRequest25('/rest/v1/rpc/create_household', { method: 'POST', body: JSON.stringify({ p_name: form.elements.name.value }) });
+      else await chalkRequest25('/rest/v1/rpc/join_household', { method: 'POST', body: JSON.stringify({ p_code: form.elements.code.value }) });
+      await refreshChalkboard25(true);
+    } catch (error) {
+      chalk25.formError = error.message || 'Dit is niet gelukt.'; paintChalkboard25();
+    }
+  }
+
+  document.addEventListener('click', event => {
+    if (event.target.closest('[data-chalk-open]')) {
+      const dialog = chalkDialog25();
+      dialog.querySelector('#chalkFormError').textContent = '';
+      dialog.showModal(); dialog.querySelector('#chalkText').focus();
+      return;
+    }
+    if (event.target.closest('[data-chalk-close]')) { document.querySelector('#chalkDialog')?.close(); return; }
+    if (event.target.closest('[data-chalk-retry]')) { refreshChalkboard25(true); return; }
+    const del = event.target.closest('[data-chalk-delete]');
+    if (del) deleteChalkMessage25(del.dataset.chalkDelete);
+  });
+  document.addEventListener('input', event => {
+    if (!event.target.matches('#chalkText')) return;
+    const count = Array.from(event.target.value).length;
+    const node = document.querySelector('#chalkCount');
+    node.textContent = `${count} / ${chalkCore25.MAX_LENGTH}`;
+    node.classList.toggle('over', count > chalkCore25.MAX_LENGTH);
+  });
+  document.addEventListener('submit', event => {
+    if (event.target.matches('#chalkForm')) { event.preventDefault(); postChalkMessage25(event.target); }
+    else if (event.target.matches('[data-chalk-create]')) { event.preventDefault(); joinOrCreateHousehold25(event.target, 'create'); }
+    else if (event.target.matches('[data-chalk-join]')) { event.preventDefault(); joinOrCreateHousehold25(event.target, 'join'); }
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && current === 'today' && document.querySelector('[data-widget18="chalkboard"]:not([hidden])')) refreshChalkboard25(true);
+  });
 
   function render25(...args) {
     if (current === 'tasks' || current === 'programs') {
