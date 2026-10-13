@@ -5,6 +5,13 @@
 })(globalThis, function () {
   // [id, label, standaard zichtbaar]. Verborgen widgets blijven bestaan en zijn via Instellingen weer in te schakelen.
   const CATALOG = [
+    ['travelActions', 'Belangrijkste reisacties', true],
+    ['dailyQuestion', 'Vraag van vandaag', true],
+    ['todayStats', 'Huishoudenstatistieken', true],
+    ['todayChores', 'Vandaag in huis', true],
+    ['todayAgenda', 'Op de agenda · vandaag', true],
+    ['todayGroceries', 'Boodschappen · vandaag', true],
+    ['lowStock', 'Bijna op', true],
     ['weather', 'Weer en uurstrook', true],
     ['overview', 'Vandaagstatistieken en diner', true],
     ['agenda', 'Agenda · komende afspraken', true],
@@ -16,7 +23,7 @@
     ['savings', 'Spaardoelen en potjes', false],
     ['car', 'Auto-informatie', false],
     ['tasks', 'Taken', false],
-    ['groceries', 'Boodschappen', false]
+    ['groceries', 'Boodschappenlijst', false]
   ];
 
   function defaults(widgetIds) {

@@ -29,3 +29,20 @@ test('new optional dashboard widgets stay hidden until selected', () => {
     ['weather', 'agenda', 'tab-budget'], ['weather', 'agenda']);
   assert.equal(selected.visible['tab-budget'], true);
 });
+
+test('the catalogue covers the fixed dashboard sections as independent controls', () => {
+  const ids = D.CATALOG.map(([id]) => id);
+  for (const id of ['travelActions', 'dailyQuestion', 'todayChores', 'todayAgenda',
+    'todayGroceries', 'lowStock', 'todayStats', 'weather', 'budget', 'car',
+    'quote', 'tasks', 'savings', 'chalkboard']) {
+    assert.ok(ids.includes(id), `${id} should have a dashboard setting`);
+  }
+  assert.equal(new Set(ids).size, ids.length);
+});
+
+test('turning every dashboard section off yields a normalized all-hidden layout', () => {
+  const ids = D.CATALOG.map(([id]) => id);
+  const defaults = D.CATALOG.filter(([, , visible]) => visible).map(([id]) => id);
+  const hidden = D.normalize({ visible: Object.fromEntries(ids.map(id => [id, false])) }, ids, defaults);
+  assert.equal(Object.values(hidden.visible).every(visible => !visible), true);
+});
