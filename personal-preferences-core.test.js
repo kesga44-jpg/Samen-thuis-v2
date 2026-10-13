@@ -22,3 +22,8 @@ test('personal preference restore constrains theme and color while retaining das
     visible: { weather: true, agenda: false }
   });
 });
+
+test('invalid or absent custom accent colors restore a safe preset color', () => {
+  assert.equal(P.normalize({ ui: { accent: 'orange', accentColor: 'red' } }, [], D).ui.accentColor, '#d56e38');
+  assert.equal(P.normalize({ ui: {} }, [], D).ui.accentColor, '#7057d9');
+});
