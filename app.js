@@ -6161,6 +6161,34 @@ document.addEventListener('click', event => {
     return `<form class="ledger-form25" data-ledger-edit="${esc(kind)}" data-entry-id="${esc(entryId)}"><h3>Boeking corrigeren</h3><div class="ledger-fields25">${fields}</div><div class="button-row"><button class="primary" type="submit">Wijziging controleren</button><button class="secondary" type="button" data-ledger-cancel-edit>Annuleren</button></div></form>`;
   }
 
+  function appendLedgerMarkup25(target, markup) {
+    if (!target) return;
+    const parsed = new DOMParser().parseFromString(markup, 'text/html');
+    const allowedTags = new Set(['article', 'b', 'button', 'div', 'form', 'h2', 'h3', 'label', 'li', 'input', 'option', 'p', 'section', 'select', 'small', 'span', 'strong', 'ul']);
+    const allowedAttributes = new Set(['aria-label', 'class', 'inputmode', 'max', 'maxlength', 'min', 'name', 'placeholder', 'required', 'role', 'selected', 'step', 'type', 'value']);
+    const appendSafeNode = (source, parent) => {
+      if (source.nodeType === Node.TEXT_NODE) {
+        parent.append(document.createTextNode(source.nodeValue || ''));
+        return;
+      }
+      if (source.nodeType !== Node.ELEMENT_NODE) return;
+      const tag = source.tagName.toLowerCase();
+      if (!allowedTags.has(tag)) return;
+      const safe = document.createElement(tag);
+      Array.from(source.attributes).forEach(attribute => {
+        const name = attribute.name.toLowerCase();
+        if (allowedAttributes.has(name) && (name !== 'class' || /^[\w -]*$/.test(attribute.value))) {
+          safe.setAttribute(name, attribute.value);
+        } else if (/^data-ledger[a-z-]*$/.test(name) || ['data-entry-id', 'data-allocation-id'].includes(name)) {
+          safe.setAttribute(name, attribute.value);
+        }
+      });
+      parent.append(safe);
+      Array.from(source.childNodes).forEach(child => appendSafeNode(child, safe));
+    };
+    Array.from(parsed.body.childNodes).forEach(child => appendSafeNode(child, target));
+  }
+
   function ledgerMarkup25() {
     const budget = ledgerBudget25(), pots = ledgerPots25(budget), ledger = ledgerState25(budget, pots);
     if (!ledger) return '<section class="card"><p role="alert">De financiële administratie is niet beschikbaar in deze browser.</p></section>';
@@ -6752,7 +6780,7 @@ document.addEventListener('click', event => {
     requestAnimationFrame(() => {
       applyDashboard25();
       if (current === 'budget19' && !document.querySelector('#view .ledger25')) {
-        document.querySelector('#view')?.insertAdjacentHTML('beforeend', ledgerMarkup25());
+        appendLedgerMarkup25(document.querySelector('#view'), ledgerMarkup25());
       }
       const settings = document.querySelector('#view .settings-grid');
       if (current === 'settings' && settings && !settings.querySelector('.dashboard-editor25')) {
