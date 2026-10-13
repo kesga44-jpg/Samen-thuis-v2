@@ -1776,3 +1776,28 @@ html[data-accent20="custom"] .mobile-nav23 button.active{
   .ledger-actions25{grid-column:1/-1;width:100%}
   .ledger-actions25 button{flex:1}
 }
+
+/* Dashboard: instelbare widgets en krijtbord */
+.dg18 [hidden]{display:none!important}
+.today-dailies.single{grid-template-columns:1fr}
+.dashboard-quote25{min-width:0}.dashboard-quote25 .quote-card{height:100%}
+.dashboard-mini-list25{margin:6px 0 0;padding-left:18px;color:var(--muted);font-size:.86rem}
+.chalkboard25{grid-column:1/-1;position:relative;padding:20px;border:8px solid #8a6240;border-radius:18px;color:#f4f1e8;background:radial-gradient(circle at 20% 15%,rgba(255,255,255,.06),transparent 45%),#2f3d39;box-shadow:inset 0 0 40px rgba(0,0,0,.35),0 6px 18px rgba(0,0,0,.18);min-width:0}
+.chalk-head25{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
+.chalk-head25 h3{margin:2px 0 0;font:600 1.4rem Georgia,serif;letter-spacing:.02em}
+.chalkboard25 .eyebrow{color:#d9d4c3}
+.chalk-button25{display:inline-block;border:1.5px dashed #f4f1e8;border-radius:12px;background:transparent;color:#f4f1e8;padding:9px 14px;font-weight:700;text-decoration:none;cursor:pointer}
+.chalk-button25:hover,.chalk-button25:focus-visible{background:rgba(255,255,255,.14);outline:2px solid #fff3b0;outline-offset:2px}
+.chalk-list25{list-style:none;margin:14px 0 0;padding:0 4px 0 0;display:grid;gap:12px;max-height:320px;overflow-y:auto}
+.chalk-message25{padding:10px 14px;border-left:3px solid #f6b8c8;background:rgba(255,255,255,.06);border-radius:8px}
+.chalk-message25 p{margin:0 0 6px;font:1.12rem/1.45 "Segoe Print","Bradley Hand",Georgia,cursive;white-space:pre-wrap;overflow-wrap:anywhere}
+.chalk-message25 footer{display:flex;justify-content:space-between;gap:10px;font-size:.78rem;color:#d9d4c3}
+.chalk-delete25{border:0;background:transparent;color:#ffd1d9;text-decoration:underline;cursor:pointer;padding:2px 4px}
+.chalk-empty25,.chalk-code25,.chalk-notice25{color:#e6e1d0;font-size:.9rem;margin:12px 0 0}
+.chalk-notice25:empty{display:none}
+.chalk-error25{color:#ffd1d9;font-size:.88rem;margin:8px 0 0}
+.chalk-dialog25 .chalk-error25{color:#b42318}
+.chalk-form25{display:grid;gap:6px;margin-top:12px;max-width:420px}
+.chalk-form25 input{padding:9px 10px;border-radius:8px;border:1px solid #d9d4c3;background:#fff;color:#1f2a27}
+.chalk-count25{color:var(--muted)}.chalk-count25.over{color:#b42318;font-weight:700}
+@media(max-width:650px){.chalkboard25{padding:14px;border-width:6px}.chalk-list25{max-height:260px}.chalk-button25{width:100%;text-align:center}}
