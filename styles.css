@@ -1697,3 +1697,28 @@ html[data-theme20="dark"] .mobile-nav-scroll23>button.active,html[data-theme19="
 /* Current-offers page */
 .offers-page25{display:grid;gap:16px}.offers-toolbar25 h2{margin:0}.offer-search25{display:flex;align-items:end;gap:12px;margin-top:16px}.offer-search25 .field{flex:1}.offer-search25 button{min-height:44px}.offer-filters25{display:flex;align-items:end;flex-wrap:wrap;gap:14px}.offer-filters25 label{display:grid;gap:6px}.offer-favorite-filter25{display:flex!important;align-items:center;gap:8px!important}.offers-list25{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,360px),1fr));gap:14px}.offer-card25{display:grid;gap:10px}.offer-card25 h2{margin:4px 0}.offer-card25 p{margin:0}.offer-card-head25{display:flex;justify-content:space-between;gap:16px}.offer-price25{font-size:1.35rem;white-space:nowrap}.offer-archive25 summary{cursor:pointer;font-weight:700}.offer-archive25 .offers-list25{margin-top:14px}.offer-search25 .field input,.offer-filters25 select{min-height:42px}.offer-card25 .button-row{align-items:center}
 @media(max-width:600px){.offer-search25{align-items:stretch;flex-direction:column}.offer-search25 button{width:100%}.offer-filters25{align-items:stretch;flex-direction:column}.offer-card-head25{flex-wrap:wrap}}
+
+/* Custom accent color and dashboard customization */
+.accent-control20{display:grid;grid-template-columns:auto 52px 1fr;align-items:center;gap:10px}
+.accent-control20 input[type=color]{width:52px;height:42px;padding:4px;border:1px solid var(--line);border-radius:10px;background:var(--paper)}
+.accent-preview20{min-width:88px;padding:9px 12px;border-radius:10px;text-align:center;font-size:.82rem;font-weight:800}
+.dashboard-preview25{padding:14px 16px;margin:0 0 14px;border:1px solid var(--line);border-radius:14px;background:var(--bg)}
+.dashboard-preview25 ol{display:flex;gap:8px;flex-wrap:wrap;padding-left:24px;margin-bottom:0}
+.dashboard-preview25 li{padding:5px 8px;border-radius:8px;background:var(--paper);color:var(--ink);font-size:.82rem}
+.dashboard-setting-row25{gap:10px}
+.dashboard-page-widget25{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:16px;min-width:0}
+.dashboard-page-widget25 h3{margin:0;font-size:1rem}
+.dashboard-page-widget25 p:not(.eyebrow){margin:5px 0 0;color:var(--muted);font-size:.86rem}
+.dashboard-page-widget25 .eyebrow{font-size:.67rem}
+.dashboard-page-widget25 a{flex:0 0 auto;color:var(--blue);text-decoration:none}
+html[data-accent20="custom"] body.st-glass20 .primary,
+html[data-accent20="custom"] body.st-glass20 button.primary{
+  color:var(--accent-button-text,#fff)!important;
+  -webkit-text-fill-color:var(--accent-button-text,#fff)!important;
+}
+@media(max-width:650px){
+  .accent-control20{grid-template-columns:1fr 52px}
+  .accent-preview20{grid-column:1/-1}
+  .dashboard-page-widget25{align-items:flex-start;flex-direction:column}
+  .dashboard-page-widget25 a{width:100%;text-align:center}
+}

@@ -259,7 +259,7 @@ let calendarOperation = null;
 let addMode = 'item';
 
 const sections = {
-  today: { label: 'Vandaag', icon: '⌂' },
+  today: { label: 'Dashboard', icon: '⌂' },
   planning: { label: 'Agenda', icon: '▦' },
   meals: { label: 'Weekmenu', icon: '♨' },
   groceries: { label: 'Boodschappen', icon: '✓' },
@@ -4860,12 +4860,12 @@ applyUi19();
 try{matchMedia('(prefers-color-scheme:dark)').addEventListener('change',()=>ui19.theme==='system'&&applyUi19())}catch(_){}
 
 const pages19=[
- ['today','Today','⌂'],['planning','Agenda','▦'],['meals','Weekmenu','♨'],['groceries','Boodschappen','✓'],['offers','Aanbiedingen','％'],['tasks','Taken','☑'],['weather','Weer','☀'],['challenges','Challenges','✦'],
- ['chores','Huishouden','⌁'],['stock','Voorraad','▤'],['programs',"Programma's",'▶'],['trips','Reizen','✈'],['ideas','Date ideeën','♡'],
- ['home','Woning','⌂'],['budget19','Budget','€'],['extra19','Extra','＋'],['settings','Instellingen','⚙']
+ ['today','Dashboard','⌂'],['planning','Agenda','▦'],['tasks','Taken','☑'],['groceries','Boodschappen','✓'],['stock','Voorraad','▤'],['offers','Aanbiedingen','％'],['budget19','Budget','€'],
+ ['meals','Weekmenu','♨'],['chores','Huishouden','⌁'],['challenges','Challenges','✦'],['weather','Weer','☀'],['programs',"Programma's",'▶'],['ideas','Date ideeën','♡'],
+ ['home','Woning','⌂'],['trips','Reizen','✈'],['extra19','Extra','＋'],['settings','Instellingen','⚙']
 ];
 try{
-  sections.today={label:'Today',icon:'⌂'};
+  sections.today={label:'Dashboard',icon:'⌂'};
   sections.ideas={label:'Date ideeën',icon:'♡'};
   sections.budget19={label:'Budget',icon:'€'};
   sections.extra19={label:'Extra',icon:'＋'};
@@ -4918,11 +4918,11 @@ function extraPage19(){
 function settingsPanel19(){
  if(current!=='settings')return;
  const v=document.querySelector('#view');if(!v||v.querySelector('[data-v19-device-settings]'))return;
- v.insertAdjacentHTML('afterbegin',`<section class="card device-settings19" data-v19-device-settings><div class="card-head"><div><p class="eyebrow">DIT APPARAAT</p><h2>Thema & weergave</h2></div><span class="tag">Niet gedeeld</span></div><p class="muted">Deze instellingen blijven alleen op dit apparaat. Daphne kan op haar telefoon dus een ander thema gebruiken.</p>
+ v.insertAdjacentHTML('afterbegin',`<section class="card device-settings19" data-v19-device-settings><div class="card-head"><div><p class="eyebrow">WEERGAVEVOORKEUREN</p><h2>Thema & weergave</h2></div><span class="tag">Persoonlijk</span></div><p class="muted">Zonder persoonlijk account worden voorkeuren op dit apparaat bewaard. Meld je aan om ze per account tussen apparaten te synchroniseren.</p>
  <div class="settings-grid19"><label>Thema<select data-v19-theme><option value="system">Systeem</option><option value="light">Licht</option><option value="dark">Donker</option></select></label>
- <label>Accent<select data-v19-accent><option value="bluePurple">Blauw / paars</option><option value="blue">Blauw</option><option value="purple">Paars</option><option value="orange">Oranje</option></select></label>
+ <label class="accent-control20">Accentkleur <input type="color" data-accent-color aria-label="Kies je eigen accentkleur"><span class="accent-preview20" data-accent-preview aria-live="polite"></span></label>
  <label>Weergave<select data-v19-density><option value="comfortable">Ruim</option><option value="compact">Compact</option></select></label></div></section>`);
- v.querySelector('[data-v19-theme]').value=ui19.theme;v.querySelector('[data-v19-accent]').value=ui19.accent;v.querySelector('[data-v19-density]').value=ui19.density;
+ v.querySelector('[data-v19-theme]').value=ui19.theme;v.querySelector('[data-v19-density]').value=ui19.density;
 }
 function editBudget19(index=null){
  data.budget ||= {income:0,expenses:[]}; data.budget.expenses ||= [];
@@ -4963,7 +4963,6 @@ document.addEventListener('click',e=>{
 });
 document.addEventListener('change',e=>{
  if(e.target.matches('[data-v19-theme]')){ui19.theme=e.target.value;saveUi19()}
- if(e.target.matches('[data-v19-accent]')){ui19.accent=e.target.value;saveUi19()}
  if(e.target.matches('[data-v19-density]')){ui19.density=e.target.value;saveUi19()}
 });
 requestAnimationFrame(()=>{nav19();settingsPanel19();applyUi19()});
@@ -4979,13 +4978,16 @@ if (window.__ST_V20__) return;
 window.__ST_V20__ = true;
 
 const KEY20 = 'samenThuisDeviceUiV20';
-const FALLBACK20 = { theme:'system', accent:'purple', density:'comfortable' };
+const FALLBACK20 = { theme:'system', accent:'purple', accentColor:'#7057d9', density:'comfortable' };
+const ACCENT_PRESETS20 = { bluePurple:'#5f63d8', blue:'#315f86', purple:'#7057d9', orange:'#d56e38' };
 
 function get20(){
   try {
     const old = JSON.parse(localStorage.getItem('samenThuisDeviceUiV19') || '{}');
     const now = JSON.parse(localStorage.getItem(KEY20) || '{}');
-    return {...FALLBACK20, ...old, ...now};
+    const saved = {...FALLBACK20, ...old, ...now};
+    if (!/^#[0-9a-f]{6}$/i.test(saved.accentColor || '')) saved.accentColor = ACCENT_PRESETS20[saved.accent] || FALLBACK20.accentColor;
+    return saved;
   } catch (_) { return {...FALLBACK20}; }
 }
 let ui20 = get20();
@@ -5001,18 +5003,25 @@ function apply20(){
   html.dataset.density19 = ui20.density || 'comfortable';
   html.dataset.density20 = ui20.density || 'comfortable';
   html.style.colorScheme = dark ? 'dark' : 'light';
-  const hex = /^#[0-9a-f]{6}$/i.test(ui20.accentColor || '') ? ui20.accentColor : '';
-  ['--blue','--blue-soft','--dark-accent-text'].forEach(v => html.style.removeProperty(v));
-  if (hex) {
-    const [r, g, b] = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16));
-    const mix = (t, k) => '#' + [r, g, b].map(c => Math.round(c + (t - c) * k).toString(16).padStart(2, '0')).join('');
-    const lum = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
-    // Keep accent text readable: darken very light colours on light themes, lighten dark colours on dark themes.
-    html.style.setProperty('--blue', dark ? mix(255, lum < 0.5 ? 0.45 : 0) : mix(0, lum > 0.65 ? 0.45 : 0));
-    html.style.setProperty('--blue-soft', mix(255, 0.88));
-    html.style.setProperty('--dark-accent-text', mix(255, lum < 0.6 ? 0.55 : 0.2));
-    html.dataset.accent20 = html.dataset.accent19 = 'custom';
-  }
+  const hex = /^#[0-9a-f]{6}$/i.test(ui20.accentColor || '') ? ui20.accentColor : FALLBACK20.accentColor;
+  const channels = value => [1, 3, 5].map(i => parseInt(value.slice(i, i + 2), 16));
+  const mix = (rgb, target, amount) => '#' + rgb.map(c => Math.round(c + (target - c) * amount).toString(16).padStart(2, '0')).join('');
+  const luminance = value => channels(value).map(c => {
+    const normalized = c / 255;
+    return normalized <= 0.04045 ? normalized / 12.92 : ((normalized + 0.055) / 1.055) ** 2.4;
+  }).reduce((sum, c, index) => sum + c * [0.2126, 0.7152, 0.0722][index], 0);
+  const baseLum = luminance(hex);
+  const baseRgb = channels(hex);
+  const accent = dark ? mix(baseRgb, 255, baseLum < 0.5 ? 0.45 : 0) : mix(baseRgb, 0, baseLum > 0.65 ? 0.45 : 0);
+  const adjustedLum = luminance(accent);
+  const whiteContrast = 1.05 / (adjustedLum + 0.05);
+  const darkContrast = (adjustedLum + 0.05) / 0.05;
+  html.style.setProperty('--blue', accent);
+  html.style.setProperty('--blue-soft', mix(baseRgb, 255, 0.88));
+  html.style.setProperty('--dark-accent-text', mix(baseRgb, 255, baseLum < 0.6 ? 0.55 : 0.2));
+  html.style.setProperty('--dark-muted-text', '#c7d8e8');
+  html.style.setProperty('--accent-button-text', whiteContrast >= darkContrast ? '#ffffff' : '#17243a');
+  html.dataset.accent20 = html.dataset.accent19 = 'custom';
   document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark ? '#081b2d' : '#eef3f9');
 }
 function save20(){
@@ -5031,7 +5040,8 @@ window.SamenThuisPersonalUi20 = {
       theme: ['system', 'light', 'dark'].includes(next.theme) ? next.theme : 'system',
       accent: ['bluePurple', 'blue', 'purple', 'orange'].includes(next.accent) ? next.accent : 'purple',
       density: ['comfortable', 'compact'].includes(next.density) ? next.density : 'comfortable',
-      ...(typeof next.accentColor === 'string' && /^#[0-9a-f]{6}$/i.test(next.accentColor) ? { accentColor: next.accentColor } : {})
+      accentColor: typeof next.accentColor === 'string' && /^#[0-9a-f]{6}$/i.test(next.accentColor)
+        ? next.accentColor : ACCENT_PRESETS20[next.accent] || FALLBACK20.accentColor
     };
     save20();
   }
@@ -5043,18 +5053,23 @@ function beautifySettings20(){
   if (!box) return;
   box.classList.add('glass20');
   const theme = box.querySelector('[data-v19-theme]');
-  const accent = box.querySelector('[data-v19-accent]');
   const density = box.querySelector('[data-v19-density]');
   if(theme){ theme.value=ui20.theme; theme.onchange=()=>{ui20.theme=theme.value;save20()}; }
-  if(accent){ accent.value=ui20.accent; accent.onchange=()=>{ui20.accent=accent.value;delete ui20.accentColor;save20()}; }
-  if(accent && !box.querySelector('[data-accent-color]')){
-    const label = document.createElement('label');
-    label.innerHTML = 'Eigen accentkleur (dit apparaat) <input type="color" data-accent-color> <button type="button" data-accent-reset class="secondary">Standaard</button>';
-    accent.closest('label')?.after(label);
-    const input = label.querySelector('input');
-    input.value = /^#[0-9a-f]{6}$/i.test(ui20.accentColor || '') ? ui20.accentColor : '#7057d9';
-    input.oninput = () => { ui20.accentColor = input.value; save20(); };
-    label.querySelector('[data-accent-reset]').onclick = () => { delete ui20.accentColor; save20(); };
+  const input = box.querySelector('[data-accent-color]');
+  const preview = box.querySelector('[data-accent-preview]');
+  if(input){
+    input.value = /^#[0-9a-f]{6}$/i.test(ui20.accentColor || '') ? ui20.accentColor : FALLBACK20.accentColor;
+    const updatePreview = () => {
+      if (!preview) return;
+      const channels = [1, 3, 5].map(i => parseInt(input.value.slice(i, i + 2), 16) / 255);
+      const lum = channels.map(c => c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4)
+        .reduce((sum, c, index) => sum + c * [0.2126, 0.7152, 0.0722][index], 0);
+      preview.textContent = input.value.toUpperCase();
+      preview.style.backgroundColor = input.value;
+      preview.style.color = lum > 0.179 ? '#17243a' : '#ffffff';
+    };
+    updatePreview();
+    input.oninput = () => { ui20.accentColor = input.value; save20(); updatePreview(); };
   }
   if(density){ density.value=ui20.density; density.onchange=()=>{ui20.density=density.value;save20()}; }
 }
@@ -5141,10 +5156,11 @@ requestAnimationFrame(dock);
 if(window.__ST_V23__) return; window.__ST_V23__=true;
 
 const NAV23=[
- ['today','⌂','Vandaag'],['planning','▦','Agenda'],['meals','♨','Weekmenu'],
- ['groceries','✓','Boodschappen'],['offers','％','Aanbiedingen'],['tasks','☑','Taken'],['stock','▤','Voorraad'],['weather','☀','Weer'],['challenges','✦','Challenges'],['chores','⌁','Huishouden'],
- ['home','⌂','Woning'],['budget19','€','Budget'],['programs','▶',"Programma's"],['trips','✈','Reizen'],
- ['ideas','♡','Date ideeën'],['extra19','＋','Extra'],['settings','⚙','Instellingen']
+ ['today','⌂','Dashboard'],['planning','▦','Agenda'],['tasks','☑','Taken'],
+ ['groceries','✓','Boodschappen'],['stock','▤','Voorraad'],['offers','％','Aanbiedingen'],['budget19','€','Budget'],
+ ['meals','♨','Weekmenu'],['chores','⌁','Huishouden'],['challenges','✦','Challenges'],['weather','☀','Weer'],['programs','▶',"Programma's"],
+ ['ideas','♡','Date ideeën'],['home','⌂','Woning'],['trips','✈','Reizen'],
+ ['extra19','＋','Extra'],['settings','⚙','Instellingen']
 ];
 
 const DEFAULT_BUDGET23={
@@ -5746,21 +5762,27 @@ requestAnimationFrame(navImport243);
    ========================================================= */
 (()=>{'use strict';
  if(window.__ST248_DOCK__)return;window.__ST248_DOCK__=true;
- const ORDER248=['today','planning','meals','groceries','tasks','stock','weather','challenges','chores','home','budget19','auto24','programs','trips','ideas','extra19','imports243','settings'];
- const LABEL248={today:'Vandaag',planning:'Agenda',meals:'Weekmenu',groceries:'Boodschappen',tasks:'Taken',stock:'Voorraad',weather:'Weer',challenges:'Challenges',chores:'Huishouden',home:'Woning',budget19:'Budget',auto24:'Auto',programs:"Programma's",trips:'Reizen',ideas:'Date ideeën',extra19:'Extra',imports243:'Import',settings:'Instellingen'};
+ const ORDER248=['today','planning','tasks','groceries','stock','offers','budget19','meals','chores','challenges','weather','programs','ideas','home','trips','auto24','extra19','imports243','settings'];
+ const LABEL248={today:'Dashboard',planning:'Agenda',tasks:'Taken',groceries:'Boodschappen',stock:'Voorraad',offers:'Aanbiedingen',budget19:'Budget',meals:'Weekmenu',chores:'Huishouden',challenges:'Challenges',weather:'Weer',programs:"Programma's",ideas:'Date ideeën',home:'Woning',trips:'Reizen',auto24:'Auto',extra19:'Extra',imports243:'Importeren',settings:'Instellingen'};
  function actualKey248(b){if(b.dataset.nav23)return b.dataset.nav23;if(b.hasAttribute('data-v24-auto'))return 'auto24';if(b.hasAttribute('data-import243-go'))return 'imports243';return ''}
+ function arrangeDesktop248(){
+   const nav=document.querySelector('.sidebar nav');if(!nav)return;
+   const buttons=[...nav.querySelectorAll(':scope > button')],map=new Map(buttons.map(b=>[b.dataset.v19Go||(b.hasAttribute('data-v24-auto')?'auto24':b.hasAttribute('data-import243-go')?'imports243':''),b]));
+   ORDER248.forEach(k=>{const b=map.get(k);if(!b)return;b.classList.toggle('active',current===k);nav.appendChild(b)});
+ }
  function arrange248(){
-   const sc=document.querySelector('.mobile-nav-scroll23');if(!sc)return;
+   const sc=document.querySelector('.mobile-nav-scroll23');if(!sc){arrangeDesktop248();return}
    const buttons=[...sc.querySelectorAll(':scope > button')],map=new Map(buttons.map(b=>[actualKey248(b),b]));
    ORDER248.forEach(k=>{const b=map.get(k);if(!b)return;b.classList.toggle('active',current===k);const small=b.querySelector('small');if(small)small.textContent=LABEL248[k]||small.textContent;sc.appendChild(b)});
    sc.dataset.glass248='true';
+   arrangeDesktop248();
  }
  const base248=render;
  render=function(...args){const r=base248(...args);requestAnimationFrame(()=>requestAnimationFrame(arrange248));return r};
- const observer248=new MutationObserver(()=>requestAnimationFrame(arrange248));
+ const observer248=new MutationObserver(()=>requestAnimationFrame(()=>{arrange248();arrangeDesktop248()}));
  const start248=()=>{const n=document.querySelector('#mobileNav23');if(n)observer248.observe(n,{childList:true,subtree:true});arrange248()};
  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start248,{once:true});else start248();
- requestAnimationFrame(()=>requestAnimationFrame(arrange248));
+ requestAnimationFrame(()=>requestAnimationFrame(()=>{arrange248();arrangeDesktop248()}));
 })();
 /* build v24.8 · liquid glass dock + logical navigation order */
 
@@ -5847,9 +5869,29 @@ document.addEventListener('click', event => {
     ['overview', 'Vandaagstatistieken en diner'],
     ['agenda', 'Komende afspraken'],
     ['outfit', 'Kledingadvies'],
-    ['air', 'Pollen en luchtkwaliteit']
+    ['air', 'Pollen en luchtkwaliteit'],
+    ['tab-dashboard', 'Dashboardoverzicht'],
+    ['tab-agenda', 'Agenda · afspraken'],
+    ['tab-tasks', 'Taken · openstaand'],
+    ['tab-groceries', 'Boodschappen · openstaand'],
+    ['tab-stock', 'Voorraad · meldingen'],
+    ['tab-offers', 'Aanbiedingen'],
+    ['tab-budget19', 'Budget · overzicht'],
+    ['tab-meals', 'Weekmenu · vandaag'],
+    ['tab-chores', 'Huishouden · binnenkort'],
+    ['tab-challenges', 'Challenges'],
+    ['tab-weather', 'Weer'],
+    ['tab-programs', "Programma's"],
+    ['tab-ideas', 'Date ideeën'],
+    ['tab-home', 'Woning · open punten'],
+    ['tab-trips', 'Reizen · volgende actie'],
+    ['tab-auto24', 'Auto · voertuigen'],
+    ['tab-extra19', 'Extra'],
+    ['tab-imports243', 'Importeren'],
+    ['tab-settings', 'Instellingen']
   ];
   const DASH_DEFAULTS = DASH_WIDGETS.map(([id]) => id);
+  const DASH_DEFAULT_VISIBLE = ['weather', 'overview', 'agenda', 'outfit', 'air'];
   const dashboardCore = window.SamenThuisDashboard;
   const WEATHER_KEY = 'samenThuisWeatherForecastV25';
   const DEFAULT_LOCATION = { place: 'Rotterdam', lat: 51.9225, lon: 4.47917 };
@@ -5863,18 +5905,22 @@ document.addEventListener('click', event => {
   };
   let dashboard25 = loadDashboard25();
 
+  function normalizeDashboard25(saved) {
+    if (dashboardCore) return dashboardCore.normalize(saved, DASH_DEFAULTS, DASH_DEFAULT_VISIBLE);
+    const base = saved && typeof saved === 'object' ? saved : {};
+    const order = Array.isArray(base.order) ? base.order.filter(id => DASH_DEFAULTS.includes(id)) : [];
+    return {
+      order: [...new Set([...order, ...DASH_DEFAULTS])],
+      visible: Object.fromEntries(DASH_DEFAULTS.map(id => [id,
+        Object.hasOwn(base.visible || {}, id) ? base.visible[id] !== false : DASH_DEFAULT_VISIBLE.includes(id)]))
+    };
+  }
+
   function loadDashboard25() {
     try {
       const saved = JSON.parse(localStorage.getItem(DASH_KEY) || 'null');
-      if (dashboardCore) return dashboardCore.normalize(saved, DASH_DEFAULTS);
-      const order = Array.isArray(saved?.order) ? saved.order.filter(id => DASH_DEFAULTS.includes(id)) : [];
-      return {
-        order: [...new Set([...order, ...DASH_DEFAULTS])],
-        visible: Object.fromEntries(DASH_DEFAULTS.map(id => [id, saved?.visible?.[id] !== false]))
-      };
-    } catch (_) {
-      return { order: [...DASH_DEFAULTS], visible: Object.fromEntries(DASH_DEFAULTS.map(id => [id, true])) };
-    }
+      return normalizeDashboard25(saved);
+    } catch (_) { return normalizeDashboard25(null); }
   }
 
   function saveDashboard25() {
@@ -5885,7 +5931,7 @@ document.addEventListener('click', event => {
   window.SamenThuisDashboardPreferences25 = {
     get() { return JSON.parse(JSON.stringify(dashboard25)); },
     set(value) {
-      dashboard25 = dashboardCore ? dashboardCore.normalize(value, DASH_DEFAULTS) : loadDashboard25();
+      dashboard25 = normalizeDashboard25(value);
       saveDashboard25();
       applyDashboard25();
     }
@@ -5896,7 +5942,35 @@ document.addEventListener('click', event => {
       const label = DASH_WIDGETS.find(([widget]) => widget === id)?.[1] || id;
       return `<div class="setting-row dashboard-setting-row25"><label><input type="checkbox" data-dashboard-visible="${id}" ${dashboard25.visible[id] ? 'checked' : ''}> ${esc(label)}</label><span><button type="button" class="secondary" data-dashboard-move="${id}" data-direction="-1" aria-label="${esc(label)} omhoog" ${index === 0 ? 'disabled' : ''}>↑</button> <button type="button" class="secondary" data-dashboard-move="${id}" data-direction="1" aria-label="${esc(label)} omlaag" ${index === dashboard25.order.length - 1 ? 'disabled' : ''}>↓</button></span></div>`;
     }).join('');
-    return `<section class="card settings-card dashboard-editor25"><div class="card-head"><div><p class="eyebrow">DASHBOARD</p><h2>Onderdelen samenstellen</h2></div></div><p class="muted">Vink kaarten aan of uit en wijzig de volgorde. Na aanmelden wordt deze indeling ook aan je persoonlijke account gekoppeld.</p>${rows}<div class="button-row"><button type="button" class="secondary" data-dashboard-reset>Standaardvolgorde herstellen</button></div></section>`;
+    const preview = dashboard25.order.filter(id => dashboard25.visible[id]).map(id =>
+      `<li>${esc(DASH_WIDGETS.find(([widget]) => widget === id)?.[1] || id)}</li>`).join('');
+    return `<section class="card settings-card dashboard-editor25"><div class="card-head"><div><p class="eyebrow">DASHBOARD</p><h2>Onderdelen samenstellen</h2></div></div><p class="muted">Kies compacte onderdelen van alle bestaande pagina's. Verberg, toon of verplaats ze; de bestaande dashboardkaarten blijven beschikbaar. Zonder account worden voorkeuren alleen op dit apparaat bewaard.</p><div class="dashboard-preview25"><strong>Voorbeeld van je dashboard (${dashboard25.order.filter(id => dashboard25.visible[id]).length} onderdelen)</strong><ol>${preview || '<li>Geen onderdelen geselecteerd</li>'}</ol></div>${rows}<div class="button-row"><button type="button" class="secondary" data-dashboard-reset>Standaardindeling herstellen</button></div></section>`;
+  }
+
+  function dashboardPageWidget25(widgetId) {
+    const pages = {
+      'tab-dashboard': ['today', 'Dashboard', `${(data.planning || []).filter(item => item.date >= todayISO()).length} komende afspraken`],
+      'tab-agenda': ['planning', 'Agenda', `${(data.planning || []).filter(item => item.date >= todayISO()).length} komende afspraken`],
+      'tab-tasks': ['tasks', 'Taken', `${(data.tasks || []).filter(item => !item.done).length} open taken`],
+      'tab-groceries': ['groceries', 'Boodschappen', `${(data.groceries || []).filter(item => !item.done).length} boodschappen open`],
+      'tab-stock': ['stock', 'Voorraad', `${(data.stock || []).filter(item => Number(item.amount || 0) <= Number(item.min ?? item.minimum ?? 0)).length} producten op of onder minimum`],
+      'tab-offers': ['offers', 'Aanbiedingen', `${(data.offers25 || []).length} bewaarde aanbiedingen`],
+      'tab-budget19': ['budget19', 'Budget', data.budgetV23 ? 'Bekijk planning, potjes en spaardoelen' : 'Bekijk je budgetoverzicht'],
+      'tab-meals': ['meals', 'Weekmenu', (data.meals || []).find(item => item.date === todayISO() && /avond/i.test(item.type || item.mealType || ''))?.title || 'Geen diner voor vandaag gepland'],
+      'tab-chores': ['chores', 'Huishouden', `${(data.chores || []).filter(item => !item.done).length} open huishoudtaken`],
+      'tab-challenges': ['challenges', 'Challenges', 'Bekijk de gezamenlijke challenges'],
+      'tab-weather': ['weather', 'Weer', data.settings?.weatherPlace || data.settings?.weatherCity || 'Weer en verwachting'],
+      'tab-programs': ['programs', "Programma's", `${(data.programs || []).filter(item => !item.done).length} programma's`],
+      'tab-ideas': ['ideas', 'Date ideeën', `${(data.ideas || []).length} ideeën`],
+      'tab-home': ['home', 'Woning', `${(data.home || []).filter(item => !item.done).length} open woningpunten`],
+      'tab-trips': ['trips', 'Reizen', `${(data.trips || []).filter(item => !item.done).length} open reisacties`],
+      'tab-auto24': ['auto24', 'Auto', `${(data.cars || []).length} voertuigen · ${(data.fuelEntries || []).length} tankbeurten`],
+      'tab-extra19': ['extra19', 'Extra', 'Open handige hulpmiddelen'],
+      'tab-imports243': ['imports243', 'Importeren', 'Gegevens importeren of een back-up herstellen'],
+      'tab-settings': ['settings', 'Instellingen', 'Beheer voorkeuren en synchronisatie']
+    };
+    const [page, title, detail] = pages[widgetId] || ['today', 'Dashboard', ''];
+    return `<section class="dashboard-page-widget25 card" data-widget18="${widgetId}"><div><p class="eyebrow">SNEL NAAR</p><h3>${esc(title)}</h3><p>${esc(detail)}</p></div><a class="secondary" href="#/${page}" data-v19-go="${page}" aria-label="Open ${esc(title)}">Open →</a></section>`;
   }
 
   function applyDashboard25() {
@@ -5906,6 +5980,12 @@ document.addEventListener('click', event => {
       const id = node.dataset.widget18 || (node.matches('[data-air24]') ? 'air' : '');
       return [id, node];
     }).filter(([id]) => id));
+    DASH_WIDGETS.filter(([id]) => id.startsWith('tab-')).forEach(([id]) => {
+      if (nodes.has(id)) return;
+      grid.insertAdjacentHTML('beforeend', dashboardPageWidget25(id));
+      const node = grid.querySelector(`[data-widget18="${id}"]`);
+      if (node) nodes.set(id, node);
+    });
     dashboard25.order.forEach(id => {
       const node = nodes.get(id);
       if (!node) return;
@@ -6250,9 +6330,9 @@ document.addEventListener('click', event => {
     localStorage.setItem(AUTH_KEY25, JSON.stringify(authSession25));
     return authSession25;
   }
-  function uiDefault25() { return { theme: 'system', accent: 'purple', density: 'comfortable' }; }
+  function uiDefault25() { return { theme: 'system', accent: 'purple', accentColor: '#7057d9', density: 'comfortable' }; }
   function setPersonalPreferences25(value) {
-    const normalized = personalPreferencesCore25?.normalize(value, DASH_DEFAULTS, dashboardCore) || value || {};
+    const normalized = personalPreferencesCore25?.normalize(value, DASH_DEFAULTS, dashboardCore, DASH_DEFAULT_VISIBLE) || value || {};
     window.SamenThuisPersonalUi20?.set(normalized.ui || uiDefault25());
     window.SamenThuisDashboardPreferences25?.set(normalized.dashboard || dashboardCore?.defaults(DASH_DEFAULTS));
   }
@@ -6512,7 +6592,7 @@ document.addEventListener('click', event => {
     }
     const move = event.target.closest('[data-dashboard-move]');
     if (move) {
-      if (dashboardCore) dashboard25 = dashboardCore.move(dashboard25, move.dataset.dashboardMove, Number(move.dataset.direction), DASH_DEFAULTS);
+      if (dashboardCore) dashboard25 = dashboardCore.move(dashboard25, move.dataset.dashboardMove, Number(move.dataset.direction), DASH_DEFAULTS, DASH_DEFAULT_VISIBLE);
       else {
         const index = dashboard25.order.indexOf(move.dataset.dashboardMove);
         const next = index + Number(move.dataset.direction);
@@ -6523,7 +6603,7 @@ document.addEventListener('click', event => {
       return;
     }
     if (event.target.closest('[data-dashboard-reset]')) {
-      dashboard25 = { order: [...DASH_DEFAULTS], visible: Object.fromEntries(DASH_DEFAULTS.map(id => [id, true])) };
+      dashboard25 = normalizeDashboard25(null);
       saveDashboard25(); render();
     }
   });
@@ -6545,7 +6625,7 @@ document.addEventListener('click', event => {
     }
     const toggle = event.target.closest('[data-dashboard-visible]');
     if (!toggle) return;
-    if (dashboardCore) dashboard25 = dashboardCore.setVisible(dashboard25, toggle.dataset.dashboardVisible, toggle.checked, DASH_DEFAULTS);
+    if (dashboardCore) dashboard25 = dashboardCore.setVisible(dashboard25, toggle.dataset.dashboardVisible, toggle.checked, DASH_DEFAULTS, DASH_DEFAULT_VISIBLE);
     else dashboard25.visible[toggle.dataset.dashboardVisible] = toggle.checked;
     saveDashboard25();
     if (current === 'settings') render();
