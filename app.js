@@ -4884,19 +4884,19 @@ window.SamenThuisGo=go19;
 function nav19(){
   const desktop=document.querySelector('.sidebar nav,.side-nav,.nav-list');
   if(desktop){
-    desktop.innerHTML=pages19.map(([id,label,icon])=>`<button class="${current===id?'active':''}" data-v19-go="${id}"><span>${icon}</span>${label}</button>`).join('');
+    desktop.innerHTML=pages19.map(([id,label,icon])=>`<button class="${current===id?'active':''}" data-v19-go="${esc(id)}"><span>${esc(icon)}</span>${esc(label)}</button>`).join('');
   }
   const mobile=document.querySelector('.mobile-nav,.bottom-nav');
   if(mobile){
     const direct=(ui19.mobileNav||DEFAULTUI19.mobileNav).slice(0,4);
-    mobile.innerHTML=direct.map(id=>{const p=pages19.find(x=>x[0]===id)||pages19[0];return `<button class="${current===id?'active':''}" data-v19-go="${id}"><span>${p[2]}</span><small>${p[1]}</small></button>`}).join('')+
+    mobile.innerHTML=direct.map(id=>{const p=pages19.find(x=>x[0]===id)||pages19[0];return `<button class="${current===id?'active':''}" data-v19-go="${esc(p[0])}"><span>${esc(p[2])}</span><small>${esc(p[1])}</small></button>`}).join('')+
       `<button data-v19-more><span>•••</span><small>Meer</small></button>`;
   }
 }
 function more19(){
   let old=document.querySelector('[data-v19-moremenu]');if(old){old.remove();return}
   const direct=new Set(ui19.mobileNav||DEFAULTUI19.mobileNav);
-  document.body.insertAdjacentHTML('beforeend',`<div class="more19" data-v19-moremenu><div class="more19-sheet"><div class="more19-head"><strong>Alle pagina's</strong><button data-v19-more>×</button></div>${pages19.filter(p=>!direct.has(p[0])).map(p=>`<button data-v19-go="${p[0]}"><span>${p[2]}</span><b>${p[1]}</b></button>`).join('')}</div></div>`);
+  document.body.insertAdjacentHTML('beforeend',`<div class="more19" data-v19-moremenu><div class="more19-sheet"><div class="more19-head"><strong>Alle pagina's</strong><button data-v19-more>×</button></div>${pages19.filter(p=>!direct.has(p[0])).map(p=>`<button data-v19-go="${esc(p[0])}"><span>${esc(p[2])}</span><b>${esc(p[1])}</b></button>`).join('')}</div></div>`);
 }
 function budgetPage19(){
   const b=data.budget||data.budget19||{income:0,expenses:[]};
@@ -6144,9 +6144,10 @@ document.addEventListener('click', event => {
   function ledgerEditFormMarkup25(ledger, pots) {
     if (!ledgerEdit25) return '';
     const { kind, id: entryId } = ledgerEdit25;
+    if (!['incomes', 'expenses', 'transfers'].includes(kind)) { ledgerEdit25 = null; return ''; }
     const entry = ledger[kind]?.find(item => item.id === entryId);
     if (!entry) { ledgerEdit25 = null; return ''; }
-    const select = (name, selected, label) => `<label>${label}<select name="${name}" required>${pots.map(pot =>
+    const select = (name, selected, label) => `<label>${esc(label)}<select name="${esc(name)}" required>${pots.map(pot =>
       `<option value="${esc(pot.id)}" ${pot.id === selected ? 'selected' : ''}>${esc(pot.label)}</option>`).join('')}</select></label>`;
     const common = `<label>Bedrag (€)<input name="amount" type="number" step="0.01" min="0.01" inputmode="decimal" value="${decimalLedger25(entry.amountCents)}" required></label><label>Datum<input name="date" type="date" value="${esc(entry.date)}" required></label>`;
     let fields = common;
@@ -6157,7 +6158,7 @@ document.addEventListener('click', event => {
     } else {
       fields += `${select('fromPotId', entry.fromPotId, 'Van potje')}${select('toPotId', entry.toPotId, 'Naar potje')}<label class="ledger-wide25">Omschrijving<input name="description" value="${esc(entry.description || '')}" maxlength="160"></label>`;
     }
-    return `<form class="ledger-form25" data-ledger-edit="${kind}" data-entry-id="${esc(entryId)}"><h3>Boeking corrigeren</h3><div class="ledger-fields25">${fields}</div><div class="button-row"><button class="primary" type="submit">Wijziging controleren</button><button class="secondary" type="button" data-ledger-cancel-edit>Annuleren</button></div></form>`;
+    return `<form class="ledger-form25" data-ledger-edit="${esc(kind)}" data-entry-id="${esc(entryId)}"><h3>Boeking corrigeren</h3><div class="ledger-fields25">${fields}</div><div class="button-row"><button class="primary" type="submit">Wijziging controleren</button><button class="secondary" type="button" data-ledger-cancel-edit>Annuleren</button></div></form>`;
   }
 
   function ledgerMarkup25() {
@@ -6219,7 +6220,7 @@ document.addEventListener('click', event => {
       <div class="ledger-kpis25"><article><small>Inkomsten geboekt</small><b>${moneyLedger25(summary.incomeCents)}</b></article><article><small>Toegewezen uit inkomsten</small><b>${moneyLedger25(summary.allocatedCents)}</b></article><article><small>Werkelijk uitgegeven</small><b>${moneyLedger25(summary.expenseCents)}</b></article><article><small>Geregistreerd maandresultaat</small><b class="${monthResult < 0 ? 'ledger-negative25' : ''}">${moneyLedger25(monthResult)}</b></article><article><small>Huishoudsaldo nu</small><b class="${summary.cashBalanceCents < 0 ? 'ledger-negative25' : ''}">${moneyLedger25(summary.cashBalanceCents)}</b></article><article><small>Nog niet toegewezen</small><b class="${unallocated < 0 ? 'ledger-negative25' : ''}">${moneyLedger25(unallocated)}</b></article><article><small>Indicatie einde maand</small><b class="${projection !== null && projection < 0 ? 'ledger-negative25' : ''}">${projection === null ? '—' : moneyLedger25(projection)}</b></article></div>
       <p class="ledger-plan25">Planning: ${moneyLedger25(monthlyPlan)} per maand (waaronder ${moneyLedger25(savingsProposal)} geplande spaardoelinleg) · Werkelijke uitgaven deze maand: ${moneyLedger25(summary.expenseCents)}. De indicatie voor deze maand gebruikt alleen het bestaande geplande huishoudinkomen en vaste/huislasten minus al geboekte bedragen; het is geen bankprognose. Eerdere maanden tonen alleen de geboekte werkelijkheid.</p>
       <section class="ledger-section25"><h3>Registreren</h3><div class="ledger-forms25">
-        <form class="ledger-form25" data-ledger-form="income"><h3>Inkomen toevoegen</h3><div class="ledger-fields25"><label>Bedrag (€)<input name="amount" type="number" inputmode="decimal" min="0.01" step="0.01" required></label><label>Datum<input name="date" type="date" value="${ledgerDate}" required></label><label>Boekingsmaand<input name="month" type="month" value="${esc(ledgerMonth25)}" required></label><label>Type<select name="type"><option value="salary">Salaris</option><option value="benefit">Toeslag</option><option value="other">Overige inkomsten</option></select></label><label>Persoon / bron<input name="source" placeholder="Kees, Daphne, toeslag…" maxlength="80" required></label><label>Omschrijving (optioneel)<input name="description" maxlength="160"></label></div><button class="primary" type="submit">Inkomstenboeking controleren</button></form>
+        <form class="ledger-form25" data-ledger-form="income"><h3>Inkomen toevoegen</h3><div class="ledger-fields25"><label>Bedrag (€)<input name="amount" type="number" inputmode="decimal" min="0.01" step="0.01" required></label><label>Datum<input name="date" type="date" value="${esc(ledgerDate)}" required></label><label>Boekingsmaand<input name="month" type="month" value="${esc(ledgerMonth25)}" required></label><label>Type<select name="type"><option value="salary">Salaris</option><option value="benefit">Toeslag</option><option value="other">Overige inkomsten</option></select></label><label>Persoon / bron<input name="source" placeholder="Kees, Daphne, toeslag…" maxlength="80" required></label><label>Omschrijving (optioneel)<input name="description" maxlength="160"></label></div><button class="primary" type="submit">Inkomstenboeking controleren</button></form>
         <form class="ledger-form25" data-ledger-form="allocation"><h3>Inkomen verdelen</h3>${eligibleIncomes.length ? `<div class="ledger-fields25"><label>Inkomstenboeking<select name="incomeId" required>${eligibleIncomes.map(income => `<option value="${esc(income.id)}">${esc(income.source)} · ${esc(income.date)} · nog ${moneyLedger25(Number(income.amountCents || 0) - (income.allocations || []).reduce((sum, item) => sum + Number(item.amountCents || 0), 0))}</option>`).join('')}</select></label><label>Potje<select name="potId" required>${potOptions}</select></label><label>Bedrag (€)<input name="amount" type="number" inputmode="decimal" min="0.01" step="0.01" required></label></div><button class="primary" type="submit">Verdeling controleren</button>` : '<p class="muted">Registreer eerst inkomsten met een nog niet verdeeld bedrag.</p>'}</form>
         <form class="ledger-form25" data-ledger-form="expense"><h3>Werkelijke uitgave</h3><div class="ledger-fields25"><label>Bedrag (€)<input name="amount" type="number" inputmode="decimal" min="0.01" step="0.01" required></label><label>Datum<input name="date" type="date" value="${ledgerDate}" required></label><label>Categorie<select name="category">${['Boodschappen', 'Tanken', 'Vaste lasten', 'Abonnementen', 'Persoonlijk', 'Huishouden', 'Overig'].map(category => `<option>${category}</option>`).join('')}</select></label><label>Potje<select name="potId" required>${potOptions}</select></label><label>Persoon (optioneel)<input name="person" maxlength="80"></label><label>Omschrijving<input name="description" maxlength="160" required></label></div><button class="primary" type="submit">Uitgave controleren</button></form>
         <form class="ledger-form25" data-ledger-form="transfer"><h3>Geld tussen potjes verschuiven</h3><div class="ledger-fields25"><label>Van potje<select name="fromPotId" required>${allPotOptions}</select></label><label>Naar potje<select name="toPotId" required>${allPotOptions}</select></label><label>Bedrag (€)<input name="amount" type="number" inputmode="decimal" min="0.01" step="0.01" required></label><label>Datum<input name="date" type="date" value="${ledgerDate}" required></label><label class="ledger-wide25">Omschrijving<input name="description" maxlength="160"></label></div><p class="small-note">Ook verwijderde potjes met resterend saldo blijven bereikbaar. Vooraf wordt de verschuiving getoond en bevestigd; het huishoudsaldo verandert niet.</p><button class="primary" type="submit">Verschuiving controleren</button></form>
