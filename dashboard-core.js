@@ -8,18 +8,21 @@
     return { order: ids, visible: Object.fromEntries(ids.map(id => [id, true])) };
   }
 
-  function normalize(saved, widgetIds) {
+  function normalize(saved, widgetIds, defaultVisibleIds) {
     const base = defaults(widgetIds);
     const valid = new Set(base.order);
+    const defaultsVisible = defaultVisibleIds ? new Set(defaultVisibleIds) : valid;
     const order = Array.isArray(saved?.order) ? saved.order.filter(id => valid.has(id)) : [];
     return {
       order: [...new Set([...order, ...base.order])],
-      visible: Object.fromEntries(base.order.map(id => [id, saved?.visible?.[id] !== false]))
+      visible: Object.fromEntries(base.order.map(id => [id, Object.hasOwn(saved?.visible || {}, id)
+        ? saved.visible[id] !== false
+        : defaultsVisible.has(id)]))
     };
   }
 
-  function move(layout, id, direction, widgetIds) {
-    const next = normalize(layout, widgetIds);
+  function move(layout, id, direction, widgetIds, defaultVisibleIds) {
+    const next = normalize(layout, widgetIds, defaultVisibleIds);
     const index = next.order.indexOf(id);
     const target = index + Number(direction);
     if (index < 0 || !Number.isInteger(target) || target < 0 || target >= next.order.length) return next;
@@ -27,8 +30,8 @@
     return next;
   }
 
-  function setVisible(layout, id, visible, widgetIds) {
-    const next = normalize(layout, widgetIds);
+  function setVisible(layout, id, visible, widgetIds, defaultVisibleIds) {
+    const next = normalize(layout, widgetIds, defaultVisibleIds);
     if (Object.hasOwn(next.visible, id)) next.visible[id] = Boolean(visible);
     return next;
   }

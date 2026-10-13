@@ -259,7 +259,7 @@ let calendarOperation = null;
 let addMode = 'item';
 
 const sections = {
-  today: { label: 'Vandaag', icon: '⌂' },
+  today: { label: 'Dashboard', icon: '⌂' },
   planning: { label: 'Agenda', icon: '▦' },
   meals: { label: 'Weekmenu', icon: '♨' },
   groceries: { label: 'Boodschappen', icon: '✓' },
@@ -4860,12 +4860,12 @@ applyUi19();
 try{matchMedia('(prefers-color-scheme:dark)').addEventListener('change',()=>ui19.theme==='system'&&applyUi19())}catch(_){}
 
 const pages19=[
- ['today','Today','⌂'],['planning','Agenda','▦'],['meals','Weekmenu','♨'],['groceries','Boodschappen','✓'],['offers','Aanbiedingen','％'],['tasks','Taken','☑'],['weather','Weer','☀'],['challenges','Challenges','✦'],
- ['chores','Huishouden','⌁'],['stock','Voorraad','▤'],['programs',"Programma's",'▶'],['trips','Reizen','✈'],['ideas','Date ideeën','♡'],
- ['home','Woning','⌂'],['budget19','Budget','€'],['extra19','Extra','＋'],['settings','Instellingen','⚙']
+ ['today','Dashboard','⌂'],['planning','Agenda','▦'],['tasks','Taken','☑'],['groceries','Boodschappen','✓'],['stock','Voorraad','▤'],['offers','Aanbiedingen','％'],['budget19','Budget','€'],
+ ['meals','Weekmenu','♨'],['chores','Huishouden','⌁'],['challenges','Challenges','✦'],['weather','Weer','☀'],['programs',"Programma's",'▶'],['ideas','Date ideeën','♡'],
+ ['home','Woning','⌂'],['trips','Reizen','✈'],['extra19','Extra','＋'],['settings','Instellingen','⚙']
 ];
 try{
-  sections.today={label:'Today',icon:'⌂'};
+  sections.today={label:'Dashboard',icon:'⌂'};
   sections.ideas={label:'Date ideeën',icon:'♡'};
   sections.budget19={label:'Budget',icon:'€'};
   sections.extra19={label:'Extra',icon:'＋'};
@@ -4884,19 +4884,19 @@ window.SamenThuisGo=go19;
 function nav19(){
   const desktop=document.querySelector('.sidebar nav,.side-nav,.nav-list');
   if(desktop){
-    desktop.innerHTML=pages19.map(([id,label,icon])=>`<button class="${current===id?'active':''}" data-v19-go="${id}"><span>${icon}</span>${label}</button>`).join('');
+    desktop.innerHTML=pages19.map(([id,label,icon])=>`<button class="${current===id?'active':''}" data-v19-go="${esc(id)}"><span>${esc(icon)}</span>${esc(label)}</button>`).join('');
   }
   const mobile=document.querySelector('.mobile-nav,.bottom-nav');
   if(mobile){
     const direct=(ui19.mobileNav||DEFAULTUI19.mobileNav).slice(0,4);
-    mobile.innerHTML=direct.map(id=>{const p=pages19.find(x=>x[0]===id)||pages19[0];return `<button class="${current===id?'active':''}" data-v19-go="${id}"><span>${p[2]}</span><small>${p[1]}</small></button>`}).join('')+
+    mobile.innerHTML=direct.map(id=>{const p=pages19.find(x=>x[0]===id)||pages19[0];return `<button class="${current===id?'active':''}" data-v19-go="${esc(p[0])}"><span>${esc(p[2])}</span><small>${esc(p[1])}</small></button>`}).join('')+
       `<button data-v19-more><span>•••</span><small>Meer</small></button>`;
   }
 }
 function more19(){
   let old=document.querySelector('[data-v19-moremenu]');if(old){old.remove();return}
   const direct=new Set(ui19.mobileNav||DEFAULTUI19.mobileNav);
-  document.body.insertAdjacentHTML('beforeend',`<div class="more19" data-v19-moremenu><div class="more19-sheet"><div class="more19-head"><strong>Alle pagina's</strong><button data-v19-more>×</button></div>${pages19.filter(p=>!direct.has(p[0])).map(p=>`<button data-v19-go="${p[0]}"><span>${p[2]}</span><b>${p[1]}</b></button>`).join('')}</div></div>`);
+  document.body.insertAdjacentHTML('beforeend',`<div class="more19" data-v19-moremenu><div class="more19-sheet"><div class="more19-head"><strong>Alle pagina's</strong><button data-v19-more>×</button></div>${pages19.filter(p=>!direct.has(p[0])).map(p=>`<button data-v19-go="${esc(p[0])}"><span>${esc(p[2])}</span><b>${esc(p[1])}</b></button>`).join('')}</div></div>`);
 }
 function budgetPage19(){
   const b=data.budget||data.budget19||{income:0,expenses:[]};
@@ -4918,11 +4918,11 @@ function extraPage19(){
 function settingsPanel19(){
  if(current!=='settings')return;
  const v=document.querySelector('#view');if(!v||v.querySelector('[data-v19-device-settings]'))return;
- v.insertAdjacentHTML('afterbegin',`<section class="card device-settings19" data-v19-device-settings><div class="card-head"><div><p class="eyebrow">DIT APPARAAT</p><h2>Thema & weergave</h2></div><span class="tag">Niet gedeeld</span></div><p class="muted">Deze instellingen blijven alleen op dit apparaat. Daphne kan op haar telefoon dus een ander thema gebruiken.</p>
+ v.insertAdjacentHTML('afterbegin',`<section class="card device-settings19" data-v19-device-settings><div class="card-head"><div><p class="eyebrow">WEERGAVEVOORKEUREN</p><h2>Thema & weergave</h2></div><span class="tag">Persoonlijk</span></div><p class="muted">Zonder persoonlijk account worden voorkeuren op dit apparaat bewaard. Meld je aan om ze per account tussen apparaten te synchroniseren.</p>
  <div class="settings-grid19"><label>Thema<select data-v19-theme><option value="system">Systeem</option><option value="light">Licht</option><option value="dark">Donker</option></select></label>
- <label>Accent<select data-v19-accent><option value="bluePurple">Blauw / paars</option><option value="blue">Blauw</option><option value="purple">Paars</option><option value="orange">Oranje</option></select></label>
+ <label class="accent-control20">Accentkleur <input type="color" data-accent-color aria-label="Kies je eigen accentkleur"><span class="accent-preview20" data-accent-preview aria-live="polite"></span></label>
  <label>Weergave<select data-v19-density><option value="comfortable">Ruim</option><option value="compact">Compact</option></select></label></div></section>`);
- v.querySelector('[data-v19-theme]').value=ui19.theme;v.querySelector('[data-v19-accent]').value=ui19.accent;v.querySelector('[data-v19-density]').value=ui19.density;
+ v.querySelector('[data-v19-theme]').value=ui19.theme;v.querySelector('[data-v19-density]').value=ui19.density;
 }
 function editBudget19(index=null){
  data.budget ||= {income:0,expenses:[]}; data.budget.expenses ||= [];
@@ -4963,7 +4963,6 @@ document.addEventListener('click',e=>{
 });
 document.addEventListener('change',e=>{
  if(e.target.matches('[data-v19-theme]')){ui19.theme=e.target.value;saveUi19()}
- if(e.target.matches('[data-v19-accent]')){ui19.accent=e.target.value;saveUi19()}
  if(e.target.matches('[data-v19-density]')){ui19.density=e.target.value;saveUi19()}
 });
 requestAnimationFrame(()=>{nav19();settingsPanel19();applyUi19()});
@@ -4979,13 +4978,16 @@ if (window.__ST_V20__) return;
 window.__ST_V20__ = true;
 
 const KEY20 = 'samenThuisDeviceUiV20';
-const FALLBACK20 = { theme:'system', accent:'purple', density:'comfortable' };
+const FALLBACK20 = { theme:'system', accent:'purple', accentColor:'#7057d9', density:'comfortable' };
+const ACCENT_PRESETS20 = { bluePurple:'#5f63d8', blue:'#315f86', purple:'#7057d9', orange:'#d56e38' };
 
 function get20(){
   try {
     const old = JSON.parse(localStorage.getItem('samenThuisDeviceUiV19') || '{}');
     const now = JSON.parse(localStorage.getItem(KEY20) || '{}');
-    return {...FALLBACK20, ...old, ...now};
+    const saved = {...FALLBACK20, ...old, ...now};
+    if (!/^#[0-9a-f]{6}$/i.test(saved.accentColor || '')) saved.accentColor = ACCENT_PRESETS20[saved.accent] || FALLBACK20.accentColor;
+    return saved;
   } catch (_) { return {...FALLBACK20}; }
 }
 let ui20 = get20();
@@ -5001,18 +5003,35 @@ function apply20(){
   html.dataset.density19 = ui20.density || 'comfortable';
   html.dataset.density20 = ui20.density || 'comfortable';
   html.style.colorScheme = dark ? 'dark' : 'light';
-  const hex = /^#[0-9a-f]{6}$/i.test(ui20.accentColor || '') ? ui20.accentColor : '';
-  ['--blue','--blue-soft','--dark-accent-text'].forEach(v => html.style.removeProperty(v));
-  if (hex) {
-    const [r, g, b] = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16));
-    const mix = (t, k) => '#' + [r, g, b].map(c => Math.round(c + (t - c) * k).toString(16).padStart(2, '0')).join('');
-    const lum = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
-    // Keep accent text readable: darken very light colours on light themes, lighten dark colours on dark themes.
-    html.style.setProperty('--blue', dark ? mix(255, lum < 0.5 ? 0.45 : 0) : mix(0, lum > 0.65 ? 0.45 : 0));
-    html.style.setProperty('--blue-soft', mix(255, 0.88));
-    html.style.setProperty('--dark-accent-text', mix(255, lum < 0.6 ? 0.55 : 0.2));
-    html.dataset.accent20 = html.dataset.accent19 = 'custom';
-  }
+  const hex = /^#[0-9a-f]{6}$/i.test(ui20.accentColor || '') ? ui20.accentColor : FALLBACK20.accentColor;
+  const channels = value => [1, 3, 5].map(i => parseInt(value.slice(i, i + 2), 16));
+  const mix = (rgb, target, amount) => '#' + rgb.map((c, index) =>
+    Math.round(c + ((Array.isArray(target) ? target[index] : target) - c) * amount).toString(16).padStart(2, '0')).join('');
+  const luminance = value => channels(value).map(c => {
+    const normalized = c / 255;
+    return normalized <= 0.04045 ? normalized / 12.92 : ((normalized + 0.055) / 1.055) ** 2.4;
+  }).reduce((sum, c, index) => sum + c * [0.2126, 0.7152, 0.0722][index], 0);
+  const baseRgb = channels(hex);
+  const contrast = (foreground, background) => {
+    const [a, b] = [luminance(foreground), luminance(background)].sort((x, y) => y - x);
+    return (a + 0.05) / (b + 0.05);
+  };
+  const readableOn = (background, target) => {
+    for (let amount = 0; amount <= 1; amount += 0.01) {
+      const candidate = mix(baseRgb, target, amount);
+      if (contrast(candidate, background) >= 4.5) return candidate;
+    }
+    return target === 0 ? '#000000' : '#ffffff';
+  };
+  const darkSurface = '#0d273e';
+  const accentText = contrast('#ffffff', hex) >= contrast('#17243a', hex) ? '#ffffff' : '#17243a';
+  html.style.setProperty('--blue', readableOn(dark ? darkSurface : '#ffffff', dark ? 255 : 0));
+  html.style.setProperty('--blue-soft', mix(baseRgb, dark ? channels(darkSurface) : 255, 0.88));
+  html.style.setProperty('--dark-accent-text', readableOn(darkSurface, 255));
+  html.style.setProperty('--dark-muted-text', '#c7d8e8');
+  html.style.setProperty('--accent-button-bg', hex);
+  html.style.setProperty('--accent-button-text', accentText);
+  html.dataset.accent20 = html.dataset.accent19 = 'custom';
   document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark ? '#081b2d' : '#eef3f9');
 }
 function save20(){
@@ -5031,7 +5050,8 @@ window.SamenThuisPersonalUi20 = {
       theme: ['system', 'light', 'dark'].includes(next.theme) ? next.theme : 'system',
       accent: ['bluePurple', 'blue', 'purple', 'orange'].includes(next.accent) ? next.accent : 'purple',
       density: ['comfortable', 'compact'].includes(next.density) ? next.density : 'comfortable',
-      ...(typeof next.accentColor === 'string' && /^#[0-9a-f]{6}$/i.test(next.accentColor) ? { accentColor: next.accentColor } : {})
+      accentColor: typeof next.accentColor === 'string' && /^#[0-9a-f]{6}$/i.test(next.accentColor)
+        ? next.accentColor : ACCENT_PRESETS20[next.accent] || FALLBACK20.accentColor
     };
     save20();
   }
@@ -5043,18 +5063,23 @@ function beautifySettings20(){
   if (!box) return;
   box.classList.add('glass20');
   const theme = box.querySelector('[data-v19-theme]');
-  const accent = box.querySelector('[data-v19-accent]');
   const density = box.querySelector('[data-v19-density]');
   if(theme){ theme.value=ui20.theme; theme.onchange=()=>{ui20.theme=theme.value;save20()}; }
-  if(accent){ accent.value=ui20.accent; accent.onchange=()=>{ui20.accent=accent.value;delete ui20.accentColor;save20()}; }
-  if(accent && !box.querySelector('[data-accent-color]')){
-    const label = document.createElement('label');
-    label.innerHTML = 'Eigen accentkleur (dit apparaat) <input type="color" data-accent-color> <button type="button" data-accent-reset class="secondary">Standaard</button>';
-    accent.closest('label')?.after(label);
-    const input = label.querySelector('input');
-    input.value = /^#[0-9a-f]{6}$/i.test(ui20.accentColor || '') ? ui20.accentColor : '#7057d9';
-    input.oninput = () => { ui20.accentColor = input.value; save20(); };
-    label.querySelector('[data-accent-reset]').onclick = () => { delete ui20.accentColor; save20(); };
+  const input = box.querySelector('[data-accent-color]');
+  const preview = box.querySelector('[data-accent-preview]');
+  if(input){
+    input.value = /^#[0-9a-f]{6}$/i.test(ui20.accentColor || '') ? ui20.accentColor : FALLBACK20.accentColor;
+    const updatePreview = () => {
+      if (!preview) return;
+      const channels = [1, 3, 5].map(i => parseInt(input.value.slice(i, i + 2), 16) / 255);
+      const lum = channels.map(c => c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4)
+        .reduce((sum, c, index) => sum + c * [0.2126, 0.7152, 0.0722][index], 0);
+      preview.textContent = input.value.toUpperCase();
+      preview.style.backgroundColor = input.value;
+      preview.style.color = lum > 0.179 ? '#17243a' : '#ffffff';
+    };
+    updatePreview();
+    input.oninput = () => { ui20.accentColor = input.value; save20(); updatePreview(); };
   }
   if(density){ density.value=ui20.density; density.onchange=()=>{ui20.density=density.value;save20()}; }
 }
@@ -5141,10 +5166,11 @@ requestAnimationFrame(dock);
 if(window.__ST_V23__) return; window.__ST_V23__=true;
 
 const NAV23=[
- ['today','⌂','Vandaag'],['planning','▦','Agenda'],['meals','♨','Weekmenu'],
- ['groceries','✓','Boodschappen'],['offers','％','Aanbiedingen'],['tasks','☑','Taken'],['stock','▤','Voorraad'],['weather','☀','Weer'],['challenges','✦','Challenges'],['chores','⌁','Huishouden'],
- ['home','⌂','Woning'],['budget19','€','Budget'],['programs','▶',"Programma's"],['trips','✈','Reizen'],
- ['ideas','♡','Date ideeën'],['extra19','＋','Extra'],['settings','⚙','Instellingen']
+ ['today','⌂','Dashboard'],['planning','▦','Agenda'],['tasks','☑','Taken'],
+ ['groceries','✓','Boodschappen'],['stock','▤','Voorraad'],['offers','％','Aanbiedingen'],['budget19','€','Budget'],
+ ['meals','♨','Weekmenu'],['chores','⌁','Huishouden'],['challenges','✦','Challenges'],['weather','☀','Weer'],['programs','▶',"Programma's"],
+ ['ideas','♡','Date ideeën'],['home','⌂','Woning'],['trips','✈','Reizen'],
+ ['extra19','＋','Extra'],['settings','⚙','Instellingen']
 ];
 
 const DEFAULT_BUDGET23={
@@ -5746,21 +5772,27 @@ requestAnimationFrame(navImport243);
    ========================================================= */
 (()=>{'use strict';
  if(window.__ST248_DOCK__)return;window.__ST248_DOCK__=true;
- const ORDER248=['today','planning','meals','groceries','tasks','stock','weather','challenges','chores','home','budget19','auto24','programs','trips','ideas','extra19','imports243','settings'];
- const LABEL248={today:'Vandaag',planning:'Agenda',meals:'Weekmenu',groceries:'Boodschappen',tasks:'Taken',stock:'Voorraad',weather:'Weer',challenges:'Challenges',chores:'Huishouden',home:'Woning',budget19:'Budget',auto24:'Auto',programs:"Programma's",trips:'Reizen',ideas:'Date ideeën',extra19:'Extra',imports243:'Import',settings:'Instellingen'};
+ const ORDER248=['today','planning','tasks','groceries','stock','offers','budget19','meals','chores','challenges','weather','programs','ideas','home','trips','auto24','extra19','imports243','settings'];
+ const LABEL248={today:'Dashboard',planning:'Agenda',tasks:'Taken',groceries:'Boodschappen',stock:'Voorraad',offers:'Aanbiedingen',budget19:'Budget',meals:'Weekmenu',chores:'Huishouden',challenges:'Challenges',weather:'Weer',programs:"Programma's",ideas:'Date ideeën',home:'Woning',trips:'Reizen',auto24:'Auto',extra19:'Extra',imports243:'Importeren',settings:'Instellingen'};
  function actualKey248(b){if(b.dataset.nav23)return b.dataset.nav23;if(b.hasAttribute('data-v24-auto'))return 'auto24';if(b.hasAttribute('data-import243-go'))return 'imports243';return ''}
+ function arrangeDesktop248(){
+   const nav=document.querySelector('.sidebar nav');if(!nav)return;
+   const buttons=[...nav.querySelectorAll(':scope > button')],map=new Map(buttons.map(b=>[b.dataset.v19Go||(b.hasAttribute('data-v24-auto')?'auto24':b.hasAttribute('data-import243-go')?'imports243':''),b]));
+   ORDER248.forEach(k=>{const b=map.get(k);if(!b)return;b.classList.toggle('active',current===k);nav.appendChild(b)});
+ }
  function arrange248(){
-   const sc=document.querySelector('.mobile-nav-scroll23');if(!sc)return;
+   const sc=document.querySelector('.mobile-nav-scroll23');if(!sc){arrangeDesktop248();return}
    const buttons=[...sc.querySelectorAll(':scope > button')],map=new Map(buttons.map(b=>[actualKey248(b),b]));
    ORDER248.forEach(k=>{const b=map.get(k);if(!b)return;b.classList.toggle('active',current===k);const small=b.querySelector('small');if(small)small.textContent=LABEL248[k]||small.textContent;sc.appendChild(b)});
    sc.dataset.glass248='true';
+   arrangeDesktop248();
  }
  const base248=render;
  render=function(...args){const r=base248(...args);requestAnimationFrame(()=>requestAnimationFrame(arrange248));return r};
- const observer248=new MutationObserver(()=>requestAnimationFrame(arrange248));
+ const observer248=new MutationObserver(()=>requestAnimationFrame(()=>{arrange248();arrangeDesktop248()}));
  const start248=()=>{const n=document.querySelector('#mobileNav23');if(n)observer248.observe(n,{childList:true,subtree:true});arrange248()};
  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start248,{once:true});else start248();
- requestAnimationFrame(()=>requestAnimationFrame(arrange248));
+ requestAnimationFrame(()=>requestAnimationFrame(()=>{arrange248();arrangeDesktop248()}));
 })();
 /* build v24.8 · liquid glass dock + logical navigation order */
 
@@ -5847,9 +5879,29 @@ document.addEventListener('click', event => {
     ['overview', 'Vandaagstatistieken en diner'],
     ['agenda', 'Komende afspraken'],
     ['outfit', 'Kledingadvies'],
-    ['air', 'Pollen en luchtkwaliteit']
+    ['air', 'Pollen en luchtkwaliteit'],
+    ['tab-dashboard', 'Dashboardoverzicht'],
+    ['tab-agenda', 'Agenda · afspraken'],
+    ['tab-tasks', 'Taken · openstaand'],
+    ['tab-groceries', 'Boodschappen · openstaand'],
+    ['tab-stock', 'Voorraad · meldingen'],
+    ['tab-offers', 'Aanbiedingen'],
+    ['tab-budget19', 'Budget · overzicht'],
+    ['tab-meals', 'Weekmenu · vandaag'],
+    ['tab-chores', 'Huishouden · binnenkort'],
+    ['tab-challenges', 'Challenges'],
+    ['tab-weather', 'Weer'],
+    ['tab-programs', "Programma's"],
+    ['tab-ideas', 'Date ideeën'],
+    ['tab-home', 'Woning · open punten'],
+    ['tab-trips', 'Reizen · volgende actie'],
+    ['tab-auto24', 'Auto · voertuigen'],
+    ['tab-extra19', 'Extra'],
+    ['tab-imports243', 'Importeren'],
+    ['tab-settings', 'Instellingen']
   ];
   const DASH_DEFAULTS = DASH_WIDGETS.map(([id]) => id);
+  const DASH_DEFAULT_VISIBLE = ['weather', 'overview', 'agenda', 'outfit', 'air'];
   const dashboardCore = window.SamenThuisDashboard;
   const WEATHER_KEY = 'samenThuisWeatherForecastV25';
   const DEFAULT_LOCATION = { place: 'Rotterdam', lat: 51.9225, lon: 4.47917 };
@@ -5863,18 +5915,22 @@ document.addEventListener('click', event => {
   };
   let dashboard25 = loadDashboard25();
 
+  function normalizeDashboard25(saved) {
+    if (dashboardCore) return dashboardCore.normalize(saved, DASH_DEFAULTS, DASH_DEFAULT_VISIBLE);
+    const base = saved && typeof saved === 'object' ? saved : {};
+    const order = Array.isArray(base.order) ? base.order.filter(id => DASH_DEFAULTS.includes(id)) : [];
+    return {
+      order: [...new Set([...order, ...DASH_DEFAULTS])],
+      visible: Object.fromEntries(DASH_DEFAULTS.map(id => [id,
+        Object.hasOwn(base.visible || {}, id) ? base.visible[id] !== false : DASH_DEFAULT_VISIBLE.includes(id)]))
+    };
+  }
+
   function loadDashboard25() {
     try {
       const saved = JSON.parse(localStorage.getItem(DASH_KEY) || 'null');
-      if (dashboardCore) return dashboardCore.normalize(saved, DASH_DEFAULTS);
-      const order = Array.isArray(saved?.order) ? saved.order.filter(id => DASH_DEFAULTS.includes(id)) : [];
-      return {
-        order: [...new Set([...order, ...DASH_DEFAULTS])],
-        visible: Object.fromEntries(DASH_DEFAULTS.map(id => [id, saved?.visible?.[id] !== false]))
-      };
-    } catch (_) {
-      return { order: [...DASH_DEFAULTS], visible: Object.fromEntries(DASH_DEFAULTS.map(id => [id, true])) };
-    }
+      return normalizeDashboard25(saved);
+    } catch (_) { return normalizeDashboard25(null); }
   }
 
   function saveDashboard25() {
@@ -5885,7 +5941,7 @@ document.addEventListener('click', event => {
   window.SamenThuisDashboardPreferences25 = {
     get() { return JSON.parse(JSON.stringify(dashboard25)); },
     set(value) {
-      dashboard25 = dashboardCore ? dashboardCore.normalize(value, DASH_DEFAULTS) : loadDashboard25();
+      dashboard25 = normalizeDashboard25(value);
       saveDashboard25();
       applyDashboard25();
     }
@@ -5896,7 +5952,37 @@ document.addEventListener('click', event => {
       const label = DASH_WIDGETS.find(([widget]) => widget === id)?.[1] || id;
       return `<div class="setting-row dashboard-setting-row25"><label><input type="checkbox" data-dashboard-visible="${id}" ${dashboard25.visible[id] ? 'checked' : ''}> ${esc(label)}</label><span><button type="button" class="secondary" data-dashboard-move="${id}" data-direction="-1" aria-label="${esc(label)} omhoog" ${index === 0 ? 'disabled' : ''}>↑</button> <button type="button" class="secondary" data-dashboard-move="${id}" data-direction="1" aria-label="${esc(label)} omlaag" ${index === dashboard25.order.length - 1 ? 'disabled' : ''}>↓</button></span></div>`;
     }).join('');
-    return `<section class="card settings-card dashboard-editor25"><div class="card-head"><div><p class="eyebrow">DASHBOARD</p><h2>Onderdelen samenstellen</h2></div></div><p class="muted">Vink kaarten aan of uit en wijzig de volgorde. Na aanmelden wordt deze indeling ook aan je persoonlijke account gekoppeld.</p>${rows}<div class="button-row"><button type="button" class="secondary" data-dashboard-reset>Standaardvolgorde herstellen</button></div></section>`;
+    const preview = dashboard25.order.filter(id => dashboard25.visible[id]).map(id =>
+      `<li>${esc(DASH_WIDGETS.find(([widget]) => widget === id)?.[1] || id)}</li>`).join('');
+    return `<section class="card settings-card dashboard-editor25"><div class="card-head"><div><p class="eyebrow">DASHBOARD</p><h2>Onderdelen samenstellen</h2></div></div><p class="muted">Kies compacte onderdelen van alle bestaande pagina's. Verberg, toon of verplaats ze; de bestaande dashboardkaarten blijven beschikbaar. Zonder account worden voorkeuren alleen op dit apparaat bewaard.</p><div class="dashboard-preview25"><strong>Voorbeeld van je dashboard (${dashboard25.order.filter(id => dashboard25.visible[id]).length} onderdelen)</strong><ol>${preview || '<li>Geen onderdelen geselecteerd</li>'}</ol></div>${rows}<div class="button-row"><button type="button" class="secondary" data-dashboard-reset>Standaardindeling herstellen</button></div></section>`;
+  }
+
+  function dashboardPageWidget25(widgetId) {
+    const pages = {
+      'tab-dashboard': ['today', 'Dashboard', `${(data.planning || []).filter(item => item.date >= todayISO()).length} komende afspraken`],
+      'tab-agenda': ['planning', 'Agenda', `${(data.planning || []).filter(item => item.date >= todayISO()).length} komende afspraken`],
+      'tab-tasks': ['tasks', 'Taken', `${(data.tasks || []).filter(item => !item.done).length} open taken`],
+      'tab-groceries': ['groceries', 'Boodschappen', `${(data.groceries || []).filter(item => !item.done).length} boodschappen open`],
+      'tab-stock': ['stock', 'Voorraad', `${(data.stock || []).filter(item => Number(item.min ?? item.minimum ?? 0) > 0 && Number(item.amount || 0) <= Number(item.min ?? item.minimum ?? 0)).length} producten op of onder minimum`],
+      'tab-offers': ['offers', 'Aanbiedingen', `${(data.offers25 || []).length} bewaarde aanbiedingen`],
+      'tab-budget19': ['budget19', 'Budget', data.budgetV23?.financialLedger
+        ? `Huishoudsaldo ${moneyLedger25(ledgerCore25.availableCashCents(ledgerCore25.normalize(data.budgetV23.financialLedger)))} · zie potjes en planning`
+        : 'Bekijk planning, potjes en spaardoelen'],
+      'tab-meals': ['meals', 'Weekmenu', (data.meals || []).find(item => item.date === todayISO() && /avond/i.test(item.type || item.mealType || ''))?.title || 'Geen diner voor vandaag gepland'],
+      'tab-chores': ['chores', 'Huishouden', `${(data.chores || []).filter(item => !item.done).length} open huishoudtaken`],
+      'tab-challenges': ['challenges', 'Challenges', 'Bekijk de gezamenlijke challenges'],
+      'tab-weather': ['weather', 'Weer', data.settings?.weatherPlace || data.settings?.weatherCity || 'Weer en verwachting'],
+      'tab-programs': ['programs', "Programma's", `${(data.programs || []).filter(item => !item.done).length} programma's`],
+      'tab-ideas': ['ideas', 'Date ideeën', `${(data.ideas || []).length} ideeën`],
+      'tab-home': ['home', 'Woning', `${(data.home || []).filter(item => !item.done).length} open woningpunten`],
+      'tab-trips': ['trips', 'Reizen', `${(data.trips || []).filter(item => !item.done).length} open reisacties`],
+      'tab-auto24': ['auto24', 'Auto', `${(data.cars || []).length} voertuigen · ${(data.fuelEntries || []).length} tankbeurten`],
+      'tab-extra19': ['extra19', 'Extra', 'Open handige hulpmiddelen'],
+      'tab-imports243': ['imports243', 'Importeren', 'Gegevens importeren of een back-up herstellen'],
+      'tab-settings': ['settings', 'Instellingen', 'Beheer voorkeuren en synchronisatie']
+    };
+    const [page, title, detail] = pages[widgetId] || ['today', 'Dashboard', ''];
+    return `<section class="dashboard-page-widget25 card" data-widget18="${widgetId}"><div><p class="eyebrow">SNEL NAAR</p><h3>${esc(title)}</h3><p>${esc(detail)}</p></div><a class="secondary" href="#/${page}" data-v19-go="${page}" aria-label="Open ${esc(title)}">Open →</a></section>`;
   }
 
   function applyDashboard25() {
@@ -5906,12 +5992,509 @@ document.addEventListener('click', event => {
       const id = node.dataset.widget18 || (node.matches('[data-air24]') ? 'air' : '');
       return [id, node];
     }).filter(([id]) => id));
+    DASH_WIDGETS.filter(([id]) => id.startsWith('tab-')).forEach(([id]) => {
+      if (nodes.has(id)) return;
+      grid.insertAdjacentHTML('beforeend', dashboardPageWidget25(id));
+      const node = grid.querySelector(`[data-widget18="${id}"]`);
+      if (node) nodes.set(id, node);
+    });
     dashboard25.order.forEach(id => {
       const node = nodes.get(id);
       if (!node) return;
       node.hidden = !dashboard25.visible[id];
       grid.append(node);
     });
+  }
+
+  let ledgerMonth25 = todayISO().slice(0, 7);
+  let ledgerEdit25 = null;
+  const ledgerCore25 = window.SamenThuisBudgetLedger;
+  const moneyLedger25 = value => new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' }).format((Number(value) || 0) / 100);
+  const decimalLedger25 = value => (Number(value || 0) / 100).toFixed(2);
+  const plannedMonthlyLedger25 = item => {
+    const divisor = item.period === 'jaar' || item.period === 'yearly' ? 12
+      : item.period === 'kwartaal' || item.period === 'quarterly' ? 3 : 1;
+    return Math.round((Number(item.amount || 0) / divisor) * 100);
+  };
+
+  function ledgerBudget25() {
+    const budget = data.budgetV23 || {};
+    budget.houseCategories = Array.isArray(budget.houseCategories) ? budget.houseCategories : [];
+    budget.fixed = Array.isArray(budget.fixed) ? budget.fixed : [];
+    budget.goals = Array.isArray(budget.goals) ? budget.goals : [];
+    return budget;
+  }
+
+  function ledgerPots25(budget = ledgerBudget25()) {
+    const pots = [];
+    budget.houseCategories.forEach((item, index) => pots.push({
+      id: `category:${item.id || String(item.title || `huisbudget-${index}`).toLocaleLowerCase('nl-NL')}`,
+      label: item.title || `Huisbudget ${index + 1}`, kind: 'house',
+      plannedCents: Math.round((Number(item.amount) || 0) * 100)
+    }));
+    budget.fixed.forEach((item, index) => pots.push({
+      id: `fixed:${item.id || String(item.title || `last-${index}`).toLocaleLowerCase('nl-NL')}`,
+      label: item.title || `Vaste last ${index + 1}`, kind: 'fixed',
+      plannedCents: plannedMonthlyLedger25(item)
+    }));
+    budget.goals.forEach((item, index) => pots.push({
+      id: `goal:${item.id || String(item.title || `doel-${index}`).toLocaleLowerCase('nl-NL')}`,
+      label: item.title || `Spaardoel ${index + 1}`, kind: 'goal',
+      plannedCents: Math.round((Number(item.monthly) || 0) * 100)
+    }));
+    return pots;
+  }
+
+  function ledgerState25(budget = ledgerBudget25(), pots = ledgerPots25(budget)) {
+    if (!ledgerCore25) return null;
+    const current = budget.financialLedger;
+    const ledger = ledgerCore25.normalize(current);
+    let changed = !current || !Array.isArray(current.incomes) || !Array.isArray(current.expenses)
+      || !Array.isArray(current.transfers) || !current.openingBalances || !current.goalSnapshots || !current.potSnapshots;
+    const activePotIds = new Set(pots.map(pot => pot.id));
+    pots.forEach(pot => {
+      const previous = ledger.potSnapshots[pot.id];
+      const next = { label: pot.label, kind: pot.kind, plannedCents: pot.plannedCents, active: true };
+      if (!previous || previous.label !== next.label || previous.kind !== next.kind
+        || previous.plannedCents !== next.plannedCents || previous.active !== true) changed = true;
+      ledger.potSnapshots[pot.id] = next;
+    });
+    Object.keys(ledger.potSnapshots).forEach(potId => {
+      if (activePotIds.has(potId)) return;
+      if (ledger.potSnapshots[potId].active !== false) changed = true;
+      ledger.potSnapshots[potId] = { ...ledger.potSnapshots[potId], active: false };
+    });
+    Object.keys(ledgerCore25.allPotBalances(ledger, pots)).forEach(potId => {
+      if (ledger.potSnapshots[potId]) return;
+      ledger.potSnapshots[potId] = { label: 'Verwijderd potje', kind: 'archived', plannedCents: 0, active: false };
+      changed = true;
+    });
+    budget.goals.forEach((goal, index) => {
+      const pot = pots.find(item => item.id === `goal:${goal.id || String(goal.title || `doel-${index}`).toLocaleLowerCase('nl-NL')}`);
+      if (!pot) return;
+      const saved = window.SamenThuisSavings?.balance(goal) ?? Number(goal.current || 0);
+      const balance = Math.round((Number(saved) || 0) * 100);
+      const key = String(goal.id || pot.id);
+      if (!Object.hasOwn(ledger.goalSnapshots, key)) {
+        ledger.goalSnapshots[key] = balance;
+        if (!Object.hasOwn(ledger.openingBalances, pot.id)) ledger.openingBalances[pot.id] = balance;
+        changed = true;
+      } else {
+        const previous = Number(ledger.goalSnapshots[key]) || 0;
+        if (previous !== balance) {
+          ledger.openingBalances[pot.id] = (Number(ledger.openingBalances[pot.id]) || 0) + balance - previous;
+          ledger.goalSnapshots[key] = balance;
+          changed = true;
+        }
+      }
+    });
+    budget.financialLedger = ledger;
+    if (changed) save({ touch: false });
+    return ledger;
+  }
+
+  function ledgerPotHistory25(ledger, activePots) {
+    const activeIds = new Set(activePots.map(pot => pot.id));
+    const balances = ledgerCore25.allPotBalances(ledger, activePots);
+    const ids = new Set([...Object.keys(ledger.potSnapshots || {}), ...Object.keys(balances)]);
+    return [...activePots, ...[...ids].filter(id => !activeIds.has(id)).map(id => ({
+      id, ...(ledger.potSnapshots[id] || { label: 'Verwijderd potje', kind: 'archived', plannedCents: 0 }),
+      archived: true
+    }))];
+  }
+
+  function syncGoalMirrors25(ledger, budget = ledgerBudget25()) {
+    const savings = window.SamenThuisSavings;
+    if (!savings) return;
+    const movements = new Map();
+    const addMovement = (potId, amountCents, date, key, note) => {
+      if (!String(potId || '').startsWith('goal:') || !amountCents) return;
+      const goal = budget.goals.find((item, index) =>
+        `goal:${item.id || String(item.title || `doel-${index}`).toLocaleLowerCase('nl-NL')}` === potId);
+      if (!goal) return;
+      const goalId = String(goal.id || potId);
+      if (!movements.has(goalId)) movements.set(goalId, []);
+      movements.get(goalId).push({
+        id: `budget-ledger:${key}`, externalId: `budget-ledger:${key}`,
+        amount: Number(amountCents) / 100, date, note, source: 'budget-ledger'
+      });
+    };
+    ledger.incomes.forEach(income => (income.allocations || []).forEach(allocation =>
+      addMovement(allocation.potId, allocation.amountCents, income.date, `allocation:${allocation.id}`, `Toewijzing van ${income.source}`)));
+    ledger.expenses.forEach(expense =>
+      addMovement(expense.potId, -Number(expense.amountCents || 0), expense.date, `expense:${expense.id}`, expense.description));
+    ledger.transfers.forEach(transfer => {
+      addMovement(transfer.fromPotId, -Number(transfer.amountCents || 0), transfer.date, `transfer-out:${transfer.id}`, transfer.description || 'Interne verschuiving');
+      addMovement(transfer.toPotId, Number(transfer.amountCents || 0), transfer.date, `transfer-in:${transfer.id}`, transfer.description || 'Interne verschuiving');
+    });
+    budget.goals.forEach(goal => {
+      goal.deposits = Array.isArray(goal.deposits) ? goal.deposits : [];
+      const retained = goal.deposits.filter(deposit => !String(deposit.externalId || '').startsWith('budget-ledger:'));
+      const expected = movements.get(String(goal.id)) || [];
+      goal.deposits = [...retained, ...expected.map(movement => ({
+        ...movement,
+        amount: Math.round(movement.amount * 100) / 100,
+        sig: `${movement.date}|${movement.amount}|${movement.note.toLowerCase()}|${movement.source}`
+      }))];
+      const goalBalance = savings.balance(goal);
+      ledger.goalSnapshots[String(goal.id)] = Math.round(goalBalance * 100);
+    });
+  }
+
+  function ledgerNode25(tag, className = '', text) {
+    const node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text !== undefined) node.textContent = String(text);
+    return node;
+  }
+
+  function ledgerInput25(name, type = 'text', values = {}) {
+    const input = ledgerNode25('input');
+    input.name = name;
+    input.type = type;
+    Object.entries(values).forEach(([key, value]) => {
+      if (key === 'required') input.required = Boolean(value);
+      else if (key === 'value') input.value = String(value ?? '');
+      else input.setAttribute(key, String(value));
+    });
+    return input;
+  }
+
+  function ledgerSelect25(name, options, required = true) {
+    const select = ledgerNode25('select');
+    select.name = name;
+    select.required = required;
+    options.forEach(({ value, label, selected }) => {
+      const option = ledgerNode25('option', '', label);
+      option.value = value;
+      if (selected) option.selected = true;
+      select.append(option);
+    });
+    return select;
+  }
+
+  function ledgerField25(labelText, control, wide = false) {
+    const label = ledgerNode25('label', wide ? 'ledger-wide25' : '');
+    label.append(document.createTextNode(labelText), control);
+    return label;
+  }
+
+  function ledgerButton25(text, className = 'secondary', type = 'button', attributes = {}) {
+    const button = ledgerNode25('button', className, text);
+    button.type = type;
+    Object.entries(attributes).forEach(([name, value]) => button.setAttribute(name, String(value)));
+    return button;
+  }
+
+  function ledgerEditFormMarkup25(ledger, pots) {
+    if (!ledgerEdit25) return null;
+    const { kind, id: entryId } = ledgerEdit25;
+    if (!['incomes', 'expenses', 'transfers'].includes(kind)) { ledgerEdit25 = null; return null; }
+    const entry = ledger[kind]?.find(item => item.id === entryId);
+    if (!entry) { ledgerEdit25 = null; return null; }
+    const potSelect = (name, selected, label) => ledgerField25(label, ledgerSelect25(name,
+      pots.map(pot => ({ value: pot.id, label: pot.label, selected: pot.id === selected }))));
+    const fields = ledgerNode25('div', 'ledger-fields25');
+    fields.append(
+      ledgerField25('Bedrag (€)', ledgerInput25('amount', 'number', {
+        step: '0.01', min: '0.01', inputmode: 'decimal', value: decimalLedger25(entry.amountCents), required: true
+      })),
+      ledgerField25('Datum', ledgerInput25('date', 'date', { value: entry.date, required: true }))
+    );
+    if (kind === 'incomes') {
+      fields.append(
+        ledgerField25('Boekingsmaand', ledgerInput25('month', 'month', { value: entry.month || entry.date.slice(0, 7), required: true })),
+        ledgerField25('Persoon / bron', ledgerInput25('source', 'text', { value: entry.source || '', maxlength: '80', required: true })),
+        ledgerField25('Omschrijving', ledgerInput25('description', 'text', { value: entry.description || '', maxlength: '160' }), true)
+      );
+    } else if (kind === 'expenses') {
+      const categories = ['Boodschappen', 'Tanken', 'Vaste lasten', 'Abonnementen', 'Persoonlijk', 'Huishouden', 'Overig'];
+      fields.append(
+        ledgerField25('Categorie', ledgerSelect25('category', categories.map(category => ({
+          value: category, label: category, selected: category === entry.category
+        })))),
+        potSelect('potId', entry.potId, 'Potje'),
+        ledgerField25('Persoon (optioneel)', ledgerInput25('person', 'text', { value: entry.person || '', maxlength: '80' })),
+        ledgerField25('Omschrijving', ledgerInput25('description', 'text', {
+          value: entry.description || '', maxlength: '160', required: true
+        }), true)
+      );
+    } else {
+      fields.append(
+        potSelect('fromPotId', entry.fromPotId, 'Van potje'),
+        potSelect('toPotId', entry.toPotId, 'Naar potje'),
+        ledgerField25('Omschrijving', ledgerInput25('description', 'text', { value: entry.description || '', maxlength: '160' }), true)
+      );
+    }
+    const form = ledgerNode25('form', 'ledger-form25');
+    form.dataset.ledgerEdit = kind;
+    form.dataset.entryId = entryId;
+    form.append(ledgerNode25('h3', '', 'Boeking corrigeren'), fields);
+    const actions = ledgerNode25('div', 'button-row');
+    actions.append(
+      ledgerButton25('Wijziging controleren', 'primary', 'submit'),
+      ledgerButton25('Annuleren', 'secondary', 'button', { 'data-ledger-cancel-edit': '' })
+    );
+    form.append(actions);
+    return form;
+  }
+
+  function ledgerMarkup25() {
+    const budget = ledgerBudget25(), pots = ledgerPots25(budget), ledger = ledgerState25(budget, pots);
+    if (!ledger) {
+      const section = ledgerNode25('section', 'card');
+      const message = ledgerNode25('p', '', 'De financiële administratie is niet beschikbaar in deze browser.');
+      message.setAttribute('role', 'alert');
+      section.append(message);
+      return section;
+    }
+    const allPots = ledgerPotHistory25(ledger, pots);
+    const summary = ledgerCore25.monthSummary(ledger, ledgerMonth25, allPots);
+    const balances = summary.potBalances;
+    const allocationsForPot = potId => ledger.incomes.reduce((sum, income) =>
+      sum + (income.allocations || []).filter(item => item.potId === potId).reduce((n, item) => n + Number(item.amountCents || 0), 0), 0);
+    const monthlyPlan = [...budget.fixed.map(plannedMonthlyLedger25),
+      ...budget.houseCategories.map(item => Math.round((Number(item.amount) || 0) * 100)),
+      ...budget.goals.map(item => Math.round((Number(item.monthly) || 0) * 100)),
+      Math.round((Number(budget.investing) || 0) * 100)].reduce((sum, value) => sum + value, 0);
+    const monthResult = summary.incomeCents - summary.expenseCents;
+    const totalPotBalances = Object.values(balances).reduce((sum, value) => sum + Number(value || 0), 0);
+    const unallocated = summary.cashBalanceCents - totalPotBalances;
+    const plannedContribution = budget.incomes && Number.isFinite(Number(budget.contributionPct))
+      ? Math.round((Number(budget.incomes.Kees || 0) + Number(budget.incomes.Daphne || 0))
+        * Math.max(0, Math.min(100, Number(budget.contributionPct))) * 100 / 100)
+      : null;
+    const plannedExternal = [...budget.fixed.map(plannedMonthlyLedger25),
+      ...budget.houseCategories.map(item => Math.round((Number(item.amount) || 0) * 100))]
+      .reduce((sum, value) => sum + value, 0);
+    const savingsProposal = budget.goals.reduce((sum, goal) => sum + Math.round((Number(goal.monthly) || 0) * 100), 0);
+    const projection = ledgerMonth25 === todayISO().slice(0, 7) && plannedContribution !== null
+      ? summary.cashBalanceCents + Math.max(0, plannedContribution - summary.incomeCents)
+        - Math.max(0, plannedExternal - summary.expenseCents)
+      : null;
+    const ledgerDate = ledgerMonth25 === todayISO().slice(0, 7) ? todayISO() : `${ledgerMonth25}-01`;
+    const eligibleIncomes = ledger.incomes.filter(income => Number(income.amountCents || 0)
+      > (income.allocations || []).reduce((sum, allocation) => sum + Number(allocation.amountCents || 0), 0));
+    const section = ledgerNode25('section', 'card ledger25');
+    const heading = ledgerNode25('div', 'card-head');
+    const headingText = ledgerNode25('div');
+    headingText.append(ledgerNode25('p', 'eyebrow', 'WERKELIJKHEID · APARTE BOEKINGEN'),
+      ledgerNode25('h2', '', 'Inkomsten, uitgaven & potjessaldi'));
+    const monthInput = ledgerInput25('month', 'month', { value: ledgerMonth25 });
+    monthInput.dataset.ledgerMonth = '';
+    heading.append(headingText, ledgerField25('Maand', monthInput));
+    heading.querySelector('label').className = 'ledger-month25';
+    section.append(heading, ledgerNode25('p', 'muted',
+      'Deze administratie is aanvullend op het bestaande budgetplan. De geplande maandinleg, huisbudgetten en spaardoelen blijven ongewijzigd. Verdelingen en interne verschuivingen tellen niet als inkomsten.'));
+
+    const kpis = ledgerNode25('div', 'ledger-kpis25');
+    const kpi = (label, value, negative = false) => {
+      const item = ledgerNode25('article');
+      item.append(ledgerNode25('small', '', label),
+        ledgerNode25('b', negative ? 'ledger-negative25' : '', value === null ? '—' : moneyLedger25(value)));
+      return item;
+    };
+    kpis.append(
+      kpi('Inkomsten geboekt', summary.incomeCents),
+      kpi('Toegewezen uit inkomsten', summary.allocatedCents),
+      kpi('Werkelijk uitgegeven', summary.expenseCents),
+      kpi('Geregistreerd maandresultaat', monthResult, monthResult < 0),
+      kpi('Huishoudsaldo nu', summary.cashBalanceCents, summary.cashBalanceCents < 0),
+      kpi('Nog niet toegewezen', unallocated, unallocated < 0),
+      kpi('Indicatie einde maand', projection, projection !== null && projection < 0)
+    );
+    section.append(kpis);
+    section.append(ledgerNode25('p', 'ledger-plan25',
+      `Planning: ${moneyLedger25(monthlyPlan)} per maand (waaronder ${moneyLedger25(savingsProposal)} geplande spaardoelinleg) · Werkelijke uitgaven deze maand: ${moneyLedger25(summary.expenseCents)}. De indicatie voor deze maand gebruikt alleen het bestaande geplande huishoudinkomen en vaste/huislasten minus al geboekte bedragen; het is geen bankprognose. Eerdere maanden tonen alleen de geboekte werkelijkheid.`));
+
+    const registration = ledgerNode25('section', 'ledger-section25');
+    registration.append(ledgerNode25('h3', '', 'Registreren'));
+    const forms = ledgerNode25('div', 'ledger-forms25');
+    const addForm = (kind, title, fields, buttonText, extra) => {
+      const form = ledgerNode25('form', 'ledger-form25');
+      form.dataset.ledgerForm = kind;
+      form.append(ledgerNode25('h3', '', title));
+      const fieldGrid = ledgerNode25('div', 'ledger-fields25');
+      fields.forEach(field => fieldGrid.append(field));
+      form.append(fieldGrid);
+      if (extra) form.append(extra);
+      form.append(ledgerButton25(buttonText, 'primary', 'submit'));
+      forms.append(form);
+      return form;
+    };
+    const expenseCategories = ['Boodschappen', 'Tanken', 'Vaste lasten', 'Abonnementen', 'Persoonlijk', 'Huishouden', 'Overig'];
+    const potOptions = pots.map(pot => ({ value: pot.id, label: pot.label }));
+    const allPotOptions = allPots.map(pot => ({
+      value: pot.id, label: `${pot.label}${pot.archived ? ' · verwijderd' : ''}`
+    }));
+    const incomeFields = [
+      ledgerField25('Bedrag (€)', ledgerInput25('amount', 'number', { inputmode: 'decimal', min: '0.01', step: '0.01', required: true })),
+      ledgerField25('Datum', ledgerInput25('date', 'date', { value: ledgerDate, required: true })),
+      ledgerField25('Boekingsmaand', ledgerInput25('month', 'month', { value: ledgerMonth25, required: true })),
+      ledgerField25('Type', ledgerSelect25('type', [
+        { value: 'salary', label: 'Salaris' }, { value: 'benefit', label: 'Toeslag' }, { value: 'other', label: 'Overige inkomsten' }
+      ], false)),
+      ledgerField25('Persoon / bron', ledgerInput25('source', 'text', { placeholder: 'Kees, Daphne, toeslag…', maxlength: '80', required: true })),
+      ledgerField25('Omschrijving (optioneel)', ledgerInput25('description', 'text', { maxlength: '160' }))
+    ];
+    addForm('income', 'Inkomen toevoegen', incomeFields, 'Inkomstenboeking controleren');
+
+    const allocationForm = ledgerNode25('form', 'ledger-form25');
+    allocationForm.dataset.ledgerForm = 'allocation';
+    allocationForm.append(ledgerNode25('h3', '', 'Inkomen verdelen'));
+    if (eligibleIncomes.length) {
+      const allocationFields = ledgerNode25('div', 'ledger-fields25');
+      allocationFields.append(
+        ledgerField25('Inkomstenboeking', ledgerSelect25('incomeId', eligibleIncomes.map(income => {
+          const allocated = (income.allocations || []).reduce((sum, item) => sum + Number(item.amountCents || 0), 0);
+          return {
+            value: income.id,
+            label: `${income.source} · ${income.date} · nog ${moneyLedger25(Number(income.amountCents || 0) - allocated)}`
+          };
+        }))),
+        ledgerField25('Potje', ledgerSelect25('potId', potOptions)),
+        ledgerField25('Bedrag (€)', ledgerInput25('amount', 'number', { inputmode: 'decimal', min: '0.01', step: '0.01', required: true }))
+      );
+      allocationForm.append(allocationFields, ledgerButton25('Verdeling controleren', 'primary', 'submit'));
+    } else {
+      allocationForm.append(ledgerNode25('p', 'muted', 'Registreer eerst inkomsten met een nog niet verdeeld bedrag.'));
+    }
+    forms.append(allocationForm);
+
+    addForm('expense', 'Werkelijke uitgave', [
+      ledgerField25('Bedrag (€)', ledgerInput25('amount', 'number', { inputmode: 'decimal', min: '0.01', step: '0.01', required: true })),
+      ledgerField25('Datum', ledgerInput25('date', 'date', { value: ledgerDate, required: true })),
+      ledgerField25('Categorie', ledgerSelect25('category', expenseCategories.map(category => ({ value: category, label: category })), false)),
+      ledgerField25('Potje', ledgerSelect25('potId', potOptions)),
+      ledgerField25('Persoon (optioneel)', ledgerInput25('person', 'text', { maxlength: '80' })),
+      ledgerField25('Omschrijving', ledgerInput25('description', 'text', { maxlength: '160', required: true }))
+    ], 'Uitgave controleren');
+
+    addForm('transfer', 'Geld tussen potjes verschuiven', [
+      ledgerField25('Van potje', ledgerSelect25('fromPotId', allPotOptions)),
+      ledgerField25('Naar potje', ledgerSelect25('toPotId', allPotOptions)),
+      ledgerField25('Bedrag (€)', ledgerInput25('amount', 'number', { inputmode: 'decimal', min: '0.01', step: '0.01', required: true })),
+      ledgerField25('Datum', ledgerInput25('date', 'date', { value: ledgerDate, required: true })),
+      ledgerField25('Omschrijving', ledgerInput25('description', 'text', { maxlength: '160' }), true)
+    ], 'Verschuiving controleren', ledgerNode25('p', 'small-note',
+      'Ook verwijderde potjes met resterend saldo blijven bereikbaar. Vooraf wordt de verschuiving getoond en bevestigd; het huishoudsaldo verandert niet.'));
+    registration.append(forms);
+    section.append(registration);
+
+    const selectedEdit = ledgerEditFormMarkup25(ledger, allPots);
+    if (selectedEdit) section.append(selectedEdit);
+
+    const historySection = (title, content) => {
+      const block = ledgerNode25('section', 'ledger-section25');
+      block.append(ledgerNode25('h3', '', title), content);
+      return block;
+    };
+    const potSection = ledgerNode25('section', 'ledger-section25');
+    const potHeading = ledgerNode25('div', 'card-head');
+    potHeading.append(ledgerNode25('h3', '', 'Potjes · saldo nu'),
+      ledgerNode25('span', 'small-note', 'Bestaande maandbudgetten blijven planning.'));
+    potSection.append(potHeading);
+    const potRows = ledgerNode25('div');
+    allPots.forEach(pot => {
+      const balance = Number(balances[pot.id] || 0);
+      const assigned = Number(ledger.openingBalances[pot.id] || 0) + allocationsForPot(pot.id);
+      const spent = summary.expenses.filter(item => item.potId === pot.id)
+        .reduce((sum, item) => sum + Number(item.amountCents || 0), 0);
+      const row = ledgerNode25('article', `ledger-pot25${balance < 0 ? ' is-negative' : ''}${pot.archived ? ' is-archived' : ''}`);
+      const name = ledgerNode25('div');
+      name.append(ledgerNode25('h3', '', pot.label), ledgerNode25('small', '',
+        pot.archived ? 'Verwijderd potje · verschuif het saldo naar een actief potje'
+          : pot.kind === 'goal' ? 'Spaardoel' : pot.kind === 'fixed' ? 'Vaste last' : 'Huisbudget'));
+      row.append(name);
+      const metric = (label, value) => {
+        const item = ledgerNode25('span');
+        item.append(ledgerNode25('small', '', label), ledgerNode25('b', '', moneyLedger25(value)));
+        return item;
+      };
+      row.append(
+        metric(pot.archived ? 'Begroot toen verwijderd' : 'Begroot / mnd', pot.plannedCents),
+        metric('Toegewezen totaal', assigned),
+        metric('Uitgegeven deze maand', spent),
+        metric('Saldo nu', balance)
+      );
+      potRows.append(row);
+    });
+    potSection.append(allPots.length ? potRows
+      : ledgerNode25('p', 'muted', 'Voeg eerst potjes of spaardoelen toe in de bestaande budgetplanning.'));
+    section.append(potSection);
+
+    const incomeRows = ledgerNode25('div', 'ledger-history25');
+    summary.incomes.forEach(income => {
+      const allocated = (income.allocations || []).reduce((sum, allocation) => sum + Number(allocation.amountCents || 0), 0);
+      const row = ledgerNode25('article', 'ledger-entry25');
+      const details = ledgerNode25('div');
+      const type = income.type === 'salary' ? 'Salaris' : income.type === 'benefit' ? 'Toeslag' : 'Overige inkomsten';
+      details.append(ledgerNode25('strong', '', `${income.source} · ${type}`),
+        ledgerNode25('small', '', `${income.date} · maand ${income.month || income.date.slice(0, 7)}${income.description ? ` · ${income.description}` : ''}`));
+      if (income.allocations?.length) {
+        const allocationList = ledgerNode25('ul');
+        income.allocations.forEach(allocation => {
+          const pot = allPots.find(item => item.id === allocation.potId);
+          const item = ledgerNode25('li', '', `${pot?.label || 'Verwijderd potje'} · ${moneyLedger25(allocation.amountCents)} `);
+          item.append(ledgerButton25('Verwijderen', 'text-btn', 'button', {
+            'data-ledger-delete-allocation': income.id,
+            'data-allocation-id': allocation.id
+          }));
+          allocationList.append(item);
+        });
+        details.append(allocationList);
+      }
+      details.append(ledgerNode25('small', '', `Nog te verdelen: ${moneyLedger25(Number(income.amountCents || 0) - allocated)}`));
+      const actions = ledgerNode25('span', 'ledger-actions25');
+      actions.append(
+        ledgerButton25('Corrigeren', 'secondary', 'button', { 'data-ledger-edit-kind': 'incomes', 'data-entry-id': income.id }),
+        ledgerButton25('Verwijderen', 'secondary', 'button', { 'data-ledger-delete-kind': 'incomes', 'data-entry-id': income.id })
+      );
+      row.append(details, ledgerNode25('b', '', moneyLedger25(income.amountCents)), actions);
+      incomeRows.append(row);
+    });
+    if (!summary.incomes.length) incomeRows.append(ledgerNode25('p', 'muted', 'Geen inkomsten geboekt voor deze maand.'));
+    section.append(historySection(`Inkomsten van ${ledgerMonth25}`, incomeRows));
+
+    const expenseRows = ledgerNode25('div', 'ledger-history25');
+    summary.expenses.forEach(expense => {
+      const pot = allPots.find(item => item.id === expense.potId);
+      const details = ledgerNode25('div');
+      details.append(ledgerNode25('strong', '', expense.description),
+        ledgerNode25('small', '', `${expense.date} · ${expense.category} · ${pot?.label || 'Verwijderd potje'}${expense.person ? ` · ${expense.person}` : ''}`));
+      const actions = ledgerNode25('span', 'ledger-actions25');
+      actions.append(
+        ledgerButton25('Corrigeren', 'secondary', 'button', { 'data-ledger-edit-kind': 'expenses', 'data-entry-id': expense.id }),
+        ledgerButton25('Verwijderen', 'secondary', 'button', { 'data-ledger-delete-kind': 'expenses', 'data-entry-id': expense.id })
+      );
+      const row = ledgerNode25('article', 'ledger-entry25');
+      row.append(details, ledgerNode25('b', '', `− ${moneyLedger25(expense.amountCents)}`), actions);
+      expenseRows.append(row);
+    });
+    if (!summary.expenses.length) expenseRows.append(ledgerNode25('p', 'muted', 'Geen uitgaven geboekt voor deze maand.'));
+    section.append(historySection(`Uitgaven van ${ledgerMonth25}`, expenseRows));
+
+    const transferRows = ledgerNode25('div', 'ledger-history25');
+    summary.transfers.forEach(transfer => {
+      const from = allPots.find(item => item.id === transfer.fromPotId);
+      const to = allPots.find(item => item.id === transfer.toPotId);
+      const details = ledgerNode25('div');
+      details.append(ledgerNode25('strong', '', `${from?.label || 'Verwijderd potje'} → ${to?.label || 'Verwijderd potje'}`),
+        ledgerNode25('small', '', `${transfer.date}${transfer.description ? ` · ${transfer.description}` : ''}`));
+      const actions = ledgerNode25('span', 'ledger-actions25');
+      actions.append(
+        ledgerButton25('Corrigeren', 'secondary', 'button', { 'data-ledger-edit-kind': 'transfers', 'data-entry-id': transfer.id }),
+        ledgerButton25('Verwijderen', 'secondary', 'button', { 'data-ledger-delete-kind': 'transfers', 'data-entry-id': transfer.id })
+      );
+      const row = ledgerNode25('article', 'ledger-entry25');
+      row.append(details, ledgerNode25('b', '', moneyLedger25(transfer.amountCents)), actions);
+      transferRows.append(row);
+    });
+    if (!summary.transfers.length) transferRows.append(ledgerNode25('p', 'muted', 'Geen verschuivingen geboekt voor deze maand.'));
+    section.append(historySection(`Verschuivingen van ${ledgerMonth25}`, transferRows));
+    section.append(ledgerNode25('p', 'small-note',
+      'Boekingen worden in de bestaande huishoudopslag bewaard en via de huidige versleutelde huishoudsynchronisatie gedeeld. Dit registreert bedragen; het voert geen bankbetalingen uit.'));
+    return section;
   }
 
   let offerQuery25 = '';
@@ -6250,9 +6833,9 @@ document.addEventListener('click', event => {
     localStorage.setItem(AUTH_KEY25, JSON.stringify(authSession25));
     return authSession25;
   }
-  function uiDefault25() { return { theme: 'system', accent: 'purple', density: 'comfortable' }; }
+  function uiDefault25() { return { theme: 'system', accent: 'purple', accentColor: '#7057d9', density: 'comfortable' }; }
   function setPersonalPreferences25(value) {
-    const normalized = personalPreferencesCore25?.normalize(value, DASH_DEFAULTS, dashboardCore) || value || {};
+    const normalized = personalPreferencesCore25?.normalize(value, DASH_DEFAULTS, dashboardCore, DASH_DEFAULT_VISIBLE) || value || {};
     window.SamenThuisPersonalUi20?.set(normalized.ui || uiDefault25());
     window.SamenThuisDashboardPreferences25?.set(normalized.dashboard || dashboardCore?.defaults(DASH_DEFAULTS));
   }
@@ -6432,6 +7015,9 @@ document.addEventListener('click', event => {
     const result = previousRender25(...args);
     requestAnimationFrame(() => {
       applyDashboard25();
+      if (current === 'budget19' && !document.querySelector('#view .ledger25')) {
+        document.querySelector('#view')?.append(ledgerMarkup25());
+      }
       const settings = document.querySelector('#view .settings-grid');
       if (current === 'settings' && settings && !settings.querySelector('.dashboard-editor25')) {
         settings.insertAdjacentHTML('beforeend', dashboardEditor25());
@@ -6453,6 +7039,35 @@ document.addEventListener('click', event => {
   };
 
   document.addEventListener('click', event => {
+    if (event.target.closest('[data-ledger-cancel-edit]')) {
+      ledgerEdit25 = null; render(); return;
+    }
+    const editLedger = event.target.closest('[data-ledger-edit-kind]');
+    if (editLedger) {
+      ledgerEdit25 = { kind: editLedger.dataset.ledgerEditKind, id: editLedger.dataset.entryId };
+      render(); return;
+    }
+    const deleteAllocation = event.target.closest('[data-ledger-delete-allocation]');
+    if (deleteAllocation) {
+      const ledger = ledgerState25(), income = ledger.incomes.find(item => item.id === deleteAllocation.dataset.ledgerDeleteAllocation);
+      if (!income || !confirm('Deze pottoewijzing verwijderen? De inkomstenboeking blijft staan en het bedrag wordt weer niet-toegewezen.')) return;
+      ledgerCore25.removeAllocation(ledger, income.id, deleteAllocation.dataset.allocationId);
+      syncGoalMirrors25(ledger);
+      save(); render(); return;
+    }
+    const deleteLedger = event.target.closest('[data-ledger-delete-kind]');
+    if (deleteLedger) {
+      const kind = deleteLedger.dataset.ledgerDeleteKind, ledger = ledgerState25();
+      const entry = ledger[kind]?.find(item => item.id === deleteLedger.dataset.entryId);
+      if (!entry) return;
+      const note = kind === 'incomes' ? ' De bijbehorende toewijzingen verdwijnen ook; reeds geboekte uitgaven blijven zichtbaar.'
+        : kind === 'expenses' ? ' Het huishoud- en potjessaldo wordt opnieuw berekend.'
+          : ' Het saldo wordt opnieuw berekend; het huishoudtotaal blijft gelijk.';
+      if (!confirm(`Deze ${kind === 'incomes' ? 'inkomstenboeking' : kind === 'expenses' ? 'uitgave' : 'verschuiving'} verwijderen?${note}`)) return;
+      ledgerCore25.removeEntry(ledger, kind, entry.id);
+      syncGoalMirrors25(ledger);
+      ledgerEdit25 = null; save(); render(); return;
+    }
     const favoriteOffer = event.target.closest('[data-offer-favorite]');
     if (favoriteOffer) {
       const key = favoriteOffer.dataset.offerFavorite;
@@ -6512,7 +7127,7 @@ document.addEventListener('click', event => {
     }
     const move = event.target.closest('[data-dashboard-move]');
     if (move) {
-      if (dashboardCore) dashboard25 = dashboardCore.move(dashboard25, move.dataset.dashboardMove, Number(move.dataset.direction), DASH_DEFAULTS);
+      if (dashboardCore) dashboard25 = dashboardCore.move(dashboard25, move.dataset.dashboardMove, Number(move.dataset.direction), DASH_DEFAULTS, DASH_DEFAULT_VISIBLE);
       else {
         const index = dashboard25.order.indexOf(move.dataset.dashboardMove);
         const next = index + Number(move.dataset.direction);
@@ -6523,12 +7138,17 @@ document.addEventListener('click', event => {
       return;
     }
     if (event.target.closest('[data-dashboard-reset]')) {
-      dashboard25 = { order: [...DASH_DEFAULTS], visible: Object.fromEntries(DASH_DEFAULTS.map(id => [id, true])) };
+      dashboard25 = normalizeDashboard25(null);
       saveDashboard25(); render();
     }
   });
 
   document.addEventListener('change', event => {
+    if (event.target.matches('[data-ledger-month]')) {
+      if (ledgerCore25.validMonth(event.target.value)) { ledgerMonth25 = event.target.value; ledgerEdit25 = null; render(); }
+      else toast('Kies een geldige maand.');
+      return;
+    }
     if (event.target.matches('[data-offer-filter]')) {
       offerFilters25[event.target.dataset.offerFilter] = event.target.value;
       render(); return;
@@ -6545,7 +7165,7 @@ document.addEventListener('click', event => {
     }
     const toggle = event.target.closest('[data-dashboard-visible]');
     if (!toggle) return;
-    if (dashboardCore) dashboard25 = dashboardCore.setVisible(dashboard25, toggle.dataset.dashboardVisible, toggle.checked, DASH_DEFAULTS);
+    if (dashboardCore) dashboard25 = dashboardCore.setVisible(dashboard25, toggle.dataset.dashboardVisible, toggle.checked, DASH_DEFAULTS, DASH_DEFAULT_VISIBLE);
     else dashboard25.visible[toggle.dataset.dashboardVisible] = toggle.checked;
     saveDashboard25();
     if (current === 'settings') render();
@@ -6553,6 +7173,102 @@ document.addEventListener('click', event => {
   });
 
   document.addEventListener('submit', event => {
+    const ledgerEditForm = event.target.closest('[data-ledger-edit]');
+    const ledgerForm = event.target.closest('[data-ledger-form]');
+    if (ledgerEditForm || ledgerForm) {
+      event.preventDefault();
+      const form = ledgerEditForm || ledgerForm;
+      const fields = Object.fromEntries(new FormData(form));
+      const budget = ledgerBudget25(), pots = ledgerPots25(budget), ledger = ledgerState25(budget, pots);
+      const allPots = ledgerPotHistory25(ledger, pots);
+      const submit = form.querySelector('button[type="submit"]');
+      if (submit) submit.disabled = true;
+      try {
+        if (ledgerEditForm) {
+          const kind = ledgerEditForm.dataset.ledgerEdit, entryId = ledgerEditForm.dataset.entryId;
+          const preview = clone(ledger);
+          try {
+            ledgerCore25.updateEntry(preview, kind, entryId, fields, allPots, { allowOverdraw: true });
+            if (kind !== 'incomes') {
+              const before = ledgerCore25.allPotBalances(ledger, allPots);
+              const after = ledgerCore25.allPotBalances(preview, allPots);
+              const newlyOverdrawn = Object.entries(after).filter(([potId, balance]) =>
+                balance < 0 && balance < (before[potId] || 0));
+              for (const [potId, balance] of newlyOverdrawn) {
+                const pot = allPots.find(item => item.id === potId);
+                if (!confirm(`Deze correctie leidt tot een negatief saldo van ${moneyLedger25(balance)} in ${pot?.label || 'een potje'}. Bewust doorgaan?`)) {
+                  if (submit) submit.disabled = false;
+                  return;
+                }
+              }
+            }
+          } catch (error) { throw error; }
+          ledgerCore25.updateEntry(ledger, kind, entryId, fields, allPots, { allowOverdraw: true });
+          syncGoalMirrors25(ledger);
+          ledgerEdit25 = null; save(); render(); toast('Boeking bijgewerkt'); return;
+        }
+        const action = ledgerForm.dataset.ledgerForm;
+        if (action === 'income') {
+          if (!confirm(`Inkomsten registreren: ${moneyLedger25(ledgerCore25.cents(fields.amount))} van ${String(fields.source).trim()}, geboekt in ${fields.month}?`)) {
+            if (submit) submit.disabled = false;
+            return;
+          }
+          ledgerCore25.addIncome(ledger, fields, pots);
+          syncGoalMirrors25(ledger);
+          toast('Inkomstenboeking opgeslagen');
+        } else if (action === 'allocation') {
+          const income = ledger.incomes.find(item => item.id === fields.incomeId);
+          if (!income) throw new Error('Deze inkomstenboeking bestaat niet meer.');
+          const pot = pots.find(item => item.id === fields.potId);
+          const amount = ledgerCore25.cents(fields.amount);
+          const already = (income.allocations || []).reduce((sum, item) => sum + Number(item.amountCents || 0), 0);
+          if (!confirm(`Verdeling controleren: ${moneyLedger25(amount)} van ${income.source} naar ${pot?.label || 'het potje'}. Daarna blijft ${moneyLedger25(Number(income.amountCents || 0) - already - amount)} van deze inkomstenboeking nog niet toegewezen. Dit is geen nieuwe inkomstenboeking. Definitief verdelen?`)) {
+            if (submit) submit.disabled = false;
+            return;
+          }
+          ledgerCore25.allocateIncome(ledger, fields, pots);
+          syncGoalMirrors25(ledger);
+          toast('Verdeling opgeslagen');
+        } else if (action === 'expense') {
+          try { ledgerCore25.addExpense(ledger, fields, pots); }
+          catch (error) {
+            if (error.code !== 'INSUFFICIENT_FUNDS') throw error;
+            const balance = ledgerCore25.allPotBalances(ledger, pots)[fields.potId] || 0;
+            if (!confirm(`${error.message} Het huidige saldo is ${moneyLedger25(balance)}; de boeking maakt het saldo negatief. Bewust toch registreren?`)) {
+              if (submit) submit.disabled = false;
+              return;
+            }
+            ledgerCore25.addExpense(ledger, fields, pots, { allowOverdraw: true });
+          }
+          syncGoalMirrors25(ledger);
+          toast('Uitgave opgeslagen');
+        } else if (action === 'transfer') {
+          const preview = clone(ledger);
+          ledgerCore25.addTransfer(preview, fields, allPots, { allowOverdraw: true });
+          const amount = ledgerCore25.cents(fields.amount);
+          const before = ledgerCore25.allPotBalances(ledger, allPots);
+          const after = ledgerCore25.allPotBalances(preview, allPots);
+          const source = allPots.find(item => item.id === fields.fromPotId);
+          const destination = allPots.find(item => item.id === fields.toPotId);
+          if (!confirm(`Controleer verschuiving: ${moneyLedger25(amount)} van ${source?.label || 'bronpotje'} (${moneyLedger25(before[fields.fromPotId] || 0)} → ${moneyLedger25(after[fields.fromPotId] || 0)}) naar ${destination?.label || 'doelpotje'} (${moneyLedger25(before[fields.toPotId] || 0)} → ${moneyLedger25(after[fields.toPotId] || 0)}). Huishoudsaldo blijft ${moneyLedger25(ledgerCore25.availableCashCents(ledger))}. Definitief verschuiven?`)) {
+            if (submit) submit.disabled = false;
+            return;
+          }
+          if ((before[fields.fromPotId] || 0) < amount && !confirm(`Waarschuwing: het bronpotje krijgt een negatief saldo van ${moneyLedger25(after[fields.fromPotId] || 0)}. Bewust doorgaan?`)) {
+            if (submit) submit.disabled = false;
+            return;
+          }
+          ledgerCore25.addTransfer(ledger, fields, allPots, { allowOverdraw: true });
+          syncGoalMirrors25(ledger);
+          toast('Verschuiving opgeslagen');
+        }
+        save(); render();
+      } catch (error) {
+        if (submit) submit.disabled = false;
+        toast(error.message || 'De boeking kon niet worden opgeslagen.');
+      }
+      return;
+    }
     const offerForm = event.target.closest('[data-offer-search]');
     if (offerForm) {
       event.preventDefault();
