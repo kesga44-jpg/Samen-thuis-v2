@@ -1713,12 +1713,66 @@ html[data-theme20="dark"] .mobile-nav-scroll23>button.active,html[data-theme19="
 .dashboard-page-widget25 a{flex:0 0 auto;color:var(--blue);text-decoration:none}
 html[data-accent20="custom"] body.st-glass20 .primary,
 html[data-accent20="custom"] body.st-glass20 button.primary{
+  background:var(--accent-button-bg,var(--blue))!important;
   color:var(--accent-button-text,#fff)!important;
   -webkit-text-fill-color:var(--accent-button-text,#fff)!important;
+}
+html[data-accent20="custom"] .sidebar .nav-item.active{
+  background:var(--accent-button-bg,var(--blue))!important;
+  color:var(--accent-button-text,#fff)!important;
+}
+html[data-accent20="custom"] .mobile-nav23 button.active{
+  background:var(--accent-button-bg,var(--blue))!important;
+  color:var(--accent-button-text,#fff)!important;
+  -webkit-text-fill-color:var(--accent-button-text,#fff)!important;
+}
+.ledger25{display:grid;gap:18px;margin-top:18px}
+.ledger25 .card-head{align-items:flex-start;gap:14px;flex-wrap:wrap;margin-bottom:0}
+.ledger25 h2,.ledger25 h3{margin:0}
+.ledger-month25{display:grid;gap:5px;font-size:.82rem;font-weight:700}
+.ledger-month25 input,.ledger-form25 input,.ledger-form25 select{min-width:0;min-height:42px;padding:9px 10px;border:1px solid var(--line);border-radius:9px;background:var(--paper);color:var(--ink)}
+.ledger-kpis25{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}
+.ledger-kpis25 article,.ledger-pot25{display:grid;gap:5px;padding:13px;border:1px solid var(--line);border-radius:12px;background:var(--paper)}
+.ledger-kpis25 small,.ledger-pot25 small{color:var(--muted);font-size:.75rem}
+.ledger-kpis25 b{font-size:1.12rem}
+.ledger-negative25{color:var(--red)!important}
+.ledger-plan25{margin:0;padding:12px;border-left:4px solid var(--blue);border-radius:5px;background:var(--blue-soft);font-size:.88rem}
+.ledger-section25{display:grid;gap:10px;padding-top:14px;border-top:1px solid var(--line)}
+.ledger-forms25{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.ledger-form25{display:grid;align-content:start;gap:12px;padding:15px;border:1px solid var(--line);border-radius:13px;background:var(--bg)}
+.ledger-form25 h3{font-size:1rem}
+.ledger-form25 label{display:grid;gap:5px;font-size:.8rem;font-weight:700}
+.ledger-fields25{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.ledger-wide25{grid-column:1/-1}
+.ledger-pot25{grid-template-columns:minmax(120px,1.4fr) repeat(4,minmax(105px,1fr));align-items:center;margin-top:8px}
+.ledger-pot25 h3{font-size:.94rem}
+.ledger-pot25 span{display:grid;gap:4px}
+.ledger-pot25.is-negative{border-color:var(--red);background:var(--red-soft,#fce8ea)}
+.ledger-history25{display:grid;gap:8px}
+.ledger-entry25{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:12px;padding:12px;border:1px solid var(--line);border-radius:11px;background:var(--paper)}
+.ledger-entry25>div{min-width:0}
+.ledger-entry25 strong,.ledger-entry25 small{display:block;overflow-wrap:anywhere}
+.ledger-entry25 small{margin-top:3px;color:var(--muted);font-size:.76rem}
+.ledger-entry25 ul{display:grid;gap:2px;padding-left:18px;margin:5px 0}
+.ledger-entry25 li{font-size:.8rem}
+.ledger-actions25{display:flex;gap:6px}
+.ledger-actions25 .secondary{padding:7px 9px;font-size:.78rem}
+.ledger-form25 button:disabled{opacity:.55;cursor:wait}
+@media(max-width:850px){
+  .ledger-kpis25{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .ledger-pot25{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .ledger-pot25>div{grid-column:1/-1}
 }
 @media(max-width:650px){
   .accent-control20{grid-template-columns:1fr 52px}
   .accent-preview20{grid-column:1/-1}
   .dashboard-page-widget25{align-items:flex-start;flex-direction:column}
   .dashboard-page-widget25 a{width:100%;text-align:center}
+  .ledger-forms25,.ledger-fields25{grid-template-columns:1fr}
+  .ledger-kpis25{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .ledger-pot25{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .ledger-entry25{grid-template-columns:minmax(0,1fr) auto}
+  .ledger-entry25> b{grid-column:2;grid-row:1}
+  .ledger-actions25{grid-column:1/-1;width:100%}
+  .ledger-actions25 button{flex:1}
 }

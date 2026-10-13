@@ -5005,22 +5005,32 @@ function apply20(){
   html.style.colorScheme = dark ? 'dark' : 'light';
   const hex = /^#[0-9a-f]{6}$/i.test(ui20.accentColor || '') ? ui20.accentColor : FALLBACK20.accentColor;
   const channels = value => [1, 3, 5].map(i => parseInt(value.slice(i, i + 2), 16));
-  const mix = (rgb, target, amount) => '#' + rgb.map(c => Math.round(c + (target - c) * amount).toString(16).padStart(2, '0')).join('');
+  const mix = (rgb, target, amount) => '#' + rgb.map((c, index) =>
+    Math.round(c + ((Array.isArray(target) ? target[index] : target) - c) * amount).toString(16).padStart(2, '0')).join('');
   const luminance = value => channels(value).map(c => {
     const normalized = c / 255;
     return normalized <= 0.04045 ? normalized / 12.92 : ((normalized + 0.055) / 1.055) ** 2.4;
   }).reduce((sum, c, index) => sum + c * [0.2126, 0.7152, 0.0722][index], 0);
-  const baseLum = luminance(hex);
   const baseRgb = channels(hex);
-  const accent = dark ? mix(baseRgb, 255, baseLum < 0.5 ? 0.45 : 0) : mix(baseRgb, 0, baseLum > 0.65 ? 0.45 : 0);
-  const adjustedLum = luminance(accent);
-  const whiteContrast = 1.05 / (adjustedLum + 0.05);
-  const darkContrast = (adjustedLum + 0.05) / 0.05;
-  html.style.setProperty('--blue', accent);
-  html.style.setProperty('--blue-soft', mix(baseRgb, 255, 0.88));
-  html.style.setProperty('--dark-accent-text', mix(baseRgb, 255, baseLum < 0.6 ? 0.55 : 0.2));
+  const contrast = (foreground, background) => {
+    const [a, b] = [luminance(foreground), luminance(background)].sort((x, y) => y - x);
+    return (a + 0.05) / (b + 0.05);
+  };
+  const readableOn = (background, target) => {
+    for (let amount = 0; amount <= 1; amount += 0.01) {
+      const candidate = mix(baseRgb, target, amount);
+      if (contrast(candidate, background) >= 4.5) return candidate;
+    }
+    return target === 0 ? '#000000' : '#ffffff';
+  };
+  const darkSurface = '#0d273e';
+  const accentText = contrast('#ffffff', hex) >= contrast('#17243a', hex) ? '#ffffff' : '#17243a';
+  html.style.setProperty('--blue', readableOn(dark ? darkSurface : '#ffffff', dark ? 255 : 0));
+  html.style.setProperty('--blue-soft', mix(baseRgb, dark ? channels(darkSurface) : 255, 0.88));
+  html.style.setProperty('--dark-accent-text', readableOn(darkSurface, 255));
   html.style.setProperty('--dark-muted-text', '#c7d8e8');
-  html.style.setProperty('--accent-button-text', whiteContrast >= darkContrast ? '#ffffff' : '#17243a');
+  html.style.setProperty('--accent-button-bg', hex);
+  html.style.setProperty('--accent-button-text', accentText);
   html.dataset.accent20 = html.dataset.accent19 = 'custom';
   document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark ? '#081b2d' : '#eef3f9');
 }
@@ -5953,9 +5963,11 @@ document.addEventListener('click', event => {
       'tab-agenda': ['planning', 'Agenda', `${(data.planning || []).filter(item => item.date >= todayISO()).length} komende afspraken`],
       'tab-tasks': ['tasks', 'Taken', `${(data.tasks || []).filter(item => !item.done).length} open taken`],
       'tab-groceries': ['groceries', 'Boodschappen', `${(data.groceries || []).filter(item => !item.done).length} boodschappen open`],
-      'tab-stock': ['stock', 'Voorraad', `${(data.stock || []).filter(item => Number(item.amount || 0) <= Number(item.min ?? item.minimum ?? 0)).length} producten op of onder minimum`],
+      'tab-stock': ['stock', 'Voorraad', `${(data.stock || []).filter(item => Number(item.min ?? item.minimum ?? 0) > 0 && Number(item.amount || 0) <= Number(item.min ?? item.minimum ?? 0)).length} producten op of onder minimum`],
       'tab-offers': ['offers', 'Aanbiedingen', `${(data.offers25 || []).length} bewaarde aanbiedingen`],
-      'tab-budget19': ['budget19', 'Budget', data.budgetV23 ? 'Bekijk planning, potjes en spaardoelen' : 'Bekijk je budgetoverzicht'],
+      'tab-budget19': ['budget19', 'Budget', data.budgetV23?.financialLedger
+        ? `Huishoudsaldo ${moneyLedger25(ledgerCore25.availableCashCents(ledgerCore25.normalize(data.budgetV23.financialLedger)))} · zie potjes en planning`
+        : 'Bekijk planning, potjes en spaardoelen'],
       'tab-meals': ['meals', 'Weekmenu', (data.meals || []).find(item => item.date === todayISO() && /avond/i.test(item.type || item.mealType || ''))?.title || 'Geen diner voor vandaag gepland'],
       'tab-chores': ['chores', 'Huishouden', `${(data.chores || []).filter(item => !item.done).length} open huishoudtaken`],
       'tab-challenges': ['challenges', 'Challenges', 'Bekijk de gezamenlijke challenges'],
@@ -5992,6 +6004,232 @@ document.addEventListener('click', event => {
       node.hidden = !dashboard25.visible[id];
       grid.append(node);
     });
+  }
+
+  let ledgerMonth25 = todayISO().slice(0, 7);
+  let ledgerEdit25 = null;
+  const ledgerCore25 = window.SamenThuisBudgetLedger;
+  const moneyLedger25 = value => new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' }).format((Number(value) || 0) / 100);
+  const decimalLedger25 = value => (Number(value || 0) / 100).toFixed(2);
+  const plannedMonthlyLedger25 = item => {
+    const divisor = item.period === 'jaar' || item.period === 'yearly' ? 12
+      : item.period === 'kwartaal' || item.period === 'quarterly' ? 3 : 1;
+    return Math.round((Number(item.amount || 0) / divisor) * 100);
+  };
+
+  function ledgerBudget25() {
+    const budget = data.budgetV23 || {};
+    budget.houseCategories = Array.isArray(budget.houseCategories) ? budget.houseCategories : [];
+    budget.fixed = Array.isArray(budget.fixed) ? budget.fixed : [];
+    budget.goals = Array.isArray(budget.goals) ? budget.goals : [];
+    return budget;
+  }
+
+  function ledgerPots25(budget = ledgerBudget25()) {
+    const pots = [];
+    budget.houseCategories.forEach((item, index) => pots.push({
+      id: `category:${item.id || String(item.title || `huisbudget-${index}`).toLocaleLowerCase('nl-NL')}`,
+      label: item.title || `Huisbudget ${index + 1}`, kind: 'house',
+      plannedCents: Math.round((Number(item.amount) || 0) * 100)
+    }));
+    budget.fixed.forEach((item, index) => pots.push({
+      id: `fixed:${item.id || String(item.title || `last-${index}`).toLocaleLowerCase('nl-NL')}`,
+      label: item.title || `Vaste last ${index + 1}`, kind: 'fixed',
+      plannedCents: plannedMonthlyLedger25(item)
+    }));
+    budget.goals.forEach((item, index) => pots.push({
+      id: `goal:${item.id || String(item.title || `doel-${index}`).toLocaleLowerCase('nl-NL')}`,
+      label: item.title || `Spaardoel ${index + 1}`, kind: 'goal',
+      plannedCents: Math.round((Number(item.monthly) || 0) * 100)
+    }));
+    return pots;
+  }
+
+  function ledgerState25(budget = ledgerBudget25(), pots = ledgerPots25(budget)) {
+    if (!ledgerCore25) return null;
+    const current = budget.financialLedger;
+    const ledger = ledgerCore25.normalize(current);
+    let changed = !current || !Array.isArray(current.incomes) || !Array.isArray(current.expenses)
+      || !Array.isArray(current.transfers) || !current.openingBalances || !current.goalSnapshots || !current.potSnapshots;
+    const activePotIds = new Set(pots.map(pot => pot.id));
+    pots.forEach(pot => {
+      const previous = ledger.potSnapshots[pot.id];
+      const next = { label: pot.label, kind: pot.kind, plannedCents: pot.plannedCents, active: true };
+      if (!previous || previous.label !== next.label || previous.kind !== next.kind
+        || previous.plannedCents !== next.plannedCents || previous.active !== true) changed = true;
+      ledger.potSnapshots[pot.id] = next;
+    });
+    Object.keys(ledger.potSnapshots).forEach(potId => {
+      if (activePotIds.has(potId)) return;
+      if (ledger.potSnapshots[potId].active !== false) changed = true;
+      ledger.potSnapshots[potId] = { ...ledger.potSnapshots[potId], active: false };
+    });
+    Object.keys(ledgerCore25.allPotBalances(ledger, pots)).forEach(potId => {
+      if (ledger.potSnapshots[potId]) return;
+      ledger.potSnapshots[potId] = { label: 'Verwijderd potje', kind: 'archived', plannedCents: 0, active: false };
+      changed = true;
+    });
+    budget.goals.forEach((goal, index) => {
+      const pot = pots.find(item => item.id === `goal:${goal.id || String(goal.title || `doel-${index}`).toLocaleLowerCase('nl-NL')}`);
+      if (!pot) return;
+      const saved = window.SamenThuisSavings?.balance(goal) ?? Number(goal.current || 0);
+      const balance = Math.round((Number(saved) || 0) * 100);
+      const key = String(goal.id || pot.id);
+      if (!Object.hasOwn(ledger.goalSnapshots, key)) {
+        ledger.goalSnapshots[key] = balance;
+        if (!Object.hasOwn(ledger.openingBalances, pot.id)) ledger.openingBalances[pot.id] = balance;
+        changed = true;
+      } else {
+        const previous = Number(ledger.goalSnapshots[key]) || 0;
+        if (previous !== balance) {
+          ledger.openingBalances[pot.id] = (Number(ledger.openingBalances[pot.id]) || 0) + balance - previous;
+          ledger.goalSnapshots[key] = balance;
+          changed = true;
+        }
+      }
+    });
+    budget.financialLedger = ledger;
+    if (changed) save({ touch: false });
+    return ledger;
+  }
+
+  function ledgerPotHistory25(ledger, activePots) {
+    const activeIds = new Set(activePots.map(pot => pot.id));
+    const balances = ledgerCore25.allPotBalances(ledger, activePots);
+    const ids = new Set([...Object.keys(ledger.potSnapshots || {}), ...Object.keys(balances)]);
+    return [...activePots, ...[...ids].filter(id => !activeIds.has(id)).map(id => ({
+      id, ...(ledger.potSnapshots[id] || { label: 'Verwijderd potje', kind: 'archived', plannedCents: 0 }),
+      archived: true
+    }))];
+  }
+
+  function syncGoalMirrors25(ledger, budget = ledgerBudget25()) {
+    const savings = window.SamenThuisSavings;
+    if (!savings) return;
+    const movements = new Map();
+    const addMovement = (potId, amountCents, date, key, note) => {
+      if (!String(potId || '').startsWith('goal:') || !amountCents) return;
+      const goal = budget.goals.find((item, index) =>
+        `goal:${item.id || String(item.title || `doel-${index}`).toLocaleLowerCase('nl-NL')}` === potId);
+      if (!goal) return;
+      const goalId = String(goal.id || potId);
+      if (!movements.has(goalId)) movements.set(goalId, []);
+      movements.get(goalId).push({
+        id: `budget-ledger:${key}`, externalId: `budget-ledger:${key}`,
+        amount: Number(amountCents) / 100, date, note, source: 'budget-ledger'
+      });
+    };
+    ledger.incomes.forEach(income => (income.allocations || []).forEach(allocation =>
+      addMovement(allocation.potId, allocation.amountCents, income.date, `allocation:${allocation.id}`, `Toewijzing van ${income.source}`)));
+    ledger.expenses.forEach(expense =>
+      addMovement(expense.potId, -Number(expense.amountCents || 0), expense.date, `expense:${expense.id}`, expense.description));
+    ledger.transfers.forEach(transfer => {
+      addMovement(transfer.fromPotId, -Number(transfer.amountCents || 0), transfer.date, `transfer-out:${transfer.id}`, transfer.description || 'Interne verschuiving');
+      addMovement(transfer.toPotId, Number(transfer.amountCents || 0), transfer.date, `transfer-in:${transfer.id}`, transfer.description || 'Interne verschuiving');
+    });
+    budget.goals.forEach(goal => {
+      goal.deposits = Array.isArray(goal.deposits) ? goal.deposits : [];
+      const retained = goal.deposits.filter(deposit => !String(deposit.externalId || '').startsWith('budget-ledger:'));
+      const expected = movements.get(String(goal.id)) || [];
+      goal.deposits = [...retained, ...expected.map(movement => ({
+        ...movement,
+        amount: Math.round(movement.amount * 100) / 100,
+        sig: `${movement.date}|${movement.amount}|${movement.note.toLowerCase()}|${movement.source}`
+      }))];
+      const goalBalance = savings.balance(goal);
+      ledger.goalSnapshots[String(goal.id)] = Math.round(goalBalance * 100);
+    });
+  }
+
+  function ledgerEditFormMarkup25(ledger, pots) {
+    if (!ledgerEdit25) return '';
+    const { kind, id: entryId } = ledgerEdit25;
+    const entry = ledger[kind]?.find(item => item.id === entryId);
+    if (!entry) { ledgerEdit25 = null; return ''; }
+    const select = (name, selected, label) => `<label>${label}<select name="${name}" required>${pots.map(pot =>
+      `<option value="${esc(pot.id)}" ${pot.id === selected ? 'selected' : ''}>${esc(pot.label)}</option>`).join('')}</select></label>`;
+    const common = `<label>Bedrag (€)<input name="amount" type="number" step="0.01" min="0.01" inputmode="decimal" value="${decimalLedger25(entry.amountCents)}" required></label><label>Datum<input name="date" type="date" value="${esc(entry.date)}" required></label>`;
+    let fields = common;
+    if (kind === 'incomes') {
+      fields += `<label>Boekingsmaand<input name="month" type="month" value="${esc(entry.month || entry.date.slice(0, 7))}" required></label><label>Persoon / bron<input name="source" value="${esc(entry.source || '')}" required maxlength="80"></label><label class="ledger-wide25">Omschrijving<input name="description" value="${esc(entry.description || '')}" maxlength="160"></label>`;
+    } else if (kind === 'expenses') {
+      fields += `<label>Categorie<select name="category" required>${['Boodschappen', 'Tanken', 'Vaste lasten', 'Abonnementen', 'Persoonlijk', 'Huishouden', 'Overig'].map(category => `<option ${category === entry.category ? 'selected' : ''}>${category}</option>`).join('')}</select></label>${select('potId', entry.potId, 'Potje')}<label>Persoon (optioneel)<input name="person" value="${esc(entry.person || '')}" maxlength="80"></label><label class="ledger-wide25">Omschrijving<input name="description" value="${esc(entry.description || '')}" required maxlength="160"></label>`;
+    } else {
+      fields += `${select('fromPotId', entry.fromPotId, 'Van potje')}${select('toPotId', entry.toPotId, 'Naar potje')}<label class="ledger-wide25">Omschrijving<input name="description" value="${esc(entry.description || '')}" maxlength="160"></label>`;
+    }
+    return `<form class="ledger-form25" data-ledger-edit="${kind}" data-entry-id="${esc(entryId)}"><h3>Boeking corrigeren</h3><div class="ledger-fields25">${fields}</div><div class="button-row"><button class="primary" type="submit">Wijziging controleren</button><button class="secondary" type="button" data-ledger-cancel-edit>Annuleren</button></div></form>`;
+  }
+
+  function ledgerMarkup25() {
+    const budget = ledgerBudget25(), pots = ledgerPots25(budget), ledger = ledgerState25(budget, pots);
+    if (!ledger) return '<section class="card"><p role="alert">De financiële administratie is niet beschikbaar in deze browser.</p></section>';
+    const allPots = ledgerPotHistory25(ledger, pots);
+    const summary = ledgerCore25.monthSummary(ledger, ledgerMonth25, allPots);
+    const balances = summary.potBalances;
+    const allocationsForPot = potId => ledger.incomes.reduce((sum, income) =>
+      sum + (income.allocations || []).filter(item => item.potId === potId).reduce((n, item) => n + Number(item.amountCents || 0), 0), 0);
+    const monthlyPlan = [...budget.fixed.map(plannedMonthlyLedger25),
+      ...budget.houseCategories.map(item => Math.round((Number(item.amount) || 0) * 100)),
+      ...budget.goals.map(item => Math.round((Number(item.monthly) || 0) * 100)),
+      Math.round((Number(budget.investing) || 0) * 100)].reduce((sum, value) => sum + value, 0);
+    const monthResult = summary.incomeCents - summary.expenseCents;
+    const totalPotBalances = Object.values(balances).reduce((sum, value) => sum + Number(value || 0), 0);
+    const unallocated = summary.cashBalanceCents - totalPotBalances;
+    const plannedContribution = budget.incomes && Number.isFinite(Number(budget.contributionPct))
+      ? Math.round((Number(budget.incomes.Kees || 0) + Number(budget.incomes.Daphne || 0))
+        * Math.max(0, Math.min(100, Number(budget.contributionPct))) * 100 / 100)
+      : null;
+    const plannedExternal = [...budget.fixed.map(plannedMonthlyLedger25),
+      ...budget.houseCategories.map(item => Math.round((Number(item.amount) || 0) * 100))]
+      .reduce((sum, value) => sum + value, 0);
+    const projection = ledgerMonth25 === todayISO().slice(0, 7) && plannedContribution !== null
+      ? summary.cashBalanceCents + Math.max(0, plannedContribution - summary.incomeCents)
+        - Math.max(0, plannedExternal - summary.expenseCents)
+      : null;
+    const potOptions = pots.map(pot => `<option value="${esc(pot.id)}">${esc(pot.label)}</option>`).join('');
+    const allPotOptions = allPots.map(pot => `<option value="${esc(pot.id)}">${esc(pot.label)}${pot.archived ? ' · verwijderd' : ''}</option>`).join('');
+    const ledgerDate = ledgerMonth25 === todayISO().slice(0, 7) ? todayISO() : `${ledgerMonth25}-01`;
+    const eligibleIncomes = ledger.incomes.filter(income => Number(income.amountCents || 0)
+      > (income.allocations || []).reduce((sum, allocation) => sum + Number(allocation.amountCents || 0), 0));
+    const incomeRows = summary.incomes.map(income => {
+      const allocated = (income.allocations || []).reduce((sum, allocation) => sum + Number(allocation.amountCents || 0), 0);
+      const allocations = (income.allocations || []).map(allocation => {
+        const pot = allPots.find(item => item.id === allocation.potId);
+        return `<li>${esc(pot?.label || 'Verwijderd potje')} · ${moneyLedger25(allocation.amountCents)} <button type="button" class="text-btn" data-ledger-delete-allocation="${esc(income.id)}" data-allocation-id="${esc(allocation.id)}">Verwijderen</button></li>`;
+      }).join('');
+      return `<article class="ledger-entry25"><div><strong>${esc(income.source)} · ${income.type === 'salary' ? 'Salaris' : income.type === 'benefit' ? 'Toeslag' : 'Overige inkomsten'}</strong><small>${esc(income.date)} · maand ${esc(income.month || income.date.slice(0, 7))}${income.description ? ` · ${esc(income.description)}` : ''}</small>${allocations ? `<ul>${allocations}</ul>` : ''}<small>Nog te verdelen: ${moneyLedger25(Number(income.amountCents || 0) - allocated)}</small></div><b>${moneyLedger25(income.amountCents)}</b><span class="ledger-actions25"><button type="button" class="secondary" data-ledger-edit-kind="incomes" data-entry-id="${esc(income.id)}">Corrigeren</button><button type="button" class="secondary" data-ledger-delete-kind="incomes" data-entry-id="${esc(income.id)}">Verwijderen</button></span></article>`;
+    }).join('') || '<p class="muted">Geen inkomsten geboekt voor deze maand.</p>';
+    const expenseRows = summary.expenses.map(expense => {
+      const pot = allPots.find(item => item.id === expense.potId);
+      return `<article class="ledger-entry25"><div><strong>${esc(expense.description)}</strong><small>${esc(expense.date)} · ${esc(expense.category)} · ${esc(pot?.label || 'Verwijderd potje')}${expense.person ? ` · ${esc(expense.person)}` : ''}</small></div><b>− ${moneyLedger25(expense.amountCents)}</b><span class="ledger-actions25"><button type="button" class="secondary" data-ledger-edit-kind="expenses" data-entry-id="${esc(expense.id)}">Corrigeren</button><button type="button" class="secondary" data-ledger-delete-kind="expenses" data-entry-id="${esc(expense.id)}">Verwijderen</button></span></article>`;
+    }).join('') || '<p class="muted">Geen uitgaven geboekt voor deze maand.</p>';
+    const transferRows = summary.transfers.map(transfer => {
+      const from = allPots.find(item => item.id === transfer.fromPotId), to = allPots.find(item => item.id === transfer.toPotId);
+      return `<article class="ledger-entry25"><div><strong>${esc(from?.label || 'Verwijderd potje')} → ${esc(to?.label || 'Verwijderd potje')}</strong><small>${esc(transfer.date)}${transfer.description ? ` · ${esc(transfer.description)}` : ''}</small></div><b>${moneyLedger25(transfer.amountCents)}</b><span class="ledger-actions25"><button type="button" class="secondary" data-ledger-edit-kind="transfers" data-entry-id="${esc(transfer.id)}">Corrigeren</button><button type="button" class="secondary" data-ledger-delete-kind="transfers" data-entry-id="${esc(transfer.id)}">Verwijderen</button></span></article>`;
+    }).join('') || '<p class="muted">Geen verschuivingen geboekt voor deze maand.</p>';
+    const potRows = allPots.map(pot => {
+      const balance = Number(balances[pot.id] || 0);
+      const assigned = Number(ledger.openingBalances[pot.id] || 0) + allocationsForPot(pot.id);
+      const spent = summary.expenses.filter(item => item.potId === pot.id).reduce((sum, item) => sum + Number(item.amountCents || 0), 0);
+      return `<article class="ledger-pot25 ${balance < 0 ? 'is-negative' : ''} ${pot.archived ? 'is-archived' : ''}"><div><h3>${esc(pot.label)}</h3><small>${pot.archived ? 'Verwijderd potje · verschuif het saldo naar een actief potje' : pot.kind === 'goal' ? 'Spaardoel' : pot.kind === 'fixed' ? 'Vaste last' : 'Huisbudget'}</small></div><span><small>${pot.archived ? 'Begroot toen verwijderd' : 'Begroot / mnd'}</small><b>${moneyLedger25(pot.plannedCents)}</b></span><span><small>Toegewezen totaal</small><b>${moneyLedger25(assigned)}</b></span><span><small>Uitgegeven deze maand</small><b>${moneyLedger25(spent)}</b></span><span><small>Saldo nu</small><b>${moneyLedger25(balance)}</b></span></article>`;
+    }).join('');
+    const savingsProposal = budget.goals.reduce((sum, goal) => sum + Math.round((Number(goal.monthly) || 0) * 100), 0);
+    const selectedEdit = ledgerEditFormMarkup25(ledger, allPots);
+    return `<section class="card ledger25"><div class="card-head"><div><p class="eyebrow">WERKELIJKHEID · APARTE BOEKINGEN</p><h2>Inkomsten, uitgaven & potjessaldi</h2></div><label class="ledger-month25">Maand<input type="month" data-ledger-month value="${esc(ledgerMonth25)}"></label></div><p class="muted">Deze administratie is aanvullend op het bestaande budgetplan. De geplande maandinleg, huisbudgetten en spaardoelen blijven ongewijzigd. Verdelingen en interne verschuivingen tellen niet als inkomsten.</p>
+      <div class="ledger-kpis25"><article><small>Inkomsten geboekt</small><b>${moneyLedger25(summary.incomeCents)}</b></article><article><small>Toegewezen uit inkomsten</small><b>${moneyLedger25(summary.allocatedCents)}</b></article><article><small>Werkelijk uitgegeven</small><b>${moneyLedger25(summary.expenseCents)}</b></article><article><small>Geregistreerd maandresultaat</small><b class="${monthResult < 0 ? 'ledger-negative25' : ''}">${moneyLedger25(monthResult)}</b></article><article><small>Huishoudsaldo nu</small><b class="${summary.cashBalanceCents < 0 ? 'ledger-negative25' : ''}">${moneyLedger25(summary.cashBalanceCents)}</b></article><article><small>Nog niet toegewezen</small><b class="${unallocated < 0 ? 'ledger-negative25' : ''}">${moneyLedger25(unallocated)}</b></article><article><small>Indicatie einde maand</small><b class="${projection !== null && projection < 0 ? 'ledger-negative25' : ''}">${projection === null ? '—' : moneyLedger25(projection)}</b></article></div>
+      <p class="ledger-plan25">Planning: ${moneyLedger25(monthlyPlan)} per maand (waaronder ${moneyLedger25(savingsProposal)} geplande spaardoelinleg) · Werkelijke uitgaven deze maand: ${moneyLedger25(summary.expenseCents)}. De indicatie voor deze maand gebruikt alleen het bestaande geplande huishoudinkomen en vaste/huislasten minus al geboekte bedragen; het is geen bankprognose. Eerdere maanden tonen alleen de geboekte werkelijkheid.</p>
+      <section class="ledger-section25"><h3>Registreren</h3><div class="ledger-forms25">
+        <form class="ledger-form25" data-ledger-form="income"><h3>Inkomen toevoegen</h3><div class="ledger-fields25"><label>Bedrag (€)<input name="amount" type="number" inputmode="decimal" min="0.01" step="0.01" required></label><label>Datum<input name="date" type="date" value="${ledgerDate}" required></label><label>Boekingsmaand<input name="month" type="month" value="${esc(ledgerMonth25)}" required></label><label>Type<select name="type"><option value="salary">Salaris</option><option value="benefit">Toeslag</option><option value="other">Overige inkomsten</option></select></label><label>Persoon / bron<input name="source" placeholder="Kees, Daphne, toeslag…" maxlength="80" required></label><label>Omschrijving (optioneel)<input name="description" maxlength="160"></label></div><button class="primary" type="submit">Inkomstenboeking controleren</button></form>
+        <form class="ledger-form25" data-ledger-form="allocation"><h3>Inkomen verdelen</h3>${eligibleIncomes.length ? `<div class="ledger-fields25"><label>Inkomstenboeking<select name="incomeId" required>${eligibleIncomes.map(income => `<option value="${esc(income.id)}">${esc(income.source)} · ${esc(income.date)} · nog ${moneyLedger25(Number(income.amountCents || 0) - (income.allocations || []).reduce((sum, item) => sum + Number(item.amountCents || 0), 0))}</option>`).join('')}</select></label><label>Potje<select name="potId" required>${potOptions}</select></label><label>Bedrag (€)<input name="amount" type="number" inputmode="decimal" min="0.01" step="0.01" required></label></div><button class="primary" type="submit">Verdeling controleren</button>` : '<p class="muted">Registreer eerst inkomsten met een nog niet verdeeld bedrag.</p>'}</form>
+        <form class="ledger-form25" data-ledger-form="expense"><h3>Werkelijke uitgave</h3><div class="ledger-fields25"><label>Bedrag (€)<input name="amount" type="number" inputmode="decimal" min="0.01" step="0.01" required></label><label>Datum<input name="date" type="date" value="${ledgerDate}" required></label><label>Categorie<select name="category">${['Boodschappen', 'Tanken', 'Vaste lasten', 'Abonnementen', 'Persoonlijk', 'Huishouden', 'Overig'].map(category => `<option>${category}</option>`).join('')}</select></label><label>Potje<select name="potId" required>${potOptions}</select></label><label>Persoon (optioneel)<input name="person" maxlength="80"></label><label>Omschrijving<input name="description" maxlength="160" required></label></div><button class="primary" type="submit">Uitgave controleren</button></form>
+        <form class="ledger-form25" data-ledger-form="transfer"><h3>Geld tussen potjes verschuiven</h3><div class="ledger-fields25"><label>Van potje<select name="fromPotId" required>${allPotOptions}</select></label><label>Naar potje<select name="toPotId" required>${allPotOptions}</select></label><label>Bedrag (€)<input name="amount" type="number" inputmode="decimal" min="0.01" step="0.01" required></label><label>Datum<input name="date" type="date" value="${ledgerDate}" required></label><label class="ledger-wide25">Omschrijving<input name="description" maxlength="160"></label></div><p class="small-note">Ook verwijderde potjes met resterend saldo blijven bereikbaar. Vooraf wordt de verschuiving getoond en bevestigd; het huishoudsaldo verandert niet.</p><button class="primary" type="submit">Verschuiving controleren</button></form>
+      </div></section>
+      ${selectedEdit}
+      <section class="ledger-section25"><div class="card-head"><h3>Potjes · saldo nu</h3><span class="small-note">Bestaande maandbudgetten blijven planning.</span></div>${potRows || '<p class="muted">Voeg eerst potjes of spaardoelen toe in de bestaande budgetplanning.</p>'}</section>
+      <section class="ledger-section25"><h3>Inkomsten van ${esc(ledgerMonth25)}</h3><div class="ledger-history25">${incomeRows}</div></section>
+      <section class="ledger-section25"><h3>Uitgaven van ${esc(ledgerMonth25)}</h3><div class="ledger-history25">${expenseRows}</div></section>
+      <section class="ledger-section25"><h3>Verschuivingen van ${esc(ledgerMonth25)}</h3><div class="ledger-history25">${transferRows}</div></section>
+      <p class="small-note">Boekingen worden in de bestaande huishoudopslag bewaard en via de huidige versleutelde huishoudsynchronisatie gedeeld. Dit registreert bedragen; het voert geen bankbetalingen uit.</p></section>`;
   }
 
   let offerQuery25 = '';
@@ -6512,6 +6750,9 @@ document.addEventListener('click', event => {
     const result = previousRender25(...args);
     requestAnimationFrame(() => {
       applyDashboard25();
+      if (current === 'budget19' && !document.querySelector('#view .ledger25')) {
+        document.querySelector('#view')?.insertAdjacentHTML('beforeend', ledgerMarkup25());
+      }
       const settings = document.querySelector('#view .settings-grid');
       if (current === 'settings' && settings && !settings.querySelector('.dashboard-editor25')) {
         settings.insertAdjacentHTML('beforeend', dashboardEditor25());
@@ -6533,6 +6774,35 @@ document.addEventListener('click', event => {
   };
 
   document.addEventListener('click', event => {
+    if (event.target.closest('[data-ledger-cancel-edit]')) {
+      ledgerEdit25 = null; render(); return;
+    }
+    const editLedger = event.target.closest('[data-ledger-edit-kind]');
+    if (editLedger) {
+      ledgerEdit25 = { kind: editLedger.dataset.ledgerEditKind, id: editLedger.dataset.entryId };
+      render(); return;
+    }
+    const deleteAllocation = event.target.closest('[data-ledger-delete-allocation]');
+    if (deleteAllocation) {
+      const ledger = ledgerState25(), income = ledger.incomes.find(item => item.id === deleteAllocation.dataset.ledgerDeleteAllocation);
+      if (!income || !confirm('Deze pottoewijzing verwijderen? De inkomstenboeking blijft staan en het bedrag wordt weer niet-toegewezen.')) return;
+      ledgerCore25.removeAllocation(ledger, income.id, deleteAllocation.dataset.allocationId);
+      syncGoalMirrors25(ledger);
+      save(); render(); return;
+    }
+    const deleteLedger = event.target.closest('[data-ledger-delete-kind]');
+    if (deleteLedger) {
+      const kind = deleteLedger.dataset.ledgerDeleteKind, ledger = ledgerState25();
+      const entry = ledger[kind]?.find(item => item.id === deleteLedger.dataset.entryId);
+      if (!entry) return;
+      const note = kind === 'incomes' ? ' De bijbehorende toewijzingen verdwijnen ook; reeds geboekte uitgaven blijven zichtbaar.'
+        : kind === 'expenses' ? ' Het huishoud- en potjessaldo wordt opnieuw berekend.'
+          : ' Het saldo wordt opnieuw berekend; het huishoudtotaal blijft gelijk.';
+      if (!confirm(`Deze ${kind === 'incomes' ? 'inkomstenboeking' : kind === 'expenses' ? 'uitgave' : 'verschuiving'} verwijderen?${note}`)) return;
+      ledgerCore25.removeEntry(ledger, kind, entry.id);
+      syncGoalMirrors25(ledger);
+      ledgerEdit25 = null; save(); render(); return;
+    }
     const favoriteOffer = event.target.closest('[data-offer-favorite]');
     if (favoriteOffer) {
       const key = favoriteOffer.dataset.offerFavorite;
@@ -6609,6 +6879,11 @@ document.addEventListener('click', event => {
   });
 
   document.addEventListener('change', event => {
+    if (event.target.matches('[data-ledger-month]')) {
+      if (ledgerCore25.validMonth(event.target.value)) { ledgerMonth25 = event.target.value; ledgerEdit25 = null; render(); }
+      else toast('Kies een geldige maand.');
+      return;
+    }
     if (event.target.matches('[data-offer-filter]')) {
       offerFilters25[event.target.dataset.offerFilter] = event.target.value;
       render(); return;
@@ -6633,6 +6908,102 @@ document.addEventListener('click', event => {
   });
 
   document.addEventListener('submit', event => {
+    const ledgerEditForm = event.target.closest('[data-ledger-edit]');
+    const ledgerForm = event.target.closest('[data-ledger-form]');
+    if (ledgerEditForm || ledgerForm) {
+      event.preventDefault();
+      const form = ledgerEditForm || ledgerForm;
+      const fields = Object.fromEntries(new FormData(form));
+      const budget = ledgerBudget25(), pots = ledgerPots25(budget), ledger = ledgerState25(budget, pots);
+      const allPots = ledgerPotHistory25(ledger, pots);
+      const submit = form.querySelector('button[type="submit"]');
+      if (submit) submit.disabled = true;
+      try {
+        if (ledgerEditForm) {
+          const kind = ledgerEditForm.dataset.ledgerEdit, entryId = ledgerEditForm.dataset.entryId;
+          const preview = clone(ledger);
+          try {
+            ledgerCore25.updateEntry(preview, kind, entryId, fields, allPots, { allowOverdraw: true });
+            if (kind !== 'incomes') {
+              const before = ledgerCore25.allPotBalances(ledger, allPots);
+              const after = ledgerCore25.allPotBalances(preview, allPots);
+              const newlyOverdrawn = Object.entries(after).filter(([potId, balance]) =>
+                balance < 0 && balance < (before[potId] || 0));
+              for (const [potId, balance] of newlyOverdrawn) {
+                const pot = allPots.find(item => item.id === potId);
+                if (!confirm(`Deze correctie leidt tot een negatief saldo van ${moneyLedger25(balance)} in ${pot?.label || 'een potje'}. Bewust doorgaan?`)) {
+                  if (submit) submit.disabled = false;
+                  return;
+                }
+              }
+            }
+          } catch (error) { throw error; }
+          ledgerCore25.updateEntry(ledger, kind, entryId, fields, allPots, { allowOverdraw: true });
+          syncGoalMirrors25(ledger);
+          ledgerEdit25 = null; save(); render(); toast('Boeking bijgewerkt'); return;
+        }
+        const action = ledgerForm.dataset.ledgerForm;
+        if (action === 'income') {
+          if (!confirm(`Inkomsten registreren: ${moneyLedger25(ledgerCore25.cents(fields.amount))} van ${String(fields.source).trim()}, geboekt in ${fields.month}?`)) {
+            if (submit) submit.disabled = false;
+            return;
+          }
+          ledgerCore25.addIncome(ledger, fields, pots);
+          syncGoalMirrors25(ledger);
+          toast('Inkomstenboeking opgeslagen');
+        } else if (action === 'allocation') {
+          const income = ledger.incomes.find(item => item.id === fields.incomeId);
+          if (!income) throw new Error('Deze inkomstenboeking bestaat niet meer.');
+          const pot = pots.find(item => item.id === fields.potId);
+          const amount = ledgerCore25.cents(fields.amount);
+          const already = (income.allocations || []).reduce((sum, item) => sum + Number(item.amountCents || 0), 0);
+          if (!confirm(`Verdeling controleren: ${moneyLedger25(amount)} van ${income.source} naar ${pot?.label || 'het potje'}. Daarna blijft ${moneyLedger25(Number(income.amountCents || 0) - already - amount)} van deze inkomstenboeking nog niet toegewezen. Dit is geen nieuwe inkomstenboeking. Definitief verdelen?`)) {
+            if (submit) submit.disabled = false;
+            return;
+          }
+          ledgerCore25.allocateIncome(ledger, fields, pots);
+          syncGoalMirrors25(ledger);
+          toast('Verdeling opgeslagen');
+        } else if (action === 'expense') {
+          try { ledgerCore25.addExpense(ledger, fields, pots); }
+          catch (error) {
+            if (error.code !== 'INSUFFICIENT_FUNDS') throw error;
+            const balance = ledgerCore25.allPotBalances(ledger, pots)[fields.potId] || 0;
+            if (!confirm(`${error.message} Het huidige saldo is ${moneyLedger25(balance)}; de boeking maakt het saldo negatief. Bewust toch registreren?`)) {
+              if (submit) submit.disabled = false;
+              return;
+            }
+            ledgerCore25.addExpense(ledger, fields, pots, { allowOverdraw: true });
+          }
+          syncGoalMirrors25(ledger);
+          toast('Uitgave opgeslagen');
+        } else if (action === 'transfer') {
+          const preview = clone(ledger);
+          ledgerCore25.addTransfer(preview, fields, allPots, { allowOverdraw: true });
+          const amount = ledgerCore25.cents(fields.amount);
+          const before = ledgerCore25.allPotBalances(ledger, allPots);
+          const after = ledgerCore25.allPotBalances(preview, allPots);
+          const source = allPots.find(item => item.id === fields.fromPotId);
+          const destination = allPots.find(item => item.id === fields.toPotId);
+          if (!confirm(`Controleer verschuiving: ${moneyLedger25(amount)} van ${source?.label || 'bronpotje'} (${moneyLedger25(before[fields.fromPotId] || 0)} → ${moneyLedger25(after[fields.fromPotId] || 0)}) naar ${destination?.label || 'doelpotje'} (${moneyLedger25(before[fields.toPotId] || 0)} → ${moneyLedger25(after[fields.toPotId] || 0)}). Huishoudsaldo blijft ${moneyLedger25(ledgerCore25.availableCashCents(ledger))}. Definitief verschuiven?`)) {
+            if (submit) submit.disabled = false;
+            return;
+          }
+          if ((before[fields.fromPotId] || 0) < amount && !confirm(`Waarschuwing: het bronpotje krijgt een negatief saldo van ${moneyLedger25(after[fields.fromPotId] || 0)}. Bewust doorgaan?`)) {
+            if (submit) submit.disabled = false;
+            return;
+          }
+          ledgerCore25.addTransfer(ledger, fields, allPots, { allowOverdraw: true });
+          syncGoalMirrors25(ledger);
+          toast('Verschuiving opgeslagen');
+        }
+        save(); render();
+      } catch (error) {
+        if (submit) submit.disabled = false;
+        toast(error.message || 'De boeking kon niet worden opgeslagen.');
+      }
+      return;
+    }
     const offerForm = event.target.closest('[data-offer-search]');
     if (offerForm) {
       event.preventDefault();

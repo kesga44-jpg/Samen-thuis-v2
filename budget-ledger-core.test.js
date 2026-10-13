@@ -21,7 +21,7 @@ test('income can be allocated once without increasing household cash twice', () 
   assert.equal(L.availableCashCents(ledger), 200000);
   assert.equal(L.allPotBalances(ledger, pots).groceries, 50000);
   assert.throws(() => L.addIncome(ledger, {
-    amount: '2000', date: '2026-10-01', type: 'salary', source: 'Kees'
+    amount: '1950', date: '2026-10-28', type: 'salary', source: 'kees'
   }, pots), /al geregistreerd/);
   assert.throws(() => L.allocateIncome(ledger, {
     incomeId: 'salary', potId: 'buffer', amount: '1500.01'
@@ -51,6 +51,28 @@ test('expenses reduce household cash and the selected pot, and transfers preserv
   assert.equal(L.availableCashCents(ledger), before);
   assert.equal(L.allPotBalances(ledger, pots).buffer, 10000);
   assert.equal(L.allPotBalances(ledger, pots).groceries, 34975);
+});
+
+test('archived pot balances remain transferable without changing household cash', () => {
+  const ledger = L.empty();
+  ledger.potSnapshots['goal:removed'] = { label: 'Oud spaardoel', kind: 'goal', plannedCents: 2500, active: false };
+  ledger.openingBalances['goal:removed'] = 25000;
+  ledger.openingBalances.groceries = 0;
+  const historicalPots = [
+    { id: 'goal:removed', label: 'Oud spaardoel' },
+    { id: 'groceries', label: 'Boodschappen' }
+  ];
+  const before = L.availableCashCents(ledger);
+  L.addTransfer(ledger, {
+    amount: '125', date: '2026-10-10', fromPotId: 'goal:removed', toPotId: 'groceries'
+  }, historicalPots);
+  const balances = L.allPotBalances(ledger, historicalPots);
+  assert.equal(L.availableCashCents(ledger), before);
+  assert.equal(balances['goal:removed'], 12500);
+  assert.equal(balances.groceries, 12500);
+  assert.deepEqual(L.normalize(ledger).potSnapshots['goal:removed'], {
+    label: 'Oud spaardoel', kind: 'goal', plannedCents: 2500, active: false
+  });
 });
 
 test('month summaries stay scoped to the recorded month and edits/removals recalculate', () => {

@@ -21,7 +21,7 @@
   const monthOf = date => String(date || '').slice(0, 7);
   const id = () => globalThis.crypto?.randomUUID?.() || `ledger-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
   const clone = value => JSON.parse(JSON.stringify(value));
-  const empty = () => ({ incomes: [], expenses: [], transfers: [], openingBalances: {}, goalSnapshots: {} });
+  const empty = () => ({ incomes: [], expenses: [], transfers: [], openingBalances: {}, goalSnapshots: {}, potSnapshots: {} });
 
   function normalize(value) {
     const ledger = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
@@ -30,8 +30,9 @@
       incomes: Array.isArray(ledger.incomes) ? ledger.incomes.filter(item => item && typeof item === 'object') : [],
       expenses: Array.isArray(ledger.expenses) ? ledger.expenses.filter(item => item && typeof item === 'object') : [],
       transfers: Array.isArray(ledger.transfers) ? ledger.transfers.filter(item => item && typeof item === 'object') : [],
-      openingBalances: ledger.openingBalances && typeof ledger.openingBalances === 'object' ? ledger.openingBalances : {},
-      goalSnapshots: ledger.goalSnapshots && typeof ledger.goalSnapshots === 'object' ? ledger.goalSnapshots : {}
+      openingBalances: ledger.openingBalances && typeof ledger.openingBalances === 'object' && !Array.isArray(ledger.openingBalances) ? ledger.openingBalances : {},
+      goalSnapshots: ledger.goalSnapshots && typeof ledger.goalSnapshots === 'object' && !Array.isArray(ledger.goalSnapshots) ? ledger.goalSnapshots : {},
+      potSnapshots: ledger.potSnapshots && typeof ledger.potSnapshots === 'object' && !Array.isArray(ledger.potSnapshots) ? ledger.potSnapshots : {}
     };
   }
 
@@ -70,10 +71,11 @@
     const month = String(input.month || monthOf(date));
     if (!validMonth(month)) throw new Error('Kies een geldige maand voor de boeking.');
     const externalId = String(input.externalId || '').trim();
+    const sourceKey = source.toLocaleLowerCase('nl-NL');
     const duplicate = target.incomes.some(item =>
       (externalId && item.externalId === externalId)
-      || (type === 'salary' && item.type === 'salary' && item.date === date
-        && item.month === month && item.source === source && round(item.amountCents) === amountCents)
+      || (type === 'salary' && item.type === 'salary' && item.month === month
+        && String(item.source || '').trim().toLocaleLowerCase('nl-NL') === sourceKey)
     );
     if (duplicate) throw new Error('Deze inkomstenboeking lijkt al geregistreerd.');
     const allocations = Array.isArray(input.allocations) ? input.allocations : [];
@@ -223,7 +225,7 @@
       if (!source) throw new Error('Vul de persoon of bron van de inkomsten in.');
       if (allocatedToIncome(existing) > amountCents) throw new Error('Verwijder eerst een deel van de verdeling voordat je het bedrag verlaagt.');
       if (existing.type === 'salary' && target.incomes.some(item => item.id !== entryId && item.type === 'salary'
-        && item.date === date && item.month === month && item.source === source && round(item.amountCents) === amountCents)) {
+        && item.month === month && String(item.source || '').trim().toLocaleLowerCase('nl-NL') === source.toLocaleLowerCase('nl-NL'))) {
         throw new Error('Deze inkomstenboeking lijkt al geregistreerd.');
       }
       target.incomes[index] = { ...existing, amountCents, date, month, source, description: String(changes.description || '').trim().slice(0, 160) };
