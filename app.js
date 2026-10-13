@@ -6141,57 +6141,113 @@ document.addEventListener('click', event => {
     });
   }
 
-  function ledgerEditFormMarkup25(ledger, pots) {
-    if (!ledgerEdit25) return '';
-    const { kind, id: entryId } = ledgerEdit25;
-    if (!['incomes', 'expenses', 'transfers'].includes(kind)) { ledgerEdit25 = null; return ''; }
-    const entry = ledger[kind]?.find(item => item.id === entryId);
-    if (!entry) { ledgerEdit25 = null; return ''; }
-    const select = (name, selected, label) => `<label>${esc(label)}<select name="${esc(name)}" required>${pots.map(pot =>
-      `<option value="${esc(pot.id)}" ${pot.id === selected ? 'selected' : ''}>${esc(pot.label)}</option>`).join('')}</select></label>`;
-    const common = `<label>Bedrag (€)<input name="amount" type="number" step="0.01" min="0.01" inputmode="decimal" value="${decimalLedger25(entry.amountCents)}" required></label><label>Datum<input name="date" type="date" value="${esc(entry.date)}" required></label>`;
-    let fields = common;
-    if (kind === 'incomes') {
-      fields += `<label>Boekingsmaand<input name="month" type="month" value="${esc(entry.month || entry.date.slice(0, 7))}" required></label><label>Persoon / bron<input name="source" value="${esc(entry.source || '')}" required maxlength="80"></label><label class="ledger-wide25">Omschrijving<input name="description" value="${esc(entry.description || '')}" maxlength="160"></label>`;
-    } else if (kind === 'expenses') {
-      fields += `<label>Categorie<select name="category" required>${['Boodschappen', 'Tanken', 'Vaste lasten', 'Abonnementen', 'Persoonlijk', 'Huishouden', 'Overig'].map(category => `<option ${category === entry.category ? 'selected' : ''}>${category}</option>`).join('')}</select></label>${select('potId', entry.potId, 'Potje')}<label>Persoon (optioneel)<input name="person" value="${esc(entry.person || '')}" maxlength="80"></label><label class="ledger-wide25">Omschrijving<input name="description" value="${esc(entry.description || '')}" required maxlength="160"></label>`;
-    } else {
-      fields += `${select('fromPotId', entry.fromPotId, 'Van potje')}${select('toPotId', entry.toPotId, 'Naar potje')}<label class="ledger-wide25">Omschrijving<input name="description" value="${esc(entry.description || '')}" maxlength="160"></label>`;
-    }
-    return `<form class="ledger-form25" data-ledger-edit="${esc(kind)}" data-entry-id="${esc(entryId)}"><h3>Boeking corrigeren</h3><div class="ledger-fields25">${fields}</div><div class="button-row"><button class="primary" type="submit">Wijziging controleren</button><button class="secondary" type="button" data-ledger-cancel-edit>Annuleren</button></div></form>`;
+  function ledgerNode25(tag, className = '', text) {
+    const node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text !== undefined) node.textContent = String(text);
+    return node;
   }
 
-  function appendLedgerMarkup25(target, markup) {
-    if (!target) return;
-    const parsed = new DOMParser().parseFromString(markup, 'text/html');
-    const allowedTags = new Set(['article', 'b', 'button', 'div', 'form', 'h2', 'h3', 'label', 'li', 'input', 'option', 'p', 'section', 'select', 'small', 'span', 'strong', 'ul']);
-    const allowedAttributes = new Set(['aria-label', 'class', 'inputmode', 'max', 'maxlength', 'min', 'name', 'placeholder', 'required', 'role', 'selected', 'step', 'type', 'value']);
-    const appendSafeNode = (source, parent) => {
-      if (source.nodeType === Node.TEXT_NODE) {
-        parent.append(document.createTextNode(source.nodeValue || ''));
-        return;
-      }
-      if (source.nodeType !== Node.ELEMENT_NODE) return;
-      const tag = source.tagName.toLowerCase();
-      if (!allowedTags.has(tag)) return;
-      const safe = document.createElement(tag);
-      Array.from(source.attributes).forEach(attribute => {
-        const name = attribute.name.toLowerCase();
-        if (allowedAttributes.has(name) && (name !== 'class' || /^[\w -]*$/.test(attribute.value))) {
-          safe.setAttribute(name, attribute.value);
-        } else if (/^data-ledger[a-z-]*$/.test(name) || ['data-entry-id', 'data-allocation-id'].includes(name)) {
-          safe.setAttribute(name, attribute.value);
-        }
-      });
-      parent.append(safe);
-      Array.from(source.childNodes).forEach(child => appendSafeNode(child, safe));
-    };
-    Array.from(parsed.body.childNodes).forEach(child => appendSafeNode(child, target));
+  function ledgerInput25(name, type = 'text', values = {}) {
+    const input = ledgerNode25('input');
+    input.name = name;
+    input.type = type;
+    Object.entries(values).forEach(([key, value]) => {
+      if (key === 'required') input.required = Boolean(value);
+      else if (key === 'value') input.value = String(value ?? '');
+      else input.setAttribute(key, String(value));
+    });
+    return input;
+  }
+
+  function ledgerSelect25(name, options, required = true) {
+    const select = ledgerNode25('select');
+    select.name = name;
+    select.required = required;
+    options.forEach(({ value, label, selected }) => {
+      const option = ledgerNode25('option', '', label);
+      option.value = value;
+      if (selected) option.selected = true;
+      select.append(option);
+    });
+    return select;
+  }
+
+  function ledgerField25(labelText, control, wide = false) {
+    const label = ledgerNode25('label', wide ? 'ledger-wide25' : '');
+    label.append(document.createTextNode(labelText), control);
+    return label;
+  }
+
+  function ledgerButton25(text, className = 'secondary', type = 'button', attributes = {}) {
+    const button = ledgerNode25('button', className, text);
+    button.type = type;
+    Object.entries(attributes).forEach(([name, value]) => button.setAttribute(name, String(value)));
+    return button;
+  }
+
+  function ledgerEditFormMarkup25(ledger, pots) {
+    if (!ledgerEdit25) return null;
+    const { kind, id: entryId } = ledgerEdit25;
+    if (!['incomes', 'expenses', 'transfers'].includes(kind)) { ledgerEdit25 = null; return null; }
+    const entry = ledger[kind]?.find(item => item.id === entryId);
+    if (!entry) { ledgerEdit25 = null; return null; }
+    const potSelect = (name, selected, label) => ledgerField25(label, ledgerSelect25(name,
+      pots.map(pot => ({ value: pot.id, label: pot.label, selected: pot.id === selected }))));
+    const fields = ledgerNode25('div', 'ledger-fields25');
+    fields.append(
+      ledgerField25('Bedrag (€)', ledgerInput25('amount', 'number', {
+        step: '0.01', min: '0.01', inputmode: 'decimal', value: decimalLedger25(entry.amountCents), required: true
+      })),
+      ledgerField25('Datum', ledgerInput25('date', 'date', { value: entry.date, required: true }))
+    );
+    if (kind === 'incomes') {
+      fields.append(
+        ledgerField25('Boekingsmaand', ledgerInput25('month', 'month', { value: entry.month || entry.date.slice(0, 7), required: true })),
+        ledgerField25('Persoon / bron', ledgerInput25('source', 'text', { value: entry.source || '', maxlength: '80', required: true })),
+        ledgerField25('Omschrijving', ledgerInput25('description', 'text', { value: entry.description || '', maxlength: '160' }), true)
+      );
+    } else if (kind === 'expenses') {
+      const categories = ['Boodschappen', 'Tanken', 'Vaste lasten', 'Abonnementen', 'Persoonlijk', 'Huishouden', 'Overig'];
+      fields.append(
+        ledgerField25('Categorie', ledgerSelect25('category', categories.map(category => ({
+          value: category, label: category, selected: category === entry.category
+        })))),
+        potSelect('potId', entry.potId, 'Potje'),
+        ledgerField25('Persoon (optioneel)', ledgerInput25('person', 'text', { value: entry.person || '', maxlength: '80' })),
+        ledgerField25('Omschrijving', ledgerInput25('description', 'text', {
+          value: entry.description || '', maxlength: '160', required: true
+        }), true)
+      );
+    } else {
+      fields.append(
+        potSelect('fromPotId', entry.fromPotId, 'Van potje'),
+        potSelect('toPotId', entry.toPotId, 'Naar potje'),
+        ledgerField25('Omschrijving', ledgerInput25('description', 'text', { value: entry.description || '', maxlength: '160' }), true)
+      );
+    }
+    const form = ledgerNode25('form', 'ledger-form25');
+    form.dataset.ledgerEdit = kind;
+    form.dataset.entryId = entryId;
+    form.append(ledgerNode25('h3', '', 'Boeking corrigeren'), fields);
+    const actions = ledgerNode25('div', 'button-row');
+    actions.append(
+      ledgerButton25('Wijziging controleren', 'primary', 'submit'),
+      ledgerButton25('Annuleren', 'secondary', 'button', { 'data-ledger-cancel-edit': '' })
+    );
+    form.append(actions);
+    return form;
   }
 
   function ledgerMarkup25() {
     const budget = ledgerBudget25(), pots = ledgerPots25(budget), ledger = ledgerState25(budget, pots);
-    if (!ledger) return '<section class="card"><p role="alert">De financiële administratie is niet beschikbaar in deze browser.</p></section>';
+    if (!ledger) {
+      const section = ledgerNode25('section', 'card');
+      const message = ledgerNode25('p', '', 'De financiële administratie is niet beschikbaar in deze browser.');
+      message.setAttribute('role', 'alert');
+      section.append(message);
+      return section;
+    }
     const allPots = ledgerPotHistory25(ledger, pots);
     const summary = ledgerCore25.monthSummary(ledger, ledgerMonth25, allPots);
     const balances = summary.potBalances;
@@ -6211,54 +6267,234 @@ document.addEventListener('click', event => {
     const plannedExternal = [...budget.fixed.map(plannedMonthlyLedger25),
       ...budget.houseCategories.map(item => Math.round((Number(item.amount) || 0) * 100))]
       .reduce((sum, value) => sum + value, 0);
+    const savingsProposal = budget.goals.reduce((sum, goal) => sum + Math.round((Number(goal.monthly) || 0) * 100), 0);
     const projection = ledgerMonth25 === todayISO().slice(0, 7) && plannedContribution !== null
       ? summary.cashBalanceCents + Math.max(0, plannedContribution - summary.incomeCents)
         - Math.max(0, plannedExternal - summary.expenseCents)
       : null;
-    const potOptions = pots.map(pot => `<option value="${esc(pot.id)}">${esc(pot.label)}</option>`).join('');
-    const allPotOptions = allPots.map(pot => `<option value="${esc(pot.id)}">${esc(pot.label)}${pot.archived ? ' · verwijderd' : ''}</option>`).join('');
     const ledgerDate = ledgerMonth25 === todayISO().slice(0, 7) ? todayISO() : `${ledgerMonth25}-01`;
     const eligibleIncomes = ledger.incomes.filter(income => Number(income.amountCents || 0)
       > (income.allocations || []).reduce((sum, allocation) => sum + Number(allocation.amountCents || 0), 0));
-    const incomeRows = summary.incomes.map(income => {
-      const allocated = (income.allocations || []).reduce((sum, allocation) => sum + Number(allocation.amountCents || 0), 0);
-      const allocations = (income.allocations || []).map(allocation => {
-        const pot = allPots.find(item => item.id === allocation.potId);
-        return `<li>${esc(pot?.label || 'Verwijderd potje')} · ${moneyLedger25(allocation.amountCents)} <button type="button" class="text-btn" data-ledger-delete-allocation="${esc(income.id)}" data-allocation-id="${esc(allocation.id)}">Verwijderen</button></li>`;
-      }).join('');
-      return `<article class="ledger-entry25"><div><strong>${esc(income.source)} · ${income.type === 'salary' ? 'Salaris' : income.type === 'benefit' ? 'Toeslag' : 'Overige inkomsten'}</strong><small>${esc(income.date)} · maand ${esc(income.month || income.date.slice(0, 7))}${income.description ? ` · ${esc(income.description)}` : ''}</small>${allocations ? `<ul>${allocations}</ul>` : ''}<small>Nog te verdelen: ${moneyLedger25(Number(income.amountCents || 0) - allocated)}</small></div><b>${moneyLedger25(income.amountCents)}</b><span class="ledger-actions25"><button type="button" class="secondary" data-ledger-edit-kind="incomes" data-entry-id="${esc(income.id)}">Corrigeren</button><button type="button" class="secondary" data-ledger-delete-kind="incomes" data-entry-id="${esc(income.id)}">Verwijderen</button></span></article>`;
-    }).join('') || '<p class="muted">Geen inkomsten geboekt voor deze maand.</p>';
-    const expenseRows = summary.expenses.map(expense => {
-      const pot = allPots.find(item => item.id === expense.potId);
-      return `<article class="ledger-entry25"><div><strong>${esc(expense.description)}</strong><small>${esc(expense.date)} · ${esc(expense.category)} · ${esc(pot?.label || 'Verwijderd potje')}${expense.person ? ` · ${esc(expense.person)}` : ''}</small></div><b>− ${moneyLedger25(expense.amountCents)}</b><span class="ledger-actions25"><button type="button" class="secondary" data-ledger-edit-kind="expenses" data-entry-id="${esc(expense.id)}">Corrigeren</button><button type="button" class="secondary" data-ledger-delete-kind="expenses" data-entry-id="${esc(expense.id)}">Verwijderen</button></span></article>`;
-    }).join('') || '<p class="muted">Geen uitgaven geboekt voor deze maand.</p>';
-    const transferRows = summary.transfers.map(transfer => {
-      const from = allPots.find(item => item.id === transfer.fromPotId), to = allPots.find(item => item.id === transfer.toPotId);
-      return `<article class="ledger-entry25"><div><strong>${esc(from?.label || 'Verwijderd potje')} → ${esc(to?.label || 'Verwijderd potje')}</strong><small>${esc(transfer.date)}${transfer.description ? ` · ${esc(transfer.description)}` : ''}</small></div><b>${moneyLedger25(transfer.amountCents)}</b><span class="ledger-actions25"><button type="button" class="secondary" data-ledger-edit-kind="transfers" data-entry-id="${esc(transfer.id)}">Corrigeren</button><button type="button" class="secondary" data-ledger-delete-kind="transfers" data-entry-id="${esc(transfer.id)}">Verwijderen</button></span></article>`;
-    }).join('') || '<p class="muted">Geen verschuivingen geboekt voor deze maand.</p>';
-    const potRows = allPots.map(pot => {
+    const section = ledgerNode25('section', 'card ledger25');
+    const heading = ledgerNode25('div', 'card-head');
+    const headingText = ledgerNode25('div');
+    headingText.append(ledgerNode25('p', 'eyebrow', 'WERKELIJKHEID · APARTE BOEKINGEN'),
+      ledgerNode25('h2', '', 'Inkomsten, uitgaven & potjessaldi'));
+    const monthInput = ledgerInput25('month', 'month', { value: ledgerMonth25 });
+    monthInput.dataset.ledgerMonth = '';
+    heading.append(headingText, ledgerField25('Maand', monthInput));
+    heading.querySelector('label').className = 'ledger-month25';
+    section.append(heading, ledgerNode25('p', 'muted',
+      'Deze administratie is aanvullend op het bestaande budgetplan. De geplande maandinleg, huisbudgetten en spaardoelen blijven ongewijzigd. Verdelingen en interne verschuivingen tellen niet als inkomsten.'));
+
+    const kpis = ledgerNode25('div', 'ledger-kpis25');
+    const kpi = (label, value, negative = false) => {
+      const item = ledgerNode25('article');
+      item.append(ledgerNode25('small', '', label),
+        ledgerNode25('b', negative ? 'ledger-negative25' : '', value === null ? '—' : moneyLedger25(value)));
+      return item;
+    };
+    kpis.append(
+      kpi('Inkomsten geboekt', summary.incomeCents),
+      kpi('Toegewezen uit inkomsten', summary.allocatedCents),
+      kpi('Werkelijk uitgegeven', summary.expenseCents),
+      kpi('Geregistreerd maandresultaat', monthResult, monthResult < 0),
+      kpi('Huishoudsaldo nu', summary.cashBalanceCents, summary.cashBalanceCents < 0),
+      kpi('Nog niet toegewezen', unallocated, unallocated < 0),
+      kpi('Indicatie einde maand', projection, projection !== null && projection < 0)
+    );
+    section.append(kpis);
+    section.append(ledgerNode25('p', 'ledger-plan25',
+      `Planning: ${moneyLedger25(monthlyPlan)} per maand (waaronder ${moneyLedger25(savingsProposal)} geplande spaardoelinleg) · Werkelijke uitgaven deze maand: ${moneyLedger25(summary.expenseCents)}. De indicatie voor deze maand gebruikt alleen het bestaande geplande huishoudinkomen en vaste/huislasten minus al geboekte bedragen; het is geen bankprognose. Eerdere maanden tonen alleen de geboekte werkelijkheid.`));
+
+    const registration = ledgerNode25('section', 'ledger-section25');
+    registration.append(ledgerNode25('h3', '', 'Registreren'));
+    const forms = ledgerNode25('div', 'ledger-forms25');
+    const addForm = (kind, title, fields, buttonText, extra) => {
+      const form = ledgerNode25('form', 'ledger-form25');
+      form.dataset.ledgerForm = kind;
+      form.append(ledgerNode25('h3', '', title));
+      const fieldGrid = ledgerNode25('div', 'ledger-fields25');
+      fields.forEach(field => fieldGrid.append(field));
+      form.append(fieldGrid);
+      if (extra) form.append(extra);
+      form.append(ledgerButton25(buttonText, 'primary', 'submit'));
+      forms.append(form);
+      return form;
+    };
+    const expenseCategories = ['Boodschappen', 'Tanken', 'Vaste lasten', 'Abonnementen', 'Persoonlijk', 'Huishouden', 'Overig'];
+    const potOptions = pots.map(pot => ({ value: pot.id, label: pot.label }));
+    const allPotOptions = allPots.map(pot => ({
+      value: pot.id, label: `${pot.label}${pot.archived ? ' · verwijderd' : ''}`
+    }));
+    const incomeFields = [
+      ledgerField25('Bedrag (€)', ledgerInput25('amount', 'number', { inputmode: 'decimal', min: '0.01', step: '0.01', required: true })),
+      ledgerField25('Datum', ledgerInput25('date', 'date', { value: ledgerDate, required: true })),
+      ledgerField25('Boekingsmaand', ledgerInput25('month', 'month', { value: ledgerMonth25, required: true })),
+      ledgerField25('Type', ledgerSelect25('type', [
+        { value: 'salary', label: 'Salaris' }, { value: 'benefit', label: 'Toeslag' }, { value: 'other', label: 'Overige inkomsten' }
+      ], false)),
+      ledgerField25('Persoon / bron', ledgerInput25('source', 'text', { placeholder: 'Kees, Daphne, toeslag…', maxlength: '80', required: true })),
+      ledgerField25('Omschrijving (optioneel)', ledgerInput25('description', 'text', { maxlength: '160' }))
+    ];
+    addForm('income', 'Inkomen toevoegen', incomeFields, 'Inkomstenboeking controleren');
+
+    const allocationForm = ledgerNode25('form', 'ledger-form25');
+    allocationForm.dataset.ledgerForm = 'allocation';
+    allocationForm.append(ledgerNode25('h3', '', 'Inkomen verdelen'));
+    if (eligibleIncomes.length) {
+      const allocationFields = ledgerNode25('div', 'ledger-fields25');
+      allocationFields.append(
+        ledgerField25('Inkomstenboeking', ledgerSelect25('incomeId', eligibleIncomes.map(income => {
+          const allocated = (income.allocations || []).reduce((sum, item) => sum + Number(item.amountCents || 0), 0);
+          return {
+            value: income.id,
+            label: `${income.source} · ${income.date} · nog ${moneyLedger25(Number(income.amountCents || 0) - allocated)}`
+          };
+        }))),
+        ledgerField25('Potje', ledgerSelect25('potId', potOptions)),
+        ledgerField25('Bedrag (€)', ledgerInput25('amount', 'number', { inputmode: 'decimal', min: '0.01', step: '0.01', required: true }))
+      );
+      allocationForm.append(allocationFields, ledgerButton25('Verdeling controleren', 'primary', 'submit'));
+    } else {
+      allocationForm.append(ledgerNode25('p', 'muted', 'Registreer eerst inkomsten met een nog niet verdeeld bedrag.'));
+    }
+    forms.append(allocationForm);
+
+    addForm('expense', 'Werkelijke uitgave', [
+      ledgerField25('Bedrag (€)', ledgerInput25('amount', 'number', { inputmode: 'decimal', min: '0.01', step: '0.01', required: true })),
+      ledgerField25('Datum', ledgerInput25('date', 'date', { value: ledgerDate, required: true })),
+      ledgerField25('Categorie', ledgerSelect25('category', expenseCategories.map(category => ({ value: category, label: category })), false)),
+      ledgerField25('Potje', ledgerSelect25('potId', potOptions)),
+      ledgerField25('Persoon (optioneel)', ledgerInput25('person', 'text', { maxlength: '80' })),
+      ledgerField25('Omschrijving', ledgerInput25('description', 'text', { maxlength: '160', required: true }))
+    ], 'Uitgave controleren');
+
+    addForm('transfer', 'Geld tussen potjes verschuiven', [
+      ledgerField25('Van potje', ledgerSelect25('fromPotId', allPotOptions)),
+      ledgerField25('Naar potje', ledgerSelect25('toPotId', allPotOptions)),
+      ledgerField25('Bedrag (€)', ledgerInput25('amount', 'number', { inputmode: 'decimal', min: '0.01', step: '0.01', required: true })),
+      ledgerField25('Datum', ledgerInput25('date', 'date', { value: ledgerDate, required: true })),
+      ledgerField25('Omschrijving', ledgerInput25('description', 'text', { maxlength: '160' }), true)
+    ], 'Verschuiving controleren', ledgerNode25('p', 'small-note',
+      'Ook verwijderde potjes met resterend saldo blijven bereikbaar. Vooraf wordt de verschuiving getoond en bevestigd; het huishoudsaldo verandert niet.'));
+    registration.append(forms);
+    section.append(registration);
+
+    const selectedEdit = ledgerEditFormMarkup25(ledger, allPots);
+    if (selectedEdit) section.append(selectedEdit);
+
+    const historySection = (title, content) => {
+      const block = ledgerNode25('section', 'ledger-section25');
+      block.append(ledgerNode25('h3', '', title), content);
+      return block;
+    };
+    const potSection = ledgerNode25('section', 'ledger-section25');
+    const potHeading = ledgerNode25('div', 'card-head');
+    potHeading.append(ledgerNode25('h3', '', 'Potjes · saldo nu'),
+      ledgerNode25('span', 'small-note', 'Bestaande maandbudgetten blijven planning.'));
+    potSection.append(potHeading);
+    const potRows = ledgerNode25('div');
+    allPots.forEach(pot => {
       const balance = Number(balances[pot.id] || 0);
       const assigned = Number(ledger.openingBalances[pot.id] || 0) + allocationsForPot(pot.id);
-      const spent = summary.expenses.filter(item => item.potId === pot.id).reduce((sum, item) => sum + Number(item.amountCents || 0), 0);
-      return `<article class="ledger-pot25 ${balance < 0 ? 'is-negative' : ''} ${pot.archived ? 'is-archived' : ''}"><div><h3>${esc(pot.label)}</h3><small>${pot.archived ? 'Verwijderd potje · verschuif het saldo naar een actief potje' : pot.kind === 'goal' ? 'Spaardoel' : pot.kind === 'fixed' ? 'Vaste last' : 'Huisbudget'}</small></div><span><small>${pot.archived ? 'Begroot toen verwijderd' : 'Begroot / mnd'}</small><b>${moneyLedger25(pot.plannedCents)}</b></span><span><small>Toegewezen totaal</small><b>${moneyLedger25(assigned)}</b></span><span><small>Uitgegeven deze maand</small><b>${moneyLedger25(spent)}</b></span><span><small>Saldo nu</small><b>${moneyLedger25(balance)}</b></span></article>`;
-    }).join('');
-    const savingsProposal = budget.goals.reduce((sum, goal) => sum + Math.round((Number(goal.monthly) || 0) * 100), 0);
-    const selectedEdit = ledgerEditFormMarkup25(ledger, allPots);
-    return `<section class="card ledger25"><div class="card-head"><div><p class="eyebrow">WERKELIJKHEID · APARTE BOEKINGEN</p><h2>Inkomsten, uitgaven & potjessaldi</h2></div><label class="ledger-month25">Maand<input type="month" data-ledger-month value="${esc(ledgerMonth25)}"></label></div><p class="muted">Deze administratie is aanvullend op het bestaande budgetplan. De geplande maandinleg, huisbudgetten en spaardoelen blijven ongewijzigd. Verdelingen en interne verschuivingen tellen niet als inkomsten.</p>
-      <div class="ledger-kpis25"><article><small>Inkomsten geboekt</small><b>${moneyLedger25(summary.incomeCents)}</b></article><article><small>Toegewezen uit inkomsten</small><b>${moneyLedger25(summary.allocatedCents)}</b></article><article><small>Werkelijk uitgegeven</small><b>${moneyLedger25(summary.expenseCents)}</b></article><article><small>Geregistreerd maandresultaat</small><b class="${monthResult < 0 ? 'ledger-negative25' : ''}">${moneyLedger25(monthResult)}</b></article><article><small>Huishoudsaldo nu</small><b class="${summary.cashBalanceCents < 0 ? 'ledger-negative25' : ''}">${moneyLedger25(summary.cashBalanceCents)}</b></article><article><small>Nog niet toegewezen</small><b class="${unallocated < 0 ? 'ledger-negative25' : ''}">${moneyLedger25(unallocated)}</b></article><article><small>Indicatie einde maand</small><b class="${projection !== null && projection < 0 ? 'ledger-negative25' : ''}">${projection === null ? '—' : moneyLedger25(projection)}</b></article></div>
-      <p class="ledger-plan25">Planning: ${moneyLedger25(monthlyPlan)} per maand (waaronder ${moneyLedger25(savingsProposal)} geplande spaardoelinleg) · Werkelijke uitgaven deze maand: ${moneyLedger25(summary.expenseCents)}. De indicatie voor deze maand gebruikt alleen het bestaande geplande huishoudinkomen en vaste/huislasten minus al geboekte bedragen; het is geen bankprognose. Eerdere maanden tonen alleen de geboekte werkelijkheid.</p>
-      <section class="ledger-section25"><h3>Registreren</h3><div class="ledger-forms25">
-        <form class="ledger-form25" data-ledger-form="income"><h3>Inkomen toevoegen</h3><div class="ledger-fields25"><label>Bedrag (€)<input name="amount" type="number" inputmode="decimal" min="0.01" step="0.01" required></label><label>Datum<input name="date" type="date" value="${esc(ledgerDate)}" required></label><label>Boekingsmaand<input name="month" type="month" value="${esc(ledgerMonth25)}" required></label><label>Type<select name="type"><option value="salary">Salaris</option><option value="benefit">Toeslag</option><option value="other">Overige inkomsten</option></select></label><label>Persoon / bron<input name="source" placeholder="Kees, Daphne, toeslag…" maxlength="80" required></label><label>Omschrijving (optioneel)<input name="description" maxlength="160"></label></div><button class="primary" type="submit">Inkomstenboeking controleren</button></form>
-        <form class="ledger-form25" data-ledger-form="allocation"><h3>Inkomen verdelen</h3>${eligibleIncomes.length ? `<div class="ledger-fields25"><label>Inkomstenboeking<select name="incomeId" required>${eligibleIncomes.map(income => `<option value="${esc(income.id)}">${esc(income.source)} · ${esc(income.date)} · nog ${moneyLedger25(Number(income.amountCents || 0) - (income.allocations || []).reduce((sum, item) => sum + Number(item.amountCents || 0), 0))}</option>`).join('')}</select></label><label>Potje<select name="potId" required>${potOptions}</select></label><label>Bedrag (€)<input name="amount" type="number" inputmode="decimal" min="0.01" step="0.01" required></label></div><button class="primary" type="submit">Verdeling controleren</button>` : '<p class="muted">Registreer eerst inkomsten met een nog niet verdeeld bedrag.</p>'}</form>
-        <form class="ledger-form25" data-ledger-form="expense"><h3>Werkelijke uitgave</h3><div class="ledger-fields25"><label>Bedrag (€)<input name="amount" type="number" inputmode="decimal" min="0.01" step="0.01" required></label><label>Datum<input name="date" type="date" value="${ledgerDate}" required></label><label>Categorie<select name="category">${['Boodschappen', 'Tanken', 'Vaste lasten', 'Abonnementen', 'Persoonlijk', 'Huishouden', 'Overig'].map(category => `<option>${category}</option>`).join('')}</select></label><label>Potje<select name="potId" required>${potOptions}</select></label><label>Persoon (optioneel)<input name="person" maxlength="80"></label><label>Omschrijving<input name="description" maxlength="160" required></label></div><button class="primary" type="submit">Uitgave controleren</button></form>
-        <form class="ledger-form25" data-ledger-form="transfer"><h3>Geld tussen potjes verschuiven</h3><div class="ledger-fields25"><label>Van potje<select name="fromPotId" required>${allPotOptions}</select></label><label>Naar potje<select name="toPotId" required>${allPotOptions}</select></label><label>Bedrag (€)<input name="amount" type="number" inputmode="decimal" min="0.01" step="0.01" required></label><label>Datum<input name="date" type="date" value="${ledgerDate}" required></label><label class="ledger-wide25">Omschrijving<input name="description" maxlength="160"></label></div><p class="small-note">Ook verwijderde potjes met resterend saldo blijven bereikbaar. Vooraf wordt de verschuiving getoond en bevestigd; het huishoudsaldo verandert niet.</p><button class="primary" type="submit">Verschuiving controleren</button></form>
-      </div></section>
-      ${selectedEdit}
-      <section class="ledger-section25"><div class="card-head"><h3>Potjes · saldo nu</h3><span class="small-note">Bestaande maandbudgetten blijven planning.</span></div>${potRows || '<p class="muted">Voeg eerst potjes of spaardoelen toe in de bestaande budgetplanning.</p>'}</section>
-      <section class="ledger-section25"><h3>Inkomsten van ${esc(ledgerMonth25)}</h3><div class="ledger-history25">${incomeRows}</div></section>
-      <section class="ledger-section25"><h3>Uitgaven van ${esc(ledgerMonth25)}</h3><div class="ledger-history25">${expenseRows}</div></section>
-      <section class="ledger-section25"><h3>Verschuivingen van ${esc(ledgerMonth25)}</h3><div class="ledger-history25">${transferRows}</div></section>
-      <p class="small-note">Boekingen worden in de bestaande huishoudopslag bewaard en via de huidige versleutelde huishoudsynchronisatie gedeeld. Dit registreert bedragen; het voert geen bankbetalingen uit.</p></section>`;
+      const spent = summary.expenses.filter(item => item.potId === pot.id)
+        .reduce((sum, item) => sum + Number(item.amountCents || 0), 0);
+      const row = ledgerNode25('article', `ledger-pot25${balance < 0 ? ' is-negative' : ''}${pot.archived ? ' is-archived' : ''}`);
+      const name = ledgerNode25('div');
+      name.append(ledgerNode25('h3', '', pot.label), ledgerNode25('small', '',
+        pot.archived ? 'Verwijderd potje · verschuif het saldo naar een actief potje'
+          : pot.kind === 'goal' ? 'Spaardoel' : pot.kind === 'fixed' ? 'Vaste last' : 'Huisbudget'));
+      row.append(name);
+      const metric = (label, value) => {
+        const item = ledgerNode25('span');
+        item.append(ledgerNode25('small', '', label), ledgerNode25('b', '', moneyLedger25(value)));
+        return item;
+      };
+      row.append(
+        metric(pot.archived ? 'Begroot toen verwijderd' : 'Begroot / mnd', pot.plannedCents),
+        metric('Toegewezen totaal', assigned),
+        metric('Uitgegeven deze maand', spent),
+        metric('Saldo nu', balance)
+      );
+      potRows.append(row);
+    });
+    potSection.append(allPots.length ? potRows
+      : ledgerNode25('p', 'muted', 'Voeg eerst potjes of spaardoelen toe in de bestaande budgetplanning.'));
+    section.append(potSection);
+
+    const incomeRows = ledgerNode25('div', 'ledger-history25');
+    summary.incomes.forEach(income => {
+      const allocated = (income.allocations || []).reduce((sum, allocation) => sum + Number(allocation.amountCents || 0), 0);
+      const row = ledgerNode25('article', 'ledger-entry25');
+      const details = ledgerNode25('div');
+      const type = income.type === 'salary' ? 'Salaris' : income.type === 'benefit' ? 'Toeslag' : 'Overige inkomsten';
+      details.append(ledgerNode25('strong', '', `${income.source} · ${type}`),
+        ledgerNode25('small', '', `${income.date} · maand ${income.month || income.date.slice(0, 7)}${income.description ? ` · ${income.description}` : ''}`));
+      if (income.allocations?.length) {
+        const allocationList = ledgerNode25('ul');
+        income.allocations.forEach(allocation => {
+          const pot = allPots.find(item => item.id === allocation.potId);
+          const item = ledgerNode25('li', '', `${pot?.label || 'Verwijderd potje'} · ${moneyLedger25(allocation.amountCents)} `);
+          item.append(ledgerButton25('Verwijderen', 'text-btn', 'button', {
+            'data-ledger-delete-allocation': income.id,
+            'data-allocation-id': allocation.id
+          }));
+          allocationList.append(item);
+        });
+        details.append(allocationList);
+      }
+      details.append(ledgerNode25('small', '', `Nog te verdelen: ${moneyLedger25(Number(income.amountCents || 0) - allocated)}`));
+      const actions = ledgerNode25('span', 'ledger-actions25');
+      actions.append(
+        ledgerButton25('Corrigeren', 'secondary', 'button', { 'data-ledger-edit-kind': 'incomes', 'data-entry-id': income.id }),
+        ledgerButton25('Verwijderen', 'secondary', 'button', { 'data-ledger-delete-kind': 'incomes', 'data-entry-id': income.id })
+      );
+      row.append(details, ledgerNode25('b', '', moneyLedger25(income.amountCents)), actions);
+      incomeRows.append(row);
+    });
+    if (!summary.incomes.length) incomeRows.append(ledgerNode25('p', 'muted', 'Geen inkomsten geboekt voor deze maand.'));
+    section.append(historySection(`Inkomsten van ${ledgerMonth25}`, incomeRows));
+
+    const expenseRows = ledgerNode25('div', 'ledger-history25');
+    summary.expenses.forEach(expense => {
+      const pot = allPots.find(item => item.id === expense.potId);
+      const details = ledgerNode25('div');
+      details.append(ledgerNode25('strong', '', expense.description),
+        ledgerNode25('small', '', `${expense.date} · ${expense.category} · ${pot?.label || 'Verwijderd potje'}${expense.person ? ` · ${expense.person}` : ''}`));
+      const actions = ledgerNode25('span', 'ledger-actions25');
+      actions.append(
+        ledgerButton25('Corrigeren', 'secondary', 'button', { 'data-ledger-edit-kind': 'expenses', 'data-entry-id': expense.id }),
+        ledgerButton25('Verwijderen', 'secondary', 'button', { 'data-ledger-delete-kind': 'expenses', 'data-entry-id': expense.id })
+      );
+      const row = ledgerNode25('article', 'ledger-entry25');
+      row.append(details, ledgerNode25('b', '', `− ${moneyLedger25(expense.amountCents)}`), actions);
+      expenseRows.append(row);
+    });
+    if (!summary.expenses.length) expenseRows.append(ledgerNode25('p', 'muted', 'Geen uitgaven geboekt voor deze maand.'));
+    section.append(historySection(`Uitgaven van ${ledgerMonth25}`, expenseRows));
+
+    const transferRows = ledgerNode25('div', 'ledger-history25');
+    summary.transfers.forEach(transfer => {
+      const from = allPots.find(item => item.id === transfer.fromPotId);
+      const to = allPots.find(item => item.id === transfer.toPotId);
+      const details = ledgerNode25('div');
+      details.append(ledgerNode25('strong', '', `${from?.label || 'Verwijderd potje'} → ${to?.label || 'Verwijderd potje'}`),
+        ledgerNode25('small', '', `${transfer.date}${transfer.description ? ` · ${transfer.description}` : ''}`));
+      const actions = ledgerNode25('span', 'ledger-actions25');
+      actions.append(
+        ledgerButton25('Corrigeren', 'secondary', 'button', { 'data-ledger-edit-kind': 'transfers', 'data-entry-id': transfer.id }),
+        ledgerButton25('Verwijderen', 'secondary', 'button', { 'data-ledger-delete-kind': 'transfers', 'data-entry-id': transfer.id })
+      );
+      const row = ledgerNode25('article', 'ledger-entry25');
+      row.append(details, ledgerNode25('b', '', moneyLedger25(transfer.amountCents)), actions);
+      transferRows.append(row);
+    });
+    if (!summary.transfers.length) transferRows.append(ledgerNode25('p', 'muted', 'Geen verschuivingen geboekt voor deze maand.'));
+    section.append(historySection(`Verschuivingen van ${ledgerMonth25}`, transferRows));
+    section.append(ledgerNode25('p', 'small-note',
+      'Boekingen worden in de bestaande huishoudopslag bewaard en via de huidige versleutelde huishoudsynchronisatie gedeeld. Dit registreert bedragen; het voert geen bankbetalingen uit.'));
+    return section;
   }
 
   let offerQuery25 = '';
@@ -6780,7 +7016,7 @@ document.addEventListener('click', event => {
     requestAnimationFrame(() => {
       applyDashboard25();
       if (current === 'budget19' && !document.querySelector('#view .ledger25')) {
-        appendLedgerMarkup25(document.querySelector('#view'), ledgerMarkup25());
+        document.querySelector('#view')?.append(ledgerMarkup25());
       }
       const settings = document.querySelector('#view .settings-grid');
       if (current === 'settings' && settings && !settings.querySelector('.dashboard-editor25')) {
