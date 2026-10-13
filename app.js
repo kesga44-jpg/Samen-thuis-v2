@@ -460,9 +460,9 @@ function renderToday() {
   const todayPlanning = data.planning.filter(item => item.date === todayISO() && calendarById(item.calendarId).visible !== false);
   return `<section class="card welcome"><div><p class="eyebrow welcome-eyebrow">Jullie thuis, in één oogopslag</p><h2>Fijn dat jullie er zijn.</h2><p>${meal ? `Vanavond staat <strong>${esc(meal.title)}</strong> op het menu.` : 'Plan samen wat er vanavond op tafel komt.'}</p></div><div class="date-chip">${fmtDate(todayISO(), { weekday: 'long', day: 'numeric', month: 'long' })}</div></section>
     ${renderTravelActions()}
-    <div class="today-dailies single">${renderDailyQuestion()}</div>
+    <div class="today-dailies single" data-dashboard-group>${renderDailyQuestion()}</div>
     <div class="stat-row" data-widget18="todayStats"><div class="stat"><strong>${pending.length}</strong><span>huishoudtaken vandaag</span></div><div class="stat"><strong>${unbought.length}</strong><span>boodschappen open</span></div><div class="stat"><strong>${low.length}</strong><span>producten bijna op</span></div><div class="stat"><strong>${todayPlanning.length}</strong><span>agenda-items vandaag</span></div></div>
-    <div class="grid two">
+    <div class="grid two" data-dashboard-group>
       <section class="card" data-widget18="todayChores"><div class="card-head"><h2>Vandaag in huis</h2><button class="text-btn" data-view="chores">Hele week</button></div><div class="list">${todayChores.length ? todayChores.map(({ chore }) => choreOccurrenceRow(chore, todayISO())).join('') : empty('Vandaag geen huishoudtaken')}</div></section>
       <section class="card" data-widget18="todayAgenda"><div class="card-head"><h2>Op de agenda</h2><button class="text-btn" data-view="planning">Week bekijken</button></div><div class="list">${data.planning.filter(item => item.date >= todayISO() && calendarById(item.calendarId).visible !== false).sort(sortPlanning).slice(0, 5).map(item => basicRow(item.title, `${fmtDate(item.date)} · ${item.time || 'Hele dag'}`, calendarById(item.calendarId).name)).join('') || empty('Nog niets gepland')}</div></section>
       <section class="card" data-widget18="todayGroceries"><div class="card-head"><h2>Boodschappen</h2><button class="text-btn" data-view="groceries">Open lijst</button></div><div class="list">${unbought.slice(0, 5).map(groceryRow).join('') || empty('De lijst is leeg')}</div></section>
@@ -1773,7 +1773,7 @@ if (syncConfigured()) syncNow();
 
   renderTravelActions = function renderTravelActionsV11() {
     const actions = openTravelActions().slice(0, 10);
-    return `<section class="card travel-actions"><div class="card-head"><div><p class="eyebrow">Belangrijkste reisacties</p><h2>Prioriteiten & deadlines</h2></div><button class="text-btn" data-view="trips">Alle reizen</button></div><div class="list">${actions.length ? actions.map(item => {
+    return `<section class="card travel-actions" data-widget18="travelActions"><div class="card-head"><div><p class="eyebrow">Belangrijkste reisacties</p><h2>Prioriteiten & deadlines</h2></div><button class="text-btn" data-view="trips">Alle reizen</button></div><div class="list">${actions.length ? actions.map(item => {
       const folder = tripFolderById(item.tripFolderId);
       const section = tripSectionById(item.tripSectionId);
       const overdue = item.date && item.date < todayISO();
@@ -4720,7 +4720,7 @@ console.info('Samen Thuis update 16.0 geladen');
 
     if(!soon.length) return;
 
-    const html=`<section class="card" data-v16-today-chores>
+    const html=`<section class="card" data-v16-today-chores data-widget18="upcomingChores">
       <div class="card-head">
         <div><p class="eyebrow">HUISHOUDEN · BINNENKORT</p><h2>${soon.length} ${soon.length===1?'taak':'taken'} in beeld</h2></div>
         <span class="tag">Flexibel</span>
@@ -4813,7 +4813,7 @@ function html18(){
  const s=data18(),date=new Intl.DateTimeFormat('nl-NL',{weekday:'long',day:'numeric',month:'long'}).format(new Date());
  return `<section class="dash18" data-dash18><header class="dh18"><div><p class="eyebrow">Jullie thuis, in één oogopslag</p><h2>Vandaag</h2><p>${date}</p></div><div class="people18"><span>K</span><span>D</span></div></header><div class="dg18">
  <section class="weather18" data-weather18 data-widget18="weather">Weer ophalen…</section>
- <section class="today18" data-widget18="overview"><div class="ct18"><strong>Vandaag</strong><span>${s.chores} taken</span></div><div class="stats18"><button data-view="chores"><b>${s.chores}</b><small>Huishouden</small></button><button data-view="groceries"><b>${s.groceries}</b><small>Boodschappen</small></button><button data-view="stock"><b>${s.low}</b><small>Bijna op</small></button></div><div class="meal18"><small>🍽️ VANAVOND</small><strong>${esc(s.dinner?.title||'Nog geen avondeten gepland')}</strong></div></section>
+ <section class="today18" data-widget18="household"><div class="ct18"><strong>Vandaag</strong><span>${s.chores} taken</span></div><div class="stats18"><button data-view="chores"><b>${s.chores}</b><small>Huishouden</small></button><button data-view="groceries"><b>${s.groceries}</b><small>Boodschappen</small></button><button data-view="stock"><b>${s.low}</b><small>Bijna op</small></button></div><div class="meal18"><small>🍽️ VANAVOND</small><strong>${esc(s.dinner?.title||'Nog geen avondeten gepland')}</strong></div></section>
  <section class="agenda18" data-widget18="agenda"><div class="ct18"><strong>Komende afspraken</strong><button class="text-btn" data-view="planning">Alles →</button></div>${s.agenda.length?s.agenda.map(x=>`<div class="ar18"><time>${esc(x.date===todayISO()?(x.time||'Hele dag'):new Intl.DateTimeFormat('nl-NL',{weekday:'short',day:'numeric'}).format(parseDate(x.date)))}</time><div><strong>${esc(x.title)}</strong><small>${esc(x.person||'')}</small></div></div>`).join(''):'<p class="muted">Geen komende afspraken.</p>'}</section>
  <section class="outfit18" data-outfit18 data-widget18="outfit"><span>👕</span><div><strong>Wat trek je aan?</strong><p>Weeradvies laden…</p></div></section></div></section>`
 }
@@ -5962,6 +5962,9 @@ document.addEventListener('click', event => {
     document.querySelectorAll('[data-widget18]').forEach(node => {
       const id = node.dataset.widget18;
       if (Object.hasOwn(dashboard25.visible, id)) node.hidden = !dashboard25.visible[id];
+    });
+    document.querySelectorAll('[data-dashboard-group]').forEach(group => {
+      group.hidden = ![...group.querySelectorAll('[data-widget18]')].some(node => !node.hidden);
     });
     const nodes = new Map([...grid.children].map(node => {
       const id = node.dataset.widget18 || (node.matches('[data-air24]') ? 'air' : '');

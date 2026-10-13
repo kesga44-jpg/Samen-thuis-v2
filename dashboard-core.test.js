@@ -11,6 +11,12 @@ test('dashboard layout restores valid settings and fills newly available widgets
   });
 });
 
+test('legacy overview preference is preserved by the renamed household setting', () => {
+  const layout = D.normalize({ order: ['overview'], visible: { overview: false } }, D.CATALOG.map(([id]) => id));
+  assert.deepEqual(layout.order.slice(0, 1), ['household']);
+  assert.equal(layout.visible.household, false);
+});
+
 test('dashboard widgets can be hidden, restored, and reordered without invalid ids', () => {
   const initial = D.defaults(widgets);
   const hidden = D.setVisible(initial, 'agenda', false, widgets);
@@ -33,7 +39,7 @@ test('new optional dashboard widgets stay hidden until selected', () => {
 test('the catalogue covers the fixed dashboard sections as independent controls', () => {
   const ids = D.CATALOG.map(([id]) => id);
   for (const id of ['travelActions', 'dailyQuestion', 'todayChores', 'todayAgenda',
-    'todayGroceries', 'lowStock', 'todayStats', 'weather', 'budget', 'car',
+    'todayGroceries', 'lowStock', 'upcomingChores', 'todayStats', 'household', 'weather', 'budget', 'car',
     'quote', 'tasks', 'savings', 'chalkboard']) {
     assert.ok(ids.includes(id), `${id} should have a dashboard setting`);
   }

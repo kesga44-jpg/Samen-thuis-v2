@@ -1779,6 +1779,7 @@ html[data-accent20="custom"] .mobile-nav23 button.active{
 
 /* Dashboard: instelbare widgets en krijtbord */
 .dg18 [hidden]{display:none!important}
+[data-widget18][hidden],[data-dashboard-group][hidden],.dg18[hidden]{display:none!important}
 .today-dailies.single{grid-template-columns:1fr}
 .dashboard-quote25{min-width:0}.dashboard-quote25 .quote-card{height:100%}
 .dashboard-mini-list25{margin:6px 0 0;padding-left:18px;color:var(--muted);font-size:.86rem}
