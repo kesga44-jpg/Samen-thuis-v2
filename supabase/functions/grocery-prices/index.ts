@@ -13,8 +13,23 @@ function json(body: unknown, status=200) {
   return new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json" } });
 }
 
+function numberOrNull(value: unknown) {
+  if (value == null || value === "") return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
+function discountPercentage(price: unknown, originalPrice: unknown, reported: unknown) {
+  const explicit = numberOrNull(reported);
+  if (explicit != null && explicit > 0 && explicit <= 100) return explicit;
+  const current = numberOrNull(price);
+  const original = numberOrNull(originalPrice);
+  if (current == null || original == null || original <= 0 || original <= current) return null;
+  return ((original - current) / original) * 100;
+}
+
 function rank(results: any[], preferredRetailer: string) {
-  const active = results.filter(x => x?.promotion_status === "active" && Number.isFinite(Number(x?.price)));
+  const active = results.filter(x => x?.promotion_status === "active" && numberOrNull(x?.price) != null && Number(x.price) >= 0);
   if (!active.length) return null;
   const preferred = String(preferredRetailer || "").trim().toLowerCase();
   const pool = preferred ? active.filter(x => String(x.retailer || "").toLowerCase() === preferred) : active;
@@ -27,8 +42,8 @@ function rank(results: any[], preferredRetailer: string) {
     name: x.name || "",
     retailer: x.retailer || "",
     price: Number(x.price),
-    originalPrice: x.original_price == null ? null : Number(x.original_price),
-    savingsPercentage: x.savings_percentage == null ? null : Number(x.savings_percentage),
+    originalPrice: numberOrNull(x.original_price),
+    savingsPercentage: discountPercentage(x.price, x.original_price, x.savings_percentage),
     promotionType: x.promotion_type || "",
     promotionText: x.promotion_text || x.offer_text || "",
     promotionStatus: x.promotion_status || "active",
@@ -41,6 +56,8 @@ function rank(results: any[], preferredRetailer: string) {
 }
 
 function normalizeOffer(x: any) {
+  const price = numberOrNull(x.price);
+  const originalPrice = numberOrNull(x.original_price);
   return {
     productId: x.product_id || x.base_product_id || "",
     ean: x.ean || "",
@@ -48,14 +65,16 @@ function normalizeOffer(x: any) {
     brand: x.brand || x.brand_name || "",
     size: x.size || x.quantity || "",
     store: x.retailer || "",
-    price: Number(x.price),
-    originalPrice: x.original_price == null ? null : Number(x.original_price),
-    discountPercent: x.savings_percentage == null ? null : Number(x.savings_percentage),
+    price,
+    originalPrice,
+    discountPercent: discountPercentage(price, originalPrice, x.savings_percentage),
     promotionText: x.promotion_text || x.offer_text || "",
+    promotionType: x.promotion_type || "",
     validFrom: x.valid_from || "",
     validTo: x.valid_until || "",
     category: x.category || "",
     sourceUrl: x.url || x.product_url || x.offer_url || x.source_url || "",
+    providerData: x,
     source: "PrijsProfeet"
   };
 }
@@ -74,7 +93,7 @@ async function searchOffers(query: string) {
   const payload = await response.json();
   const results = Array.isArray(payload.results) ? payload.results : [];
   const offers = results
-    .filter((x: any) => x?.promotion_status === "active" && x?.price != null && Number.isFinite(Number(x.price)) && String(x?.name || "").trim())
+    .filter((x: any) => x?.promotion_status === "active" && numberOrNull(x.price) != null && Number(x.price) >= 0 && String(x?.name || "").trim())
     .map(normalizeOffer);
   return json({offers,source:"PrijsProfeet",checkedAt:new Date().toISOString()});
 }
