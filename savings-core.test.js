@@ -137,7 +137,7 @@ test('offers can be filtered by every supported store and combined with existing
     assert.equal(offers.filter(item => O.matchesOfferFilters(item, { stores: [store] })).length, 1);
   }
   const combined = offers.filter(item => O.matchesOfferFilters(item, {
-    stores: ['Lidl', 'Jumbo'], category: 'Voorraadkast',
+    stores: ['Lidl', 'PLUS'], category: 'Voorraadkast',
     categories: ['Groente', 'Fruit', 'Brood & wraps', 'Zuivel & vega', 'Vlees & vis', 'Diepvries', 'Voorraadkast', 'Kruiden & sauzen', 'Drinken', 'Schoonmaak', 'Overig']
   }));
   assert.deepEqual(combined.map(item => item.store), ['Lidl']);
@@ -168,6 +168,8 @@ test('an offer becomes a compatible unchecked grocery item that survives save an
   const restored = JSON.parse(JSON.stringify({ groceries: [item] }));
   assert.equal(restored.groceries[0].title, 'Koffie');
   assert.equal(restored.groceries[0].offerKey, O.key(offer));
+  const unknownCategory = O.groceryItemFromOffer({ ...offer, category: 'Niet ingedeeld' }, () => 'grocery-other', ['Groente', 'Voorraadkast', 'Overig']);
+  assert.equal(unknownCategory.category, 'Overig');
 });
 test('offer duplicate detection ignores matching product names from different offers', () => {
   const first = { ean: '111', name: 'Melk', store: 'Lidl', price: 1, validTo: '2026-10-20' };

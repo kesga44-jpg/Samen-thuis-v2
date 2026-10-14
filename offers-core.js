@@ -44,6 +44,7 @@
     ['dirk', 'Dirk'], ['dirk van den broek', 'Dirk'], ['dirk vd broek', 'Dirk'],
     ['aldi', 'Aldi'], ['aldi nederland', 'Aldi'],
     ['ah', 'Albert Heijn (AH)'], ['ah to go', 'Albert Heijn (AH)'], ['albert heijn', 'Albert Heijn (AH)'],
+    ['albert heijn ah', 'Albert Heijn (AH)'],
     ['albert heijn to go', 'Albert Heijn (AH)'], ['albertheijn', 'Albert Heijn (AH)'],
     ['spar', 'SPAR'], ['spar city', 'SPAR'], ['spar express', 'SPAR'], ['spar university', 'SPAR'],
     ['spar market', 'SPAR'], ['spar enjoy', 'SPAR']
@@ -79,9 +80,12 @@
     if (!offer || !String(offer.name || '').trim()) throw new Error('Deze aanbieding heeft geen productnaam.');
     if (typeof idFactory !== 'function') throw new Error('Er kan geen uniek boodschappen-ID worden gemaakt.');
     const details = [
-      Number.isFinite(Number(offer.price)) ? `Prijs: €${Number(offer.price).toFixed(2)}` : '',
+      offer.price != null && offer.price !== '' && Number.isFinite(Number(offer.price)) ? `Prijs: €${Number(offer.price).toFixed(2)}` : '',
+      offer.originalPrice != null && offer.originalPrice !== '' && Number.isFinite(Number(offer.originalPrice)) ? `Normale prijs: €${Number(offer.originalPrice).toFixed(2)}` : '',
+      offer.discountPercent != null && offer.discountPercent !== '' && Number.isFinite(Number(offer.discountPercent)) ? `${Math.round(Number(offer.discountPercent))}% korting` : '',
       offer.promotionText || '',
-      offer.validTo ? `Geldig t/m ${offer.validTo}` : ''
+      offer.validFrom ? `Geldig vanaf ${offer.validFrom}` : '',
+      offer.validTo ? `geldig t/m ${offer.validTo}` : ''
     ].filter(Boolean);
     const mappedCategory = normalizeOfferCategory(offer.category, categories, 'Overig');
     return {
