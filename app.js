@@ -506,8 +506,9 @@ function renderMeals() {
 
 function renderGroceries() {
   const groups = groupBy(data.groceries, item => item.category || 'Overig');
+  const categories = [...new Set([...GROCERY_CATEGORIES, ...Object.keys(groups)])];
   return `<section class="card import-card grocery-import"><div><p class="eyebrow">Lijst verdelen</p><h2>Plakken of uploaden</h2><p>Hoeveelheden blijven staan. De app deelt producten automatisch in; regels met ✓ worden als gekocht gemarkeerd.</p></div><textarea id="groceryImportText" placeholder="250 g spinazie\n1 teentje knoflook\n✓ Zout"></textarea><div class="button-row"><button class="primary" data-import-groceries>Verdelen over categorieën</button><button class="secondary" data-pick-file="groceryImportFile">TXT, CSV of JSON kiezen</button></div></section>
-    <div class="grid three grocery-groups">${GROCERY_CATEGORIES.map(category => {
+    <div class="grid three grocery-groups">${categories.map(category => {
       const items = groups[category] || [];
       if (!items.length) return '';
       return `<section class="card"><div class="card-head"><h2>${esc(category)}</h2><span class="tag">${items.filter(item => !item.done).length} open</span></div><div class="list">${items.map(groceryRow).join('')}</div></section>`;
@@ -6522,18 +6523,38 @@ document.addEventListener('click', event => {
       return ['http:', 'https:'].includes(url.protocol) ? url.href : '';
     } catch (_) { return ''; }
   }
+  function offerMoney25(value) {
+    const amount = Number(value);
+    return value != null && value !== '' && Number.isFinite(amount) && amount >= 0
+      ? new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' }).format(amount)
+      : '';
+  }
   function renderOfferCard25(offer, archived = false, unknownStore = false) {
     const core = offerCore25();
     const key = core.key(offer);
     const isFavorite = (data.favoriteOffers25 || []).includes(key);
     const sourceUrl = validOfferUrl25(offer.sourceUrl || '');
-    const original = sourceUrl ? `<a href="${esc(sourceUrl)}" target="_blank" rel="noopener noreferrer">Open oorspronkelijke aanbieding</a>` : '<span class="muted">Geen bronlink beschikbaar</span>';
-    const dates = [offer.validFrom && `vanaf ${offerDate25(offer.validFrom)}`, offer.validTo && `t/m ${offerDate25(offer.validTo)}`].filter(Boolean).join(' · ') || 'Geldigheidsdatums niet opgegeven';
-    const discount = Number.isFinite(Number(offer.discountPercent)) ? ` · ${Math.round(Number(offer.discountPercent))}% korting` : '';
-    return `<article class="card offer-card25"><div class="offer-card-head25"><div><p class="eyebrow">${unknownStore ? 'Niet-ondersteunde winkel · ' : ''}${esc(offer.store || (unknownStore ? 'Onbekende winkel' : 'Supermarkt'))}${offer.category ? ` · ${esc(offer.category)}` : ''}</p><h2>${esc(offer.name)}</h2><p class="muted">${esc(offer.brand || '')}${offer.size ? `${offer.brand ? ' · ' : ''}${esc(offer.size)}` : ''}</p></div><strong class="offer-price25">${new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' }).format(Number(offer.price))}</strong></div>
-      <p>${offer.originalPrice != null ? `Was ${new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' }).format(Number(offer.originalPrice))}` : ''}${discount}</p>
-      <p class="muted">${esc(dates)} · Bron: ${esc(offer.source || 'PrijsProfeet')}</p>
-      <div class="button-row">${original}<button type="button" class="secondary" data-offer-favorite="${esc(key)}">${isFavorite ? '★ Favoriet' : '☆ Favoriet'}</button>${archived ? '' : `<button type="button" class="primary" data-offer-grocery="${esc(key)}">＋ Boodschappenlijst</button>`}</div></article>`;
+    const imageUrl = validOfferUrl25(offer.imageUrl || '');
+    const price = offerMoney25(offer.price);
+    const originalPrice = offerMoney25(offer.originalPrice);
+    const percent = core.offerDiscountPercent(offer);
+    const packageDetails = [offer.packaging || offer.size, offer.contents].filter(Boolean).filter((value, index, all) => all.indexOf(value) === index).join(' · ');
+    const promotion = [offer.promotionType, offer.promotionText].filter((value, index, all) => value && all.indexOf(value) === index).join(' · ');
+    const dates = offer.validFrom && offer.validTo
+      ? `Geldig van ${offerDate25(offer.validFrom)} t/m ${offerDate25(offer.validTo)}`
+      : offer.validFrom ? `Geldig vanaf ${offerDate25(offer.validFrom)}`
+        : offer.validTo ? `Geldig t/m ${offerDate25(offer.validTo)}` : '';
+    const original = sourceUrl ? `<a href="${esc(sourceUrl)}" target="_blank" rel="noopener noreferrer">Product bij ${esc(offer.store || 'de winkel')}</a>` : '';
+    return `<article class="card offer-card25">
+      <div class="offer-card-head25"><div><p class="eyebrow">${unknownStore ? 'Niet-ondersteunde winkel · ' : ''}${esc(offer.store || (unknownStore ? 'Onbekende winkel' : 'Supermarkt'))}${offer.brand ? ` · ${esc(offer.brand)}` : ''}</p><h2>${esc(offer.name)}</h2>${packageDetails ? `<p class="muted offer-package25">${esc(packageDetails)}</p>` : ''}</div>${price ? `<strong class="offer-price25">${esc(price)}</strong>` : ''}</div>
+      ${imageUrl ? `<img class="offer-image25" src="${esc(imageUrl)}" alt="${esc(offer.name)}" loading="lazy">` : ''}
+      ${(originalPrice || percent != null) ? `<p class="offer-discount25">${originalPrice ? `<span>Was <del>${esc(originalPrice)}</del></span>` : ''}${percent != null ? `<strong>${Math.round(percent)}% korting</strong>` : ''}</p>` : ''}
+      ${offer.unitPrice ? `<p class="offer-unit-price25">${esc(offer.unitPrice)}${offer.unitPriceUnit && !String(offer.unitPrice).includes(String(offer.unitPriceUnit)) ? `/${esc(offer.unitPriceUnit)}` : ''}</p>` : ''}
+      ${promotion ? `<p class="offer-promotion25">${esc(promotion)}</p>` : ''}
+      ${offer.deliveryInfo ? `<p class="muted">${esc(offer.deliveryInfo)}</p>` : ''}
+      ${dates || offer.category ? `<p class="muted">${dates ? esc(dates) : ''}${dates && offer.category ? ' · ' : ''}${offer.category ? `Categorie: ${esc(offer.category)}` : ''}</p>` : ''}
+      <p class="muted">Bron: ${esc(offer.source || 'PrijsProfeet')}</p>
+      <div class="button-row">${original}<button type="button" class="secondary" data-offer-favorite="${esc(key)}">${isFavorite ? '★ Favoriet' : '☆ Favoriet'}</button>${archived ? '' : `<button type="button" class="primary" data-offer-grocery="${esc(key)}">＋ Voeg toe aan boodschappenlijst</button>`}</div></article>`;
   }
   function renderOffers25() {
     const { active, archived, scheduled } = offerQuery25
@@ -6544,7 +6565,7 @@ document.addEventListener('click', event => {
     const checkedAt = queryCache[offerQuery25]?.checkedAt || '';
     const categories = [...new Set([
       ...GROCERY_CATEGORIES,
-      ...active.map(item => item.category || 'Overig')
+      ...active.map(item => offerCore25().normalizeOfferCategory(item.category, GROCERY_CATEGORIES, 'Onbekend'))
     ])].sort((a, b) => a.localeCompare(b, 'nl'));
     const matchingFilters = {
       stores: [...offerSelectedStores25],
@@ -6553,9 +6574,15 @@ document.addEventListener('click', event => {
       favorites,
       categories: GROCERY_CATEGORIES
     };
+    const categoryCounts = offerCore25().offerCategoryCounts(active, {
+      stores: [...offerSelectedStores25],
+      favoritesOnly: offerFavoritesOnly25,
+      favorites,
+      categories: GROCERY_CATEGORIES
+    });
     const filtered = active.filter(item => offerCore25().matchesOfferFilters(item, matchingFilters));
     const unknownStores = active.filter(item => !offerCore25().normalizeStore(item.store)
-      && (!offerFilters25.category || offerCore25().normalizeOfferCategory(item.category, GROCERY_CATEGORIES, 'Overig') === offerFilters25.category)
+      && (!offerFilters25.category || offerCore25().normalizeOfferCategory(item.category, GROCERY_CATEGORIES, 'Onbekend') === offerFilters25.category)
       && (!offerFavoritesOnly25 || favorites.includes(offerCore25().key(item))));
     const sorters = {
       price: (a, b) => Number(a.price) - Number(b.price),
@@ -6583,7 +6610,7 @@ document.addEventListener('click', event => {
     </section>
     <section class="card"><div class="offer-filters25">
       <fieldset class="offer-store-filter25"><legend>Supermarkten</legend><div class="offer-store-options25">${offerCore25().SUPPORTED_STORES.map(store => `<label class="offer-store-choice25 ${offerSelectedStores25.has(store) ? 'is-selected' : ''}"><input type="checkbox" data-offer-store="${esc(store)}" ${offerSelectedStores25.has(store) ? 'checked' : ''}>${esc(store)}</label>`).join('')}</div><button type="button" class="text-btn" data-offer-filters-reset>Standaardfilters herstellen</button></fieldset>
-      <label>Categorie<select data-offer-filter="category"><option value="">Alle categorieën</option>${categories.map(x => `<option value="${esc(x)}" ${offerFilters25.category === x ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select></label>
+      <label>Categorie<select data-offer-filter="category"><option value="">Alle categorieën</option>${categories.map(x => `<option value="${esc(x)}" ${offerFilters25.category === x ? 'selected' : ''}>${esc(x)} (${categoryCounts[x] || 0})</option>`).join('')}</select></label>
       <label>Sorteren op<select data-offer-filter="sort"><option value="ending" ${offerFilters25.sort === 'ending' ? 'selected' : ''}>Einddatum</option><option value="price" ${offerFilters25.sort === 'price' ? 'selected' : ''}>Prijs</option><option value="discount" ${offerFilters25.sort === 'discount' ? 'selected' : ''}>Korting</option></select></label>
       <label class="offer-favorite-filter25"><input type="checkbox" data-offer-favorites ${offerFavoritesOnly25 ? 'checked' : ''}> Favorieten</label>
       <label class="offer-favorite-filter25"><input type="checkbox" data-offer-archive ${data.settings?.archiveExpiredOffers !== false ? 'checked' : ''}> Verlopen aanbiedingen archiveren</label>
@@ -6644,7 +6671,7 @@ document.addEventListener('click', event => {
       if (!offerRequestGuard25.isCurrent(requestToken)) return;
       const offers = result.offers.map(item => ({
         ...item,
-        category: offerCore25().normalizeOfferCategory(item.category, GROCERY_CATEGORIES, 'Overig')
+        category: offerCore25().normalizeOfferCategory(item.category, GROCERY_CATEGORIES, 'Onbekend')
       }));
       setOfferResults25(offers);
       data.offerSearchCache25 = { ...cache, [term]: { offers, checkedAt: result.checkedAt } };
