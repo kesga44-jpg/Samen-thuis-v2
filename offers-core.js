@@ -60,11 +60,11 @@
     if (canonical) return canonical;
     const aliases = new Map([
       ['houdbaar', 'Voorraadkast'], ['houdbare producten', 'Voorraadkast'], ['pantry', 'Voorraadkast'],
-      ['shelf stable', 'Voorraadkast'], ['groenten', 'Groente'], ['produce', 'Groente'],
+      ['shelf stable', 'Voorraadkast'], ['groenten', 'Groente'],
       ['bakkerij', 'Brood & wraps'], ['bakery', 'Brood & wraps'], ['zuivel', 'Zuivel & vega'],
       ['dairy', 'Zuivel & vega'], ['vlees', 'Vlees & vis'], ['vis', 'Vlees & vis'],
       ['meat', 'Vlees & vis'], ['fish', 'Vlees & vis'], ['dranken', 'Drinken'],
-      ['beverages', 'Drinken'], ['huishouden', 'Schoonmaak'], ['household', 'Schoonmaak']
+      ['beverages', 'Drinken']
     ]);
     const mapped = aliases.get(key);
     return mapped && categories.includes(mapped) ? mapped : raw;
@@ -83,12 +83,13 @@
       offer.promotionText || '',
       offer.validTo ? `Geldig t/m ${offer.validTo}` : ''
     ].filter(Boolean);
+    const mappedCategory = normalizeOfferCategory(offer.category, categories, 'Overig');
     return {
       id: idFactory(),
       title: String(offer.name).trim(),
       amount: 1,
       unit: String(offer.size || ''),
-      category: normalizeOfferCategory(offer.category, categories, 'Overig'),
+      category: categories.includes(mappedCategory) ? mappedCategory : 'Overig',
       store: normalizeStore(offer.store) || String(offer.store || ''),
       done: false,
       note: details.join(' · '),
