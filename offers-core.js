@@ -36,6 +36,78 @@
     return { active, archive, upcoming };
   }
   const norm = s => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+  const SUPPORTED_STORES = ['Lidl', 'PLUS', 'Jumbo', 'Dirk', 'Aldi', 'Albert Heijn (AH)', 'SPAR'];
+  const storeNames = new Map([
+    ['lidl', 'Lidl'], ['lidl nederland', 'Lidl'], ['lidl supermarkt', 'Lidl'],
+    ['plus', 'PLUS'], ['plus supermarkt', 'PLUS'], ['plus retail', 'PLUS'],
+    ['jumbo', 'Jumbo'], ['jumbo supermarkt', 'Jumbo'],
+    ['dirk', 'Dirk'], ['dirk van den broek', 'Dirk'], ['dirk vd broek', 'Dirk'],
+    ['aldi', 'Aldi'], ['aldi nederland', 'Aldi'],
+    ['ah', 'Albert Heijn (AH)'], ['ah to go', 'Albert Heijn (AH)'], ['albert heijn', 'Albert Heijn (AH)'],
+    ['albert heijn to go', 'Albert Heijn (AH)'], ['albertheijn', 'Albert Heijn (AH)'],
+    ['spar', 'SPAR'], ['spar city', 'SPAR'], ['spar express', 'SPAR'], ['spar university', 'SPAR'],
+    ['spar market', 'SPAR'], ['spar enjoy', 'SPAR']
+  ]);
+  function normalizeStore(value) {
+    const key = norm(String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, ''));
+    return storeNames.get(key) || '';
+  }
+  function normalizeOfferCategory(value, categories = [], fallback = '') {
+    const raw = String(value || '').trim();
+    if (!raw) return fallback;
+    const key = norm(raw);
+    const canonical = categories.find(category => norm(category) === key);
+    if (canonical) return canonical;
+    const aliases = new Map([
+      ['houdbaar', 'Voorraadkast'], ['houdbare producten', 'Voorraadkast'], ['pantry', 'Voorraadkast'],
+      ['shelf stable', 'Voorraadkast'], ['groenten', 'Groente'], ['produce', 'Groente'],
+      ['bakkerij', 'Brood & wraps'], ['bakery', 'Brood & wraps'], ['zuivel', 'Zuivel & vega'],
+      ['dairy', 'Zuivel & vega'], ['vlees', 'Vlees & vis'], ['vis', 'Vlees & vis'],
+      ['meat', 'Vlees & vis'], ['fish', 'Vlees & vis'], ['dranken', 'Drinken'],
+      ['beverages', 'Drinken'], ['huishouden', 'Schoonmaak'], ['household', 'Schoonmaak']
+    ]);
+    const mapped = aliases.get(key);
+    return mapped && categories.includes(mapped) ? mapped : raw;
+  }
+  function matchesOfferFilters(offer, { stores = SUPPORTED_STORES, category = '', favoritesOnly = false, favorites = [], categories = [] } = {}) {
+    const store = normalizeStore(offer.store);
+    if (!store || !stores.includes(store)) return false;
+    if (category && normalizeOfferCategory(offer.category, categories, 'Overig') !== normalizeOfferCategory(category, categories, category)) return false;
+    return !favoritesOnly || favorites.includes(key(offer));
+  }
+  function groceryItemFromOffer(offer, idFactory, categories = []) {
+    if (!offer || !String(offer.name || '').trim()) throw new Error('Deze aanbieding heeft geen productnaam.');
+    if (typeof idFactory !== 'function') throw new Error('Er kan geen uniek boodschappen-ID worden gemaakt.');
+    const details = [
+      Number.isFinite(Number(offer.price)) ? `Prijs: €${Number(offer.price).toFixed(2)}` : '',
+      offer.promotionText || '',
+      offer.validTo ? `Geldig t/m ${offer.validTo}` : ''
+    ].filter(Boolean);
+    return {
+      id: idFactory(),
+      title: String(offer.name).trim(),
+      amount: 1,
+      unit: String(offer.size || ''),
+      category: normalizeOfferCategory(offer.category, categories, 'Overig'),
+      store: normalizeStore(offer.store) || String(offer.store || ''),
+      done: false,
+      note: details.join(' · '),
+      offerKey: key(offer),
+      offerUrl: String(offer.sourceUrl || ''),
+      source: 'offer'
+    };
+  }
+  function offerAlreadyInGroceries(groceries, offer) {
+    const offerKey = key(offer);
+    return (Array.isArray(groceries) ? groceries : []).some(item => item?.offerKey === offerKey);
+  }
+  function createLatestRequestGuard() {
+    let sequence = 0;
+    return {
+      begin() { sequence += 1; return sequence; },
+      isCurrent(token) { return token === sequence; }
+    };
+  }
   function key(o) {
     const id = o.ean ? `ean:${o.ean}` : `n:${norm(o.brand)}|${norm(o.name)}|${norm(o.size)}`;
     return `${id}|${norm(o.store)}|${o.price ?? ''}|${o.validTo || ''}`;
@@ -81,11 +153,16 @@
         discountPercent: finiteOrNull(item.discountPercent),
         validFrom: dateOnly(item.validFrom),
         validTo: dateOnly(item.validTo),
+        category: String(item.category || ''),
         source: String(item.source || payload.source || 'PrijsProfeet'),
         checkedAt: payload.checkedAt || new Date().toISOString()
       }));
     return { offers: dedupe(offers), source: String(payload.source || 'PrijsProfeet'), checkedAt: payload.checkedAt || new Date().toISOString() };
   }
 
-  return { isActive, partition, dedupe, key, dayInTz, fetchOffers };
+  return {
+    isActive, partition, dedupe, key, dayInTz, fetchOffers,
+    SUPPORTED_STORES, normalizeStore, normalizeOfferCategory, matchesOfferFilters,
+    groceryItemFromOffer, offerAlreadyInGroceries, createLatestRequestGuard
+  };
 });
