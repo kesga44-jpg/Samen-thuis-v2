@@ -106,8 +106,8 @@ test('offers normalize timestamp validity dates and reject impossible dates', as
     query: 'thee', url: '/offers',
     fetchImpl: async () => ({ ok: true, json: async () => ({
       offers: [
-        { name: 'Thee', price: 2, validFrom: '2026-10-12T00:00:00Z', validTo: '2026-10-31' },
-        { name: 'Kapot', price: 1, validFrom: '2026-02-31', validTo: '2026-99-99' }
+        { name: 'Thee', store: 'Jumbo', price: 2, validFrom: '2026-10-12T00:00:00Z', validTo: '2026-10-31' },
+        { name: 'Kapot', store: 'Jumbo', price: 1, validFrom: '2026-02-31', validTo: '2026-99-99' }
       ]
     }) })
   });
@@ -204,8 +204,8 @@ test('invalid or missing source prices never produce a fabricated zero discount'
     query: 'invalid',
     url: '/offers',
     fetchImpl: async () => ({ ok: true, json: async () => ({ offers: [
-      { name: 'No original', price: 1.2 },
-      { name: 'Zero original', price: 1, originalPrice: 0 },
+      { name: 'No original', store: 'Lidl', price: 1.2 },
+      { name: 'Zero original', store: 'Lidl', price: 1, originalPrice: 0 },
       { name: 'Invalid price', price: 'not-a-price' },
       { name: 'Negative price', price: -2 }
     ] }) })
@@ -228,8 +228,9 @@ test('an offer becomes a compatible unchecked grocery item that survives save an
   const offer = {
     ean: '8710001', name: 'Koffie', brand: 'Merk', store: 'AH', size: '500 g', packaging: '1 pak', contents: '500 g',
     price: 4.5, originalPrice: 6, promotionText: '2e halve prijs', promotionType: 'Bonus',
-    unitPrice: '€ 9,00/kg', category: 'Houdbaar', validFrom: '2026-10-10',
-    validTo: '2026-10-20', sourceUrl: 'https://example.test/offer', providerData: { category: 'Houdbaar' }
+    unitPrice: '€ 9,00/kg', unitPriceValue: 9, unitPriceUnit: 'kg', currency: 'EUR',
+    category: 'Koffie & Thee', unifiedCategory: 'koffie-thee', validFrom: '2026-10-10',
+    validTo: '2026-10-20', sourceUrl: 'https://example.test/offer', providerData: { category: 'Koffie & Thee', unified_category: 'koffie-thee' }
   };
   const item = O.groceryItemFromOffer(offer, () => 'grocery-unique', ['Groente', 'Voorraadkast', 'Overig']);
   assert.deepEqual({
@@ -239,21 +240,21 @@ test('an offer becomes a compatible unchecked grocery item that survives save an
     discountPercent: item.discountPercent, unitPrice: item.unitPrice,
     promotionText: item.promotionText, validFrom: item.validFrom, validTo: item.validTo
   }, {
-    id: 'grocery-unique', title: 'Koffie', category: 'Houdbaar', amount: 1,
+    id: 'grocery-unique', title: 'Koffie', category: 'Koffie & Thee', amount: 1,
     unit: '500 g', store: 'Albert Heijn (AH)', done: false, source: 'offer',
     brand: 'Merk', price: 4.5, originalPrice: 6, discountPercent: 25,
     unitPrice: '€ 9,00/kg', promotionText: '2e halve prijs',
     validFrom: '2026-10-10', validTo: '2026-10-20'
   });
-  assert.match(item.note, /4\.50/);
+  assert.match(item.note, /4,50/);
   assert.match(item.note, /25% korting/);
   assert.match(item.note, /€ 9,00\/kg/);
   const restored = JSON.parse(JSON.stringify({ groceries: [item] }));
   assert.equal(restored.groceries[0].title, 'Koffie');
   assert.equal(restored.groceries[0].offerKey, O.key(offer));
-  assert.equal(restored.groceries[0].providerData.category, 'Houdbaar');
+  assert.equal(restored.groceries[0].providerData.category, 'Koffie & Thee');
   const unknownCategory = O.groceryItemFromOffer({ ...offer, category: 'Niet ingedeeld' }, () => 'grocery-other', ['Groente', 'Voorraadkast', 'Overig']);
-  assert.equal(unknownCategory.category, 'Niet ingedeeld');
+  assert.equal(unknownCategory.category, 'Koffie & Thee');
 });
 test('offer duplicate detection ignores matching product names from different offers', () => {
   const first = { ean: '111', name: 'Melk', store: 'Lidl', price: 1, validTo: '2026-10-20' };

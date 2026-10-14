@@ -6545,7 +6545,10 @@ document.addEventListener('click', event => {
     const active = Array.isArray(data.offers25) ? data.offers25 : [];
     const archived = Array.isArray(data.offerArchive25) ? data.offerArchive25 : [];
     const scheduled = Array.isArray(data.offerScheduled25) ? data.offerScheduled25 : [];
-    const partition = core.partition(core.dedupe([...active, ...archived, ...scheduled]), new Date());
+    const groups = offerGroups25();
+    const supported = core.filterSupportedOffers([...active, ...archived, ...scheduled])
+      .map(item => core.applyOfficialCategory(item, groups));
+    const partition = core.partition(core.dedupe(supported), new Date());
     const keepArchive = data.settings?.archiveExpiredOffers !== false;
     const nextActive = core.dedupe(partition.active);
     const nextArchive = keepArchive ? core.dedupe(partition.archive) : [];
@@ -6568,21 +6571,26 @@ document.addEventListener('click', event => {
       return ['http:', 'https:'].includes(url.protocol) ? url.href : '';
     } catch (_) { return ''; }
   }
-  function offerMoney25(value) {
+  function offerMoney25(value, currency = 'EUR') {
     const amount = Number(value);
-    return value != null && value !== '' && Number.isFinite(amount) && amount >= 0
-      ? new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' }).format(amount)
-      : '';
+    if (value == null || value === '' || !Number.isFinite(amount) || amount < 0) return '';
+    try { return new Intl.NumberFormat('nl-NL', { style: 'currency', currency: String(currency || 'EUR').toUpperCase() }).format(amount); }
+    catch (_) { return ''; }
   }
-  function renderOfferCard25(offer, archived = false, unknownStore = false) {
+  function renderOfferCard25(offer, archived = false) {
     const core = offerCore25();
     const key = core.key(offer);
     const isFavorite = (data.favoriteOffers25 || []).includes(key);
     const sourceUrl = validOfferUrl25(offer.sourceUrl || '');
     const imageUrl = validOfferUrl25(offer.imageUrl || '');
-    const price = offerMoney25(offer.price);
-    const originalPrice = offerMoney25(offer.originalPrice);
+    const price = offerMoney25(offer.price, offer.currency);
+    const reliableOriginal = Number.isFinite(Number(offer.originalPrice)) && Number(offer.originalPrice) > Number(offer.price);
+    const originalPrice = reliableOriginal ? offerMoney25(offer.originalPrice, offer.currency) : '';
     const percent = core.offerDiscountPercent(offer);
+    const savingsAmount = reliableOriginal && Number.isFinite(Number(offer.savingsAmount))
+      && Number(offer.savingsAmount) > 0
+      && Math.abs(Number(offer.savingsAmount) - (Number(offer.originalPrice) - Number(offer.price))) <= 0.01
+      ? offerMoney25(offer.savingsAmount, offer.currency) : '';
     const packageDetails = [offer.packaging || offer.size, offer.contents].filter(Boolean).filter((value, index, all) => all.indexOf(value) === index).join(' · ');
     const promotion = [offer.promotionType, offer.promotionText].filter((value, index, all) => value && all.indexOf(value) === index).join(' · ');
     const estimated = offer.validUntilEstimated === true ? ' (geschat)' : '';
@@ -6590,16 +6598,16 @@ document.addEventListener('click', event => {
       ? `Geldig van ${offerDate25(offer.validFrom)} t/m ${offerDate25(offer.validTo)}${estimated}`
       : offer.validFrom ? `Geldig vanaf ${offerDate25(offer.validFrom)}`
         : offer.validTo ? `Geldig t/m ${offerDate25(offer.validTo)}${estimated}` : '';
-    const multiBuy = offer.multiBuyQuantity > 1 && offer.multiBuyPrice != null && offerMoney25(offer.multiBuyPrice)
-      ? `${offer.multiBuyQuantity} voor ${offerMoney25(offer.multiBuyPrice)}` : '';
+    const multiBuy = offer.multiBuyQuantity > 1 && offer.multiBuyPrice != null && offerMoney25(offer.multiBuyPrice, offer.currency)
+      ? `${offer.multiBuyQuantity} voor ${offerMoney25(offer.multiBuyPrice, offer.currency)}` : '';
     const extras = [multiBuy, offer.inStoreOnly ? 'Alleen in de winkel' : '', offer.onlineOnly ? 'Alleen online' : '',
-      offer.loyaltyPrice != null && offerMoney25(offer.loyaltyPrice) ? `${offer.loyaltyProgram || 'Klantenkaart'}-prijs ${offerMoney25(offer.loyaltyPrice)}` : '',
+      offer.loyaltyPrice != null && offerMoney25(offer.loyaltyPrice, offer.currency) ? `${offer.loyaltyProgram || 'Klantenkaart'}-prijs ${offerMoney25(offer.loyaltyPrice, offer.currency)}` : '',
       offer.maxPerCustomer ? `Max. ${offer.maxPerCustomer} per klant` : ''].filter(Boolean).join(' · ');
     const original = sourceUrl ? `<a href="${esc(sourceUrl)}" target="_blank" rel="noopener noreferrer">Product bij ${esc(offer.store || 'de winkel')}</a>` : '';
     return `<article class="card offer-card25">
-      <div class="offer-card-head25"><div><p class="eyebrow">${unknownStore ? 'Niet-ondersteunde winkel · ' : ''}${esc(offer.store || (unknownStore ? 'Onbekende winkel' : 'Supermarkt'))}${offer.brand ? ` · ${esc(offer.brand)}` : ''}</p><h2>${esc(offer.name)}</h2>${packageDetails ? `<p class="muted offer-package25">${esc(packageDetails)}</p>` : ''}</div>${price ? `<strong class="offer-price25">${esc(price)}</strong>` : ''}</div>
+      <div class="offer-card-head25"><div><p class="eyebrow">${esc(offer.store || 'Supermarkt')}${offer.brand ? ` · ${esc(offer.brand)}` : ''}${offer.ean ? ` · EAN ${esc(offer.ean)}` : ''}</p><h2>${esc(offer.name)}</h2>${packageDetails ? `<p class="muted offer-package25">${esc(packageDetails)}</p>` : ''}</div>${price ? `<strong class="offer-price25">${esc(price)}</strong>` : ''}</div>
       ${imageUrl ? `<img class="offer-image25" src="${esc(imageUrl)}" alt="${esc(offer.name)}" loading="lazy">` : ''}
-      ${(originalPrice || percent != null) ? `<p class="offer-discount25">${originalPrice ? `<span>Was <del>${esc(originalPrice)}</del></span>` : ''}${percent != null ? `<strong>${Math.round(percent)}% korting</strong>` : ''}</p>` : ''}
+      ${(originalPrice || percent != null || savingsAmount) ? `<p class="offer-discount25">${originalPrice ? `<span>Was <del>${esc(originalPrice)}</del></span>` : ''}${percent != null ? `<strong>${Math.round(percent)}% korting</strong>` : ''}${savingsAmount ? `<span>${esc(savingsAmount)} korting</span>` : ''}</p>` : ''}
       ${core.formatUnitPrice(offer) ? `<p class="offer-unit-price25">${esc(core.formatUnitPrice(offer))}</p>` : ''}
       ${promotion ? `<p class="offer-promotion25">${esc(promotion)}</p>` : ''}
       ${extras ? `<p class="offer-promotion25">${esc(extras)}</p>` : ''}
@@ -6627,23 +6635,19 @@ document.addEventListener('click', event => {
     };
     const selection = { group: offerGroup25, categorySlug: offerFilters25.category };
     const filtered = active.filter(item => core.matchesOfferFilters(item, matchingFilters) && core.matchesCategorySelection(item, selection));
-    const unknownStores = active.filter(item => !core.normalizeStore(item.store)
-      && core.matchesCategorySelection(item, selection)
-      && (!offerFavoritesOnly25 || favorites.includes(core.key(item))));
     const sorters = {
       price: (a, b) => Number(a.price) - Number(b.price),
       discount: (a, b) => Number(b.discountPercent || 0) - Number(a.discountPercent || 0),
       ending: (a, b) => String(a.validTo || '9999-12-31').localeCompare(String(b.validTo || '9999-12-31'))
     };
     filtered.sort(sorters[offerFilters25.sort] || sorters.ending);
-    unknownStores.sort(sorters[offerFilters25.sort] || sorters.ending);
     const emptyMessage = !active.length
       ? offerError25 ? '' : offerQuery25 ? 'Geen actuele aanbiedingen gevonden voor deze zoekopdracht.' : 'Zoek op productnaam of merk om actuele aanbiedingen op te halen.'
       : offerSelectedStores25.size === 0
         ? 'Selecteer ten minste één supermarkt om aanbiedingen te bekijken.'
-        : (offerFilters25.category || offerGroup25) && !filtered.length && !unknownStores.length
+        : (offerFilters25.category || offerGroup25) && !filtered.length
           ? `Geen aanbiedingen in ${selectedCategory ? 'de categorie ' + selectedCategory.name : 'de hoofdgroep ' + (selectedGroup?.name || '')} voor de geselecteerde supermarkten.`
-          : offerFavoritesOnly25 && !filtered.length && !unknownStores.length
+          : offerFavoritesOnly25 && !filtered.length
             ? 'Geen favoriete aanbiedingen voldoen aan deze filters.'
             : 'Geen aanbiedingen voldoen aan deze filters.';
     return `<div class="offers-page25"><section class="card offers-toolbar25"><div><p class="eyebrow">ACTUELE SUPERMARKTAANBIEDINGEN</p><h2>Zoek in PrijsProfeet</h2></div>
@@ -6667,14 +6671,16 @@ document.addEventListener('click', event => {
       <label class="offer-favorite-filter25"><input type="checkbox" data-offer-archive ${data.settings?.archiveExpiredOffers !== false ? 'checked' : ''}> Verlopen aanbiedingen archiveren</label>
     </div></section>
     <div class="offers-list25">${filtered.map(item => renderOfferCard25(item)).join('') || (!offerError25 && !offerLoading25 ? `<section class="card"><p class="muted">${esc(emptyMessage)}</p></section>` : '')}</div>
-    ${offerHasMore25 && !offerLoading25 && active.length ? '<div class="button-row"><button type="button" class="secondary" data-offer-more>Meer resultaten laden</button></div>' : ''}
-    ${unknownStores.length ? `<section class="card offer-unknown-stores25"><h2>Niet-ondersteunde winkels</h2><p class="muted">Deze resultaten zijn door de bron teruggegeven, maar vallen niet onder de zeven supermarktfilters.</p><div class="offers-list25">${unknownStores.map(item => renderOfferCard25(item, false, true)).join('')}</div></section>` : ''}
+    ${offerHasMore25 && !offerLoading25 ? '<div class="button-row"><button type="button" class="secondary" data-offer-more>Meer resultaten laden</button></div>' : ''}
     ${archived.length ? `<details class="card offer-archive25"><summary>Archief verlopen aanbiedingen (${archived.length})</summary><div class="offers-list25">${archived.map(item => renderOfferCard25(item, true)).join('')}</div></details>` : ''}
     ${scheduled.length ? `<details class="card offer-archive25"><summary>Binnenkort geldig (${scheduled.length})</summary><div class="offers-list25">${scheduled.map(item => renderOfferCard25(item, true)).join('')}</div></details>` : ''}
     <p class="small-note">Aanbiedingen kunnen wijzigen. Controleer de geldigheid en prijs bij de oorspronkelijke bron voordat je koopt.</p></div>`;
   }
   function setOfferResults25(offers) {
-    const partition = offerCore25().partition(offerCore25().dedupe(offers), new Date());
+    const core = offerCore25();
+    const groups = offerGroups25();
+    const supported = core.filterSupportedOffers(offers).map(item => core.applyOfficialCategory(item, groups));
+    const partition = core.partition(core.dedupe(supported), new Date());
     data.offers25 = partition.active;
     data.offerScheduled25 = partition.upcoming;
     data.offerArchive25 = data.settings?.archiveExpiredOffers === false ? [] : partition.archive;
@@ -7398,7 +7404,7 @@ document.addEventListener('click', event => {
       const item = offerCore25().groceryItemFromOffer({
         ...offer,
         sourceUrl: validOfferUrl25(offer.sourceUrl) || ''
-      }, id, GROCERY_CATEGORIES);
+      }, id, offerGroups25());
       data.groceries.push(item);
       addOffer.disabled = true;
       save(); toast('Toegevoegd aan de boodschappenlijst'); render(); return;

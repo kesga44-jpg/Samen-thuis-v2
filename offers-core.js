@@ -36,7 +36,7 @@
     return { active, archive, upcoming };
   }
   const norm = s => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
-  const SUPPORTED_STORES = ['Lidl', 'PLUS', 'Jumbo', 'Dirk', 'Aldi', 'Albert Heijn (AH)', 'SPAR'];
+  const SUPPORTED_STORES = Object.freeze(['Lidl', 'PLUS', 'Jumbo', 'Dirk', 'Aldi', 'Albert Heijn (AH)', 'SPAR']);
   const storeNames = new Map([
     ['lidl', 'Lidl'], ['lidl nederland', 'Lidl'], ['lidl supermarkt', 'Lidl'],
     ['plus', 'PLUS'], ['plus supermarkt', 'PLUS'], ['plus retail', 'PLUS'],
@@ -53,6 +53,12 @@
     const key = norm(String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, ''));
     return storeNames.get(key) || '';
   }
+  function filterSupportedOffers(offers) {
+    return (Array.isArray(offers) ? offers : []).flatMap(offer => {
+      const store = normalizeStore(offer?.store);
+      return store && SUPPORTED_STORES.includes(store) ? [{ ...offer, store }] : [];
+    });
+  }
   function normalizeOfferCategory(value, categories = [], fallback = '') {
     const raw = String(value || '').trim();
     if (!raw) return fallback;
@@ -62,15 +68,17 @@
   }
   function offerDiscountPercent(offer) {
     const reported = finiteOrNull(offer?.discountPercent);
-    if (reported != null && reported > 0 && reported <= 100) return reported;
     const price = finiteOrNull(offer?.price);
     const originalPrice = finiteOrNull(offer?.originalPrice);
-    if (price == null || originalPrice == null || originalPrice <= 0 || originalPrice <= price) return null;
-    return ((originalPrice - price) / originalPrice) * 100;
+    const validReported = reported != null && reported > 0 && reported <= 100 ? reported : null;
+    if (price == null || originalPrice == null) return validReported;
+    if (originalPrice <= 0 || originalPrice <= price) return null;
+    const calculated = ((originalPrice - price) / originalPrice) * 100;
+    return validReported != null && Math.abs(validReported - calculated) <= 1.5 ? validReported : calculated;
   }
   function matchesOfferFilters(offer, { stores = SUPPORTED_STORES, category = '', favoritesOnly = false, favorites = [], categories = [] } = {}) {
     const store = normalizeStore(offer.store);
-    if (!store || !stores.includes(store)) return false;
+    if (!store || !SUPPORTED_STORES.includes(store) || !stores.map(normalizeStore).includes(store)) return false;
     if (category && normalizeOfferCategory(offer.category, categories, 'Onbekend') !== normalizeOfferCategory(category, categories, category)) return false;
     return !favoritesOnly || favorites.includes(key(offer));
   }
@@ -87,36 +95,57 @@
     if (!offer || !String(offer.name || '').trim()) throw new Error('Deze aanbieding heeft geen productnaam.');
     if (typeof idFactory !== 'function') throw new Error('Er kan geen uniek boodschappen-ID worden gemaakt.');
     const discountPercent = offerDiscountPercent(offer);
+    const category = categoryRecordForOffer(offer, categories);
+    const originalPrice = finiteOrNull(offer.originalPrice);
+    const price = finiteOrNull(offer.price);
     const details = [
-      offer.price != null && offer.price !== '' && Number.isFinite(Number(offer.price)) ? `Prijs: €${Number(offer.price).toFixed(2)}` : '',
-      offer.originalPrice != null && offer.originalPrice !== '' && Number.isFinite(Number(offer.originalPrice)) ? `Normale prijs: €${Number(offer.originalPrice).toFixed(2)}` : '',
+      price != null ? `Prijs: ${formatMoney(price, offer.currency)}` : '',
+      originalPrice != null && price != null && originalPrice > price ? `Normale prijs: ${formatMoney(originalPrice, offer.currency)}` : '',
       discountPercent != null ? `${Math.round(discountPercent)}% korting` : '',
       formatUnitPrice(offer),
       offer.promotionText || '',
       offer.validFrom ? `Geldig vanaf ${offer.validFrom}` : '',
       offer.validTo ? `geldig t/m ${offer.validTo}` : ''
     ].filter(Boolean);
-    const mappedCategory = normalizeOfferCategory(offer.category, categories, 'Onbekend');
+    const mappedCategory = category?.name || 'Onbekend';
     return {
       id: idFactory(),
       title: String(offer.name).trim(),
       brand: String(offer.brand || ''),
+      ean: String(offer.ean || ''),
       amount: 1,
       unit: String(offer.size || offer.packaging || ''),
       packaging: String(offer.packaging || ''),
       contents: String(offer.contents || ''),
       category: mappedCategory,
+      categorySlug: category?.slug || String(offer.categorySlug || offer.unifiedCategory || ''),
+      categoryGroup: category?.group || '',
+      unifiedCategory: String(offer.unifiedCategory || offer.categorySlug || ''),
       store: normalizeStore(offer.store) || String(offer.store || ''),
-      price: finiteOrNull(offer.price),
-      originalPrice: finiteOrNull(offer.originalPrice),
+      price,
+      originalPrice: originalPrice != null && price != null && originalPrice > price ? originalPrice : null,
       discountPercent,
+      savingsAmount: finiteOrNull(offer.savingsAmount),
+      currency: String(offer.currency || 'EUR'),
       unitPrice: String(offer.unitPrice || ''),
       unitPriceUnit: String(offer.unitPriceUnit || ''),
       unitPriceValue: finiteOrNull(offer.unitPriceValue),
       promotionType: String(offer.promotionType || ''),
       promotionText: String(offer.promotionText || ''),
+      promotionalKeywords: Array.isArray(offer.promotionalKeywords) ? offer.promotionalKeywords : [],
+      multiBuyQuantity: finiteOrNull(offer.multiBuyQuantity),
+      multiBuyPrice: finiteOrNull(offer.multiBuyPrice),
+      promoGroupId: offer.promoGroupId ?? null,
+      promoGroupMixable: offer.promoGroupMixable ?? null,
+      promotionStatus: String(offer.promotionStatus || ''),
       validFrom: String(offer.validFrom || ''),
       validTo: String(offer.validTo || ''),
+      validUntilEstimated: offer.validUntilEstimated === true,
+      inStoreOnly: offer.inStoreOnly === true,
+      onlineOnly: offer.onlineOnly === true,
+      loyaltyPrice: finiteOrNull(offer.loyaltyPrice),
+      loyaltyProgram: String(offer.loyaltyProgram || ''),
+      maxPerCustomer: finiteOrNull(offer.maxPerCustomer),
       imageUrl: String(offer.imageUrl || ''),
       done: false,
       note: details.join(' · '),
@@ -157,6 +186,11 @@
     return Number.isFinite(number) ? number : null;
   }
 
+  function formatMoney(value, currency = 'EUR') {
+    const code = String(currency || 'EUR').toUpperCase();
+    try { return new Intl.NumberFormat('nl-NL', { style: 'currency', currency: code }).format(value).replace(/\u00a0/g, ' '); }
+    catch (_) { return ''; }
+  }
 
   // Officiële PrijsProfeet-indeling (GET /api/v1/categories). Alleen gebruikt als expliciete fallback
   // en voor de presentatievolgorde; de API-response blijft leidend voor naam, group en count.
@@ -189,50 +223,55 @@
     });
     return out;
   }
-  // Bouwt de hoofdgroepen op uit het veld `group`. Onbekende/ontbrekende groepen komen achteraan
-  // (ontbrekend → 'overig'); bekende categorieën behouden de gewenste volgorde, nieuwe volgen daarna.
+  // Bouwt de vijf hoofdgroepen op uit het veld `group`; onbekende of ontbrekende groepen vallen onder 'overig'.
   function buildCategoryGroups(apiCategories) {
     const categories = normalizeCategoryList(apiCategories);
     const order = new Map(KNOWN_CATEGORIES.map((c, i) => [c.slug, i]));
     const groups = CATEGORY_GROUPS.map(g => ({ ...g, categories: [] }));
     const byId = new Map(groups.map(g => [g.id, g]));
     categories.forEach(cat => {
-      const id = cat.group || 'overig';
-      if (!byId.has(id)) {
-        const g = { id, name: id.charAt(0).toUpperCase() + id.slice(1), categories: [] };
-        byId.set(id, g); groups.push(g);
-      }
+      const id = byId.has(cat.group) ? cat.group : 'overig';
       byId.get(id).categories.push({ ...cat, group: id });
     });
     groups.forEach(g => g.categories.sort((a, b) => (order.has(a.slug) ? order.get(a.slug) : 1e6) - (order.has(b.slug) ? order.get(b.slug) : 1e6)));
-    return groups.filter(g => g.categories.length);
+    return categories.length ? groups : [];
   }
   function categoryBySlug(groups, slug) {
     for (const g of groups || []) { const c = g.categories.find(x => x.slug === slug); if (c) return c; }
     return null;
   }
+  function categoryRecordForOffer(offer, categories = []) {
+    const slug = String(offer?.unifiedCategory || offer?.unified_category || offer?.categorySlug || offer?.providerData?.unified_category || '').trim();
+    const entries = (Array.isArray(categories) ? categories : []).flatMap(item => Array.isArray(item?.categories) ? item.categories : [item]);
+    let category = slug ? entries.find(item => item?.slug === slug) : null;
+    if (!category && slug) category = KNOWN_CATEGORIES.find(item => item.slug === slug) || null;
+    if (!category && !slug) {
+      const label = norm(offer?.category);
+      category = entries.find(item => item?.name && norm(item.name) === label)
+        || KNOWN_CATEGORIES.find(item => norm(item.name) === label)
+        || null;
+    }
+    return category || null;
+  }
   // Koppelt een product via de officiële slug (unified_category) aan naam + group. Geen fuzzy matching.
   function applyOfficialCategory(offer, groups) {
-    const slug = String(offer?.unifiedCategory || offer?.categorySlug || '').trim();
+    const slug = String(offer?.unifiedCategory || offer?.unified_category || offer?.categorySlug || offer?.providerData?.unified_category || '').trim();
     const cat = slug ? categoryBySlug(groups, slug) : null;
     if (cat) return { ...offer, categorySlug: cat.slug, category: cat.name, categoryGroup: cat.group };
     const known = slug ? KNOWN_CATEGORIES.find(c => c.slug === slug) : null;
     if (known) return { ...offer, categorySlug: known.slug, category: known.name, categoryGroup: known.group };
-    return { ...offer, categorySlug: slug, category: slug ? (offer.category || slug) : 'Onbekend', categoryGroup: slug ? 'overig' : '' };
+    return { ...offer, categorySlug: slug, category: 'Onbekend', categoryGroup: '' };
   }
   // unit_price is door de API al per standaardhoeveelheid berekend; alleen formatteren, niet omrekenen.
   function formatUnitPrice(offer) {
     const value = finiteOrNull(offer?.unitPriceValue ?? offer?.unitPrice);
     const unit = String(offer?.unitPriceUnit || '').trim();
-    if (value == null || value < 0) {
-      const text = String(offer?.unitPrice || '').trim();
-      return text && !/^[\d.,\s]+$/.test(text) ? text : '';
-    }
-    const amount = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' }).format(value).replace(/\u00a0/g, ' ');
-    return unit ? `${amount}/${unit}` : amount;
+    if (value == null || value < 0 || !['kg', 'l', 'stuk'].includes(unit.toLowerCase())) return '';
+    const amount = formatMoney(value, offer.currency);
+    return amount ? `${amount}/${unit}` : '';
   }
   function matchesCategorySelection(offer, { group = '', categorySlug = '' } = {}) {
-    if (categorySlug) return String(offer.categorySlug || '') === categorySlug;
+    if (categorySlug) return String(offer.categorySlug || offer.unifiedCategory || offer.unified_category || '') === categorySlug;
     if (group) return String(offer.categoryGroup || '') === group;
     return true;
   }
@@ -254,12 +293,12 @@
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(payload.error || `Aanbiedingen ophalen mislukt (${response.status}).`);
     if (!Array.isArray(payload.offers)) throw new Error('De aanbiedingenbron gaf geen geldig aanbod terug.');
-    const offers = payload.offers.filter(item => item && String(item.name || '').trim() && finiteOrNull(item.price) != null && Number(item.price) >= 0)
+    const offers = filterSupportedOffers(payload.offers.filter(item => item && String(item.name || '').trim() && finiteOrNull(item.price) != null && Number(item.price) >= 0)
       .map(item => ({
         ...item,
         name: String(item.name).trim(),
         brand: String(item.brand || ''),
-        store: String(item.store || ''),
+        store: normalizeStore(item.store || item.retailer),
         price: finiteOrNull(item.price),
         originalPrice: finiteOrNull(item.originalPrice),
         discountPercent: offerDiscountPercent({
@@ -270,10 +309,11 @@
         validFrom: dateOnly(item.validFrom),
         validTo: dateOnly(item.validTo),
         category: String(item.category || ''),
-        categorySlug: String(item.unifiedCategory || ''),
+        unifiedCategory: String(item.unifiedCategory || item.unified_category || item.categorySlug || item.providerData?.unified_category || ''),
+        categorySlug: String(item.unifiedCategory || item.unified_category || item.categorySlug || item.providerData?.unified_category || ''),
         source: String(item.source || payload.source || 'PrijsProfeet'),
         checkedAt: payload.checkedAt || new Date().toISOString()
-      }));
+      })));
     return { offers: dedupe(offers), hasMore: payload.hasMore === true, page: Number(payload.page) || page, source: String(payload.source || 'PrijsProfeet'), checkedAt: payload.checkedAt || new Date().toISOString() };
   }
 
@@ -289,10 +329,10 @@
   }
 
   return {
-    CATEGORY_GROUPS, KNOWN_CATEGORIES, normalizeCategoryList, buildCategoryGroups, categoryBySlug, applyOfficialCategory, formatUnitPrice,
+    CATEGORY_GROUPS, KNOWN_CATEGORIES, normalizeCategoryList, buildCategoryGroups, categoryBySlug, categoryRecordForOffer, applyOfficialCategory, formatUnitPrice,
     matchesCategorySelection, mergeOffers, fetchCategories,
     isActive, partition, dedupe, key, dayInTz, fetchOffers,
-    SUPPORTED_STORES, normalizeStore, normalizeOfferCategory, offerDiscountPercent, offerCategoryCounts, matchesOfferFilters,
+    SUPPORTED_STORES, normalizeStore, filterSupportedOffers, normalizeOfferCategory, offerDiscountPercent, offerCategoryCounts, matchesOfferFilters,
     groceryItemFromOffer, offerAlreadyInGroceries, createLatestRequestGuard
   };
 });
