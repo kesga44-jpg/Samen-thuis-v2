@@ -6671,7 +6671,7 @@ document.addEventListener('click', event => {
       <label class="offer-favorite-filter25"><input type="checkbox" data-offer-archive ${data.settings?.archiveExpiredOffers !== false ? 'checked' : ''}> Verlopen aanbiedingen archiveren</label>
     </div></section>
     <div class="offers-list25">${filtered.map(item => renderOfferCard25(item)).join('') || (!offerError25 && !offerLoading25 ? `<section class="card"><p class="muted">${esc(emptyMessage)}</p></section>` : '')}</div>
-    ${offerHasMore25 && !offerLoading25 && active.length ? '<div class="button-row"><button type="button" class="secondary" data-offer-more>Meer resultaten laden</button></div>' : ''}
+    ${offerHasMore25 && !offerLoading25 ? '<div class="button-row"><button type="button" class="secondary" data-offer-more>Meer resultaten laden</button></div>' : ''}
     ${archived.length ? `<details class="card offer-archive25"><summary>Archief verlopen aanbiedingen (${archived.length})</summary><div class="offers-list25">${archived.map(item => renderOfferCard25(item, true)).join('')}</div></details>` : ''}
     ${scheduled.length ? `<details class="card offer-archive25"><summary>Binnenkort geldig (${scheduled.length})</summary><div class="offers-list25">${scheduled.map(item => renderOfferCard25(item, true)).join('')}</div></details>` : ''}
     <p class="small-note">Aanbiedingen kunnen wijzigen. Controleer de geldigheid en prijs bij de oorspronkelijke bron voordat je koopt.</p></div>`;

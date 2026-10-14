@@ -112,6 +112,7 @@
       id: idFactory(),
       title: String(offer.name).trim(),
       brand: String(offer.brand || ''),
+      ean: String(offer.ean || ''),
       amount: 1,
       unit: String(offer.size || offer.packaging || ''),
       packaging: String(offer.packaging || ''),
@@ -124,13 +125,27 @@
       price,
       originalPrice: originalPrice != null && price != null && originalPrice > price ? originalPrice : null,
       discountPercent,
+      savingsAmount: finiteOrNull(offer.savingsAmount),
+      currency: String(offer.currency || 'EUR'),
       unitPrice: String(offer.unitPrice || ''),
       unitPriceUnit: String(offer.unitPriceUnit || ''),
       unitPriceValue: finiteOrNull(offer.unitPriceValue),
       promotionType: String(offer.promotionType || ''),
       promotionText: String(offer.promotionText || ''),
+      promotionalKeywords: Array.isArray(offer.promotionalKeywords) ? offer.promotionalKeywords : [],
+      multiBuyQuantity: finiteOrNull(offer.multiBuyQuantity),
+      multiBuyPrice: finiteOrNull(offer.multiBuyPrice),
+      promoGroupId: offer.promoGroupId ?? null,
+      promoGroupMixable: offer.promoGroupMixable ?? null,
+      promotionStatus: String(offer.promotionStatus || ''),
       validFrom: String(offer.validFrom || ''),
       validTo: String(offer.validTo || ''),
+      validUntilEstimated: offer.validUntilEstimated === true,
+      inStoreOnly: offer.inStoreOnly === true,
+      onlineOnly: offer.onlineOnly === true,
+      loyaltyPrice: finiteOrNull(offer.loyaltyPrice),
+      loyaltyProgram: String(offer.loyaltyProgram || ''),
+      maxPerCustomer: finiteOrNull(offer.maxPerCustomer),
       imageUrl: String(offer.imageUrl || ''),
       done: false,
       note: details.join(' · '),
@@ -208,23 +223,18 @@
     });
     return out;
   }
-  // Bouwt de hoofdgroepen op uit het veld `group`. Onbekende/ontbrekende groepen komen achteraan
-  // (ontbrekend → 'overig'); bekende categorieën behouden de gewenste volgorde, nieuwe volgen daarna.
+  // Bouwt de vijf hoofdgroepen op uit het veld `group`; onbekende of ontbrekende groepen vallen onder 'overig'.
   function buildCategoryGroups(apiCategories) {
     const categories = normalizeCategoryList(apiCategories);
     const order = new Map(KNOWN_CATEGORIES.map((c, i) => [c.slug, i]));
     const groups = CATEGORY_GROUPS.map(g => ({ ...g, categories: [] }));
     const byId = new Map(groups.map(g => [g.id, g]));
     categories.forEach(cat => {
-      const id = cat.group || 'overig';
-      if (!byId.has(id)) {
-        const g = { id, name: id.charAt(0).toUpperCase() + id.slice(1), categories: [] };
-        byId.set(id, g); groups.push(g);
-      }
+      const id = byId.has(cat.group) ? cat.group : 'overig';
       byId.get(id).categories.push({ ...cat, group: id });
     });
     groups.forEach(g => g.categories.sort((a, b) => (order.has(a.slug) ? order.get(a.slug) : 1e6) - (order.has(b.slug) ? order.get(b.slug) : 1e6)));
-    return groups.filter(g => g.categories.length);
+    return categories.length ? groups : [];
   }
   function categoryBySlug(groups, slug) {
     for (const g of groups || []) { const c = g.categories.find(x => x.slug === slug); if (c) return c; }
