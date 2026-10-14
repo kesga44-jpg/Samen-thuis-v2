@@ -156,7 +156,77 @@
     return Number.isFinite(number) ? number : null;
   }
 
-  async function fetchOffers({ query, url, headers = {}, fetchImpl = globalThis.fetch, signal } = {}) {
+
+  // Officiële PrijsProfeet-indeling (GET /api/v1/categories). Alleen gebruikt als expliciete fallback
+  // en voor de presentatievolgorde; de API-response blijft leidend voor naam, group en count.
+  const CATEGORY_GROUPS = [
+    { id: 'vers', name: 'Vers' }, { id: 'houdbaar', name: 'Houdbaar' }, { id: 'dranken', name: 'Dranken' },
+    { id: 'verzorging', name: 'Verzorging' }, { id: 'overig', name: 'Overig' }
+  ];
+  const KNOWN_CATEGORIES = [
+    ['groente-fruit', 'Groente & Fruit', 'vers'], ['zuivel-eieren', 'Zuivel & Eieren', 'vers'], ['vega', 'Vega & Plantaardig', 'vers'],
+    ['kaas', 'Kaas & Vleeswaren', 'vers'], ['vlees', 'Vlees & Gevogelte', 'vers'], ['vis', 'Vis & Zeevruchten', 'vers'],
+    ['brood-bakkerij', 'Brood & Bakkerij', 'vers'],
+    ['ontbijt', 'Ontbijt & Beleg', 'houdbaar'], ['pasta-rijst-wereldkeuken', 'Pasta, Rijst & Wereldkeuken', 'houdbaar'],
+    ['soepen-conserven-sauzen', 'Soepen, Conserven & Sauzen', 'houdbaar'], ['snoep-koek-chips', 'Snoep, Koek & Chips', 'houdbaar'],
+    ['frisdrank', 'Frisdrank & Sappen', 'dranken'], ['koffie-thee', 'Koffie & Thee', 'dranken'], ['bier-wijn-sterke-drank', 'Bier, Wijn & Dranken', 'dranken'],
+    ['baby-kind', 'Baby & Kind', 'verzorging'], ['huidverzorging', 'Huidverzorging', 'verzorging'], ['haarverzorging', 'Haarverzorging', 'verzorging'],
+    ['deodorant', 'Deodorant', 'verzorging'], ['mondverzorging', 'Mondverzorging', 'verzorging'], ['gezondheid', 'Gezondheid & Vitamines', 'verzorging'],
+    ['drogisterij', 'Drogisterij overig', 'verzorging'],
+    ['diepvries', 'Diepvries', 'overig'], ['huisdier', 'Huisdieren', 'overig'], ['huishouden', 'Huishouden', 'overig'], ['overig', 'Overig', 'overig']
+  ].map(([slug, name, group]) => ({ slug, name, group, count: null }));
+
+  function normalizeCategoryList(list) {
+    const seen = new Set();
+    const out = [];
+    (Array.isArray(list) ? list : []).forEach(item => {
+      const slug = String(item?.slug || '').trim();
+      if (!slug || seen.has(slug)) return;
+      seen.add(slug);
+      const count = finiteOrNull(item.count);
+      out.push({ slug, name: String(item.name || slug).trim() || slug, group: String(item.group || '').trim().toLowerCase(), count });
+    });
+    return out;
+  }
+  // Bouwt de hoofdgroepen op uit het veld `group`. Onbekende/ontbrekende groepen komen achteraan
+  // (ontbrekend → 'overig'); bekende categorieën behouden de gewenste volgorde, nieuwe volgen daarna.
+  function buildCategoryGroups(apiCategories) {
+    const categories = normalizeCategoryList(apiCategories);
+    const order = new Map(KNOWN_CATEGORIES.map((c, i) => [c.slug, i]));
+    const groups = CATEGORY_GROUPS.map(g => ({ ...g, categories: [] }));
+    const byId = new Map(groups.map(g => [g.id, g]));
+    categories.forEach(cat => {
+      const id = cat.group || 'overig';
+      if (!byId.has(id)) {
+        const g = { id, name: id.charAt(0).toUpperCase() + id.slice(1), categories: [] };
+        byId.set(id, g); groups.push(g);
+      }
+      byId.get(id).categories.push({ ...cat, group: id });
+    });
+    groups.forEach(g => g.categories.sort((a, b) => (order.has(a.slug) ? order.get(a.slug) : 1e6) - (order.has(b.slug) ? order.get(b.slug) : 1e6)));
+    return groups.filter(g => g.categories.length);
+  }
+  function categoryBySlug(groups, slug) {
+    for (const g of groups || []) { const c = g.categories.find(x => x.slug === slug); if (c) return c; }
+    return null;
+  }
+  // Koppelt een product via de officiële slug (unified_category) aan naam + group. Geen fuzzy matching.
+  function applyOfficialCategory(offer, groups) {
+    const slug = String(offer?.unifiedCategory || offer?.categorySlug || '').trim();
+    const cat = slug ? categoryBySlug(groups, slug) : null;
+    if (cat) return { ...offer, categorySlug: cat.slug, category: cat.name, categoryGroup: cat.group };
+    return { ...offer, categorySlug: slug, category: slug ? (offer.category || slug) : 'Onbekend', categoryGroup: slug ? 'overig' : '' };
+  }
+  function matchesCategorySelection(offer, { group = '', categorySlug = '' } = {}) {
+    if (categorySlug) return String(offer.categorySlug || '') === categorySlug;
+    if (group) return String(offer.categoryGroup || '') === group;
+    return true;
+  }
+  function mergeOffers(existing, incoming) {
+    return dedupe([...(existing || []), ...(incoming || [])]);
+  }
+
+  async function fetchOffers({ query, category = '', page = 1, url, headers = {}, fetchImpl = globalThis.fetch, signal } = {}) {
     const term = String(query || '').trim();
     if (!term) throw new Error('Vul een productnaam of merk in.');
     if (!url) throw new Error('De aanbiedingenbron is niet geconfigureerd.');
@@ -164,7 +234,7 @@
     const response = await fetchImpl(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...headers },
-      body: JSON.stringify({ search: term.slice(0, 100) }),
+      body: JSON.stringify({ search: term.slice(0, 100), ...(category ? { category: String(category) } : {}), ...(page > 1 ? { page: Number(page) } : {}) }),
       ...(signal ? { signal } : {})
     });
     const payload = await response.json().catch(() => ({}));
@@ -186,13 +256,27 @@
         validFrom: dateOnly(item.validFrom),
         validTo: dateOnly(item.validTo),
         category: String(item.category || ''),
+        categorySlug: String(item.unifiedCategory || ''),
         source: String(item.source || payload.source || 'PrijsProfeet'),
         checkedAt: payload.checkedAt || new Date().toISOString()
       }));
-    return { offers: dedupe(offers), source: String(payload.source || 'PrijsProfeet'), checkedAt: payload.checkedAt || new Date().toISOString() };
+    return { offers: dedupe(offers), hasMore: payload.hasMore === true, page: Number(payload.page) || page, source: String(payload.source || 'PrijsProfeet'), checkedAt: payload.checkedAt || new Date().toISOString() };
+  }
+
+  async function fetchCategories({ url, headers = {}, fetchImpl = globalThis.fetch, signal } = {}) {
+    if (!url) throw new Error('De categoriebron is niet geconfigureerd.');
+    if (typeof fetchImpl !== 'function') throw new Error('Categorieën ophalen is niet beschikbaar in deze browser.');
+    const response = await fetchImpl(url, { method: 'POST', headers: { 'Content-Type': 'application/json', ...headers }, body: JSON.stringify({ categories: true }), ...(signal ? { signal } : {}) });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.error || `Categorieën ophalen mislukt (${response.status}).`);
+    const categories = normalizeCategoryList(payload.categories);
+    if (!categories.length) throw new Error('De categoriebron gaf geen categorieën terug.');
+    return { categories, checkedAt: payload.checkedAt || new Date().toISOString() };
   }
 
   return {
+    CATEGORY_GROUPS, KNOWN_CATEGORIES, normalizeCategoryList, buildCategoryGroups, categoryBySlug, applyOfficialCategory,
+    matchesCategorySelection, mergeOffers, fetchCategories,
     isActive, partition, dedupe, key, dayInTz, fetchOffers,
     SUPPORTED_STORES, normalizeStore, normalizeOfferCategory, offerDiscountPercent, offerCategoryCounts, matchesOfferFilters,
     groceryItemFromOffer, offerAlreadyInGroceries, createLatestRequestGuard

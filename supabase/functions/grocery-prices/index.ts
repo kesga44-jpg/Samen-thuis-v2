@@ -7,6 +7,8 @@ const cors = {
 };
 // Provider access is server-side; an API key is optional and must be stored as a Supabase secret.
 const API = "https://www.prijsprofeet.nl/api/v1/search";
+const CATEGORIES_API = "https://www.prijsprofeet.nl/api/v1/categories";
+const PAGE_SIZE = 20;
 const key = Deno.env.get("PRIJS_PROFEET_API_KEY") || "";
 
 function json(body: unknown, status=200) {
@@ -72,18 +74,57 @@ function normalizeOffer(x: any) {
     promotionType: x.promotion_type || "",
     validFrom: x.valid_from || "",
     validTo: x.valid_until || "",
-    category: x.category || "",
+    category: x.unified_category || x.category || "",
+    unifiedCategory: x.unified_category || "",
+    quantity: x.quantity ?? "",
+    unit: x.unit || "",
+    currency: x.currency || "",
+    savingsAmount: numberOrNull(x.savings_amount),
+    promotionStatus: x.promotion_status || "",
+    promotionalKeywords: Array.isArray(x.promotional_keywords) ? x.promotional_keywords : [],
+    multiBuyQuantity: numberOrNull(x.multi_buy_quantity),
+    multiBuyPrice: numberOrNull(x.multi_buy_price),
+    promoGroupId: x.promo_group_id ?? null,
+    promoGroupMixable: x.promo_group_mixable ?? null,
+    validUntilEstimated: x.valid_until_estimated === true,
+    extractedAt: x.extracted_at || "",
+    inStoreOnly: x.in_store_only === true,
+    onlineOnly: x.online_only === true,
+    loyaltyPrice: numberOrNull(x.loyalty_price),
+    loyaltyProgram: x.loyalty_program || "",
+    maxPerCustomer: numberOrNull(x.max_per_customer),
+    imageUrl: x.image_url || "",
+    unitPrice: x.unit_price != null ? String(x.unit_price) : "",
     sourceUrl: x.url || x.product_url || x.offer_url || x.source_url || "",
     providerData: x,
     source: "PrijsProfeet"
   };
 }
 
-async function searchOffers(query: string) {
+async function listCategories() {
+  const headers: Record<string,string> = { "User-Agent": "SamenThuis/1.0 (+https://github.com/)" };
+  if (key) headers["X-API-Key"] = key;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 10000);
+  try {
+    const response = await fetch(CATEGORIES_API, { headers, signal: controller.signal });
+    if (!response.ok) return json({error:`PrijsProfeet ${response.status}`},response.status);
+    const payload = await response.json();
+    const list = Array.isArray(payload) ? payload : Array.isArray(payload?.categories) ? payload.categories : [];
+    const categories = list
+      .filter((c: any) => c && typeof c.slug === "string" && c.slug)
+      .map((c: any) => ({ slug: c.slug, name: c.name || c.slug, count: numberOrNull(c.count), group: c.group || "" }));
+    return json({categories,source:"PrijsProfeet",checkedAt:new Date().toISOString()});
+  } finally { clearTimeout(timer); }
+}
+
+async function searchOffers(query: string, category = "", page = 1) {
   const url = new URL(API);
   url.searchParams.set("q", query);
-  url.searchParams.set("page_size", "20");
+  url.searchParams.set("page_size", String(PAGE_SIZE));
   url.searchParams.set("promotion_status", "active");
+  if (category) url.searchParams.set("category", category);
+  if (page > 1) url.searchParams.set("page", String(page));
   const headers: Record<string,string> = {
     "User-Agent": "SamenThuis/1.0 (+https://github.com/)"
   };
@@ -95,7 +136,7 @@ async function searchOffers(query: string) {
   const offers = results
     .filter((x: any) => x?.promotion_status === "active" && numberOrNull(x.price) != null && Number(x.price) >= 0 && String(x?.name || "").trim())
     .map(normalizeOffer);
-  return json({offers,source:"PrijsProfeet",checkedAt:new Date().toISOString()});
+  return json({offers,page,hasMore:results.length>=PAGE_SIZE,source:"PrijsProfeet",checkedAt:new Date().toISOString()});
 }
 
 async function lookup(item: {id:string;query:string;preferredRetailer?:string}) {
@@ -120,10 +161,14 @@ serve(async req => {
   if (req.method !== "POST") return json({error:"Gebruik POST"},405);
   try {
     const body = await req.json();
+    if (body?.categories === true) return await listCategories();
     if (body?.search != null) {
       const query = String(body.search).trim().slice(0, 100);
       if (!query) return json({error:"Vul een productnaam of merk in"},400);
-      return await searchOffers(query);
+      const category = String(body.category || "").trim().slice(0, 60);
+      if (category && !/^[a-z0-9-]+$/.test(category)) return json({error:"Ongeldige categorie"},400);
+      const page = Math.min(20, Math.max(1, Math.floor(Number(body.page)) || 1));
+      return await searchOffers(query, category, page);
     }
     const queries = Array.isArray(body?.queries) ? body.queries.slice(0,25) : [];
     if (!queries.length) return json({results:[]});

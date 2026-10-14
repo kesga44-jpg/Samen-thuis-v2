@@ -6486,6 +6486,13 @@ document.addEventListener('click', event => {
   let offerFilters25 = { category: '', sort: 'ending' };
   let offerSelectedStores25 = new Set();
   let offerRequestController25 = null;
+  let offerGroup25 = '';
+  let offerCategoryGroups25 = null;
+  let offerCategoryNotice25 = '';
+  let offerCategoryLoading25 = false;
+  let offerHasMore25 = false;
+  let offerPage25 = 1;
+  const OFFER_CATEGORY_TTL25 = 6 * 60 * 60 * 1000;
   const offerRequestGuard25 = offerCore25().createLatestRequestGuard();
 
   function offerCore25() { return window.SamenThuisOffers; }
@@ -6493,6 +6500,43 @@ document.addEventListener('click', event => {
     offerSelectedStores25 = new Set(offerCore25().SUPPORTED_STORES);
     offerFilters25 = { category: '', sort: 'ending' };
     offerFavoritesOnly25 = false;
+    offerGroup25 = '';
+  }
+  function offerGroups25() {
+    const core = offerCore25();
+    if (!offerCategoryGroups25) {
+      const cached = data.offerCategoryCache25;
+      offerCategoryGroups25 = core.buildCategoryGroups(cached?.categories?.length ? cached.categories : core.KNOWN_CATEGORIES);
+      if (!cached?.categories?.length) offerCategoryNotice25 = 'Standaard categorie-indeling (de actuele lijst is nog niet opgehaald).';
+      const age = cached?.checkedAt ? Date.now() - Date.parse(cached.checkedAt) : Infinity;
+      if (!(age < OFFER_CATEGORY_TTL25)) loadOfferCategories25();
+    }
+    return offerCategoryGroups25;
+  }
+  async function loadOfferCategories25(force = false) {
+    if (offerCategoryLoading25) return;
+    offerCategoryLoading25 = true;
+    const controller = typeof AbortController === 'function' ? new AbortController() : null;
+    const timer = controller ? setTimeout(() => controller.abort(), 10000) : null;
+    try {
+      const base = String(syncConfig.projectUrl || DEFAULT_PROJECT_URL).replace(/\/$/, '');
+      const result = await offerCore25().fetchCategories({
+        url: `${base}/functions/v1/grocery-prices`,
+        headers: { apikey: DEFAULT_PUBLISHABLE_KEY, Authorization: 'Bearer ' + DEFAULT_PUBLISHABLE_KEY },
+        signal: controller?.signal
+      });
+      data.offerCategoryCache25 = { categories: result.categories, checkedAt: result.checkedAt };
+      offerCategoryGroups25 = offerCore25().buildCategoryGroups(result.categories);
+      offerCategoryNotice25 = '';
+      save({ touch: false });
+    } catch (error) {
+      // Geldige (gecachte) gegevens blijven staan; alleen een melding tonen.
+      offerCategoryNotice25 = 'Categorieën konden niet worden vernieuwd; de laatst bekende indeling wordt getoond.';
+    } finally {
+      if (timer) clearTimeout(timer);
+      offerCategoryLoading25 = false;
+      if (current === 'offers') render();
+    }
   }
   resetOfferFilters25();
   function offerList25() {
@@ -6540,10 +6584,16 @@ document.addEventListener('click', event => {
     const percent = core.offerDiscountPercent(offer);
     const packageDetails = [offer.packaging || offer.size, offer.contents].filter(Boolean).filter((value, index, all) => all.indexOf(value) === index).join(' · ');
     const promotion = [offer.promotionType, offer.promotionText].filter((value, index, all) => value && all.indexOf(value) === index).join(' · ');
+    const estimated = offer.validUntilEstimated === true ? ' (geschat)' : '';
     const dates = offer.validFrom && offer.validTo
-      ? `Geldig van ${offerDate25(offer.validFrom)} t/m ${offerDate25(offer.validTo)}`
+      ? `Geldig van ${offerDate25(offer.validFrom)} t/m ${offerDate25(offer.validTo)}${estimated}`
       : offer.validFrom ? `Geldig vanaf ${offerDate25(offer.validFrom)}`
-        : offer.validTo ? `Geldig t/m ${offerDate25(offer.validTo)}` : '';
+        : offer.validTo ? `Geldig t/m ${offerDate25(offer.validTo)}${estimated}` : '';
+    const multiBuy = offer.multiBuyQuantity > 1 && offer.multiBuyPrice != null && offerMoney25(offer.multiBuyPrice)
+      ? `${offer.multiBuyQuantity} voor ${offerMoney25(offer.multiBuyPrice)}` : '';
+    const extras = [multiBuy, offer.inStoreOnly ? 'Alleen in de winkel' : '', offer.onlineOnly ? 'Alleen online' : '',
+      offer.loyaltyPrice != null && offerMoney25(offer.loyaltyPrice) ? `${offer.loyaltyProgram || 'Klantenkaart'}-prijs ${offerMoney25(offer.loyaltyPrice)}` : '',
+      offer.maxPerCustomer ? `Max. ${offer.maxPerCustomer} per klant` : ''].filter(Boolean).join(' · ');
     const original = sourceUrl ? `<a href="${esc(sourceUrl)}" target="_blank" rel="noopener noreferrer">Product bij ${esc(offer.store || 'de winkel')}</a>` : '';
     return `<article class="card offer-card25">
       <div class="offer-card-head25"><div><p class="eyebrow">${unknownStore ? 'Niet-ondersteunde winkel · ' : ''}${esc(offer.store || (unknownStore ? 'Onbekende winkel' : 'Supermarkt'))}${offer.brand ? ` · ${esc(offer.brand)}` : ''}</p><h2>${esc(offer.name)}</h2>${packageDetails ? `<p class="muted offer-package25">${esc(packageDetails)}</p>` : ''}</div>${price ? `<strong class="offer-price25">${esc(price)}</strong>` : ''}</div>
@@ -6551,6 +6601,7 @@ document.addEventListener('click', event => {
       ${(originalPrice || percent != null) ? `<p class="offer-discount25">${originalPrice ? `<span>Was <del>${esc(originalPrice)}</del></span>` : ''}${percent != null ? `<strong>${Math.round(percent)}% korting</strong>` : ''}</p>` : ''}
       ${offer.unitPrice ? `<p class="offer-unit-price25">${esc(offer.unitPrice)}${offer.unitPriceUnit && !String(offer.unitPrice).includes(String(offer.unitPriceUnit)) ? `/${esc(offer.unitPriceUnit)}` : ''}</p>` : ''}
       ${promotion ? `<p class="offer-promotion25">${esc(promotion)}</p>` : ''}
+      ${extras ? `<p class="offer-promotion25">${esc(extras)}</p>` : ''}
       ${offer.deliveryInfo ? `<p class="muted">${esc(offer.deliveryInfo)}</p>` : ''}
       ${dates || offer.category ? `<p class="muted">${dates ? esc(dates) : ''}${dates && offer.category ? ' · ' : ''}${offer.category ? `Categorie: ${esc(offer.category)}` : ''}</p>` : ''}
       <p class="muted">Bron: ${esc(offer.source || 'PrijsProfeet')}</p>
@@ -6563,27 +6614,21 @@ document.addEventListener('click', event => {
     const favorites = Array.isArray(data.favoriteOffers25) ? data.favoriteOffers25 : [];
     const queryCache = data.offerSearchCache25 && typeof data.offerSearchCache25 === 'object' ? data.offerSearchCache25 : {};
     const checkedAt = queryCache[offerQuery25]?.checkedAt || '';
-    const categories = [...new Set([
-      ...GROCERY_CATEGORIES,
-      ...active.map(item => offerCore25().normalizeOfferCategory(item.category, GROCERY_CATEGORIES, 'Onbekend'))
-    ])].sort((a, b) => a.localeCompare(b, 'nl'));
+    const core = offerCore25();
+    const groups = offerGroups25();
+    const selectedGroup = groups.find(g => g.id === offerGroup25) || null;
+    const selectedCategory = offerFilters25.category ? core.categoryBySlug(groups, offerFilters25.category) : null;
     const matchingFilters = {
       stores: [...offerSelectedStores25],
-      category: offerFilters25.category,
       favoritesOnly: offerFavoritesOnly25,
       favorites,
       categories: GROCERY_CATEGORIES
     };
-    const categoryCounts = offerCore25().offerCategoryCounts(active, {
-      stores: [...offerSelectedStores25],
-      favoritesOnly: offerFavoritesOnly25,
-      favorites,
-      categories: GROCERY_CATEGORIES
-    });
-    const filtered = active.filter(item => offerCore25().matchesOfferFilters(item, matchingFilters));
-    const unknownStores = active.filter(item => !offerCore25().normalizeStore(item.store)
-      && (!offerFilters25.category || offerCore25().normalizeOfferCategory(item.category, GROCERY_CATEGORIES, 'Onbekend') === offerFilters25.category)
-      && (!offerFavoritesOnly25 || favorites.includes(offerCore25().key(item))));
+    const selection = { group: offerGroup25, categorySlug: offerFilters25.category };
+    const filtered = active.filter(item => core.matchesOfferFilters(item, matchingFilters) && core.matchesCategorySelection(item, selection));
+    const unknownStores = active.filter(item => !core.normalizeStore(item.store)
+      && core.matchesCategorySelection(item, selection)
+      && (!offerFavoritesOnly25 || favorites.includes(core.key(item))));
     const sorters = {
       price: (a, b) => Number(a.price) - Number(b.price),
       discount: (a, b) => Number(b.discountPercent || 0) - Number(a.discountPercent || 0),
@@ -6595,8 +6640,8 @@ document.addEventListener('click', event => {
       ? offerError25 ? '' : offerQuery25 ? 'Geen actuele aanbiedingen gevonden voor deze zoekopdracht.' : 'Zoek op productnaam of merk om actuele aanbiedingen op te halen.'
       : offerSelectedStores25.size === 0
         ? 'Selecteer ten minste één supermarkt om aanbiedingen te bekijken.'
-        : offerFilters25.category && !filtered.length && !unknownStores.length
-          ? `Geen aanbiedingen in de categorie ${offerFilters25.category} voor de geselecteerde supermarkten.`
+        : (offerFilters25.category || offerGroup25) && !filtered.length && !unknownStores.length
+          ? `Geen aanbiedingen in ${selectedCategory ? 'de categorie ' + selectedCategory.name : 'de hoofdgroep ' + (selectedGroup?.name || '')} voor de geselecteerde supermarkten.`
           : offerFavoritesOnly25 && !filtered.length && !unknownStores.length
             ? 'Geen favoriete aanbiedingen voldoen aan deze filters.'
             : 'Geen aanbiedingen voldoen aan deze filters.';
@@ -6610,12 +6655,18 @@ document.addEventListener('click', event => {
     </section>
     <section class="card"><div class="offer-filters25">
       <fieldset class="offer-store-filter25"><legend>Supermarkten</legend><div class="offer-store-options25">${offerCore25().SUPPORTED_STORES.map(store => `<label class="offer-store-choice25 ${offerSelectedStores25.has(store) ? 'is-selected' : ''}"><input type="checkbox" data-offer-store="${esc(store)}" ${offerSelectedStores25.has(store) ? 'checked' : ''}>${esc(store)}</label>`).join('')}</div><button type="button" class="text-btn" data-offer-filters-reset>Standaardfilters herstellen</button></fieldset>
-      <label>Categorie<select data-offer-filter="category"><option value="">Alle categorieën</option>${categories.map(x => `<option value="${esc(x)}" ${offerFilters25.category === x ? 'selected' : ''}>${esc(x)} (${categoryCounts[x] || 0})</option>`).join('')}</select></label>
+      <div class="offer-category-filter25 cat-wrap25"><span class="offer-category-title25">Categorieën</span>
+        <div class="offer-chip-row25" role="group" aria-label="Hoofdgroepen"><button type="button" class="offer-chip25 ${!offerGroup25 && !offerFilters25.category ? 'is-selected' : ''}" data-offer-group="" aria-pressed="${!offerGroup25 && !offerFilters25.category}">Alle categorieën</button>${groups.map(g => `<button type="button" class="offer-chip25 ${offerGroup25 === g.id ? 'is-selected' : ''}" data-offer-group="${esc(g.id)}" aria-pressed="${offerGroup25 === g.id}">${esc(g.name)}</button>`).join('')}</div>
+        ${selectedGroup ? `<div class="offer-chip-row25" role="group" aria-label="Categorieën in ${esc(selectedGroup.name)}">${selectedGroup.categories.map(c => `<button type="button" class="offer-chip25 offer-chip-sub25 ${offerFilters25.category === c.slug ? 'is-selected' : ''}" data-offer-category="${esc(c.slug)}" aria-pressed="${offerFilters25.category === c.slug}" title="${c.count != null ? `${esc(c.name)} · ${c.count} producten volgens PrijsProfeet` : esc(c.name)}">${esc(c.name)}</button>`).join('')}</div>` : ''}
+        ${selectedCategory ? `<p class="small-note">Geselecteerd: <strong>${esc(selectedCategory.name)}</strong>${selectedGroup ? ` (${esc(selectedGroup.name)})` : ''}${offerQuery25 ? '' : ' — vul een zoekterm in om deze categorie te doorzoeken'} <button type="button" class="text-btn" data-offer-group="">Terug naar alle categorieën</button></p>` : ''}
+        ${offerCategoryNotice25 ? `<p class="small-note">${esc(offerCategoryNotice25)}</p>` : ''}
+      </div>
       <label>Sorteren op<select data-offer-filter="sort"><option value="ending" ${offerFilters25.sort === 'ending' ? 'selected' : ''}>Einddatum</option><option value="price" ${offerFilters25.sort === 'price' ? 'selected' : ''}>Prijs</option><option value="discount" ${offerFilters25.sort === 'discount' ? 'selected' : ''}>Korting</option></select></label>
       <label class="offer-favorite-filter25"><input type="checkbox" data-offer-favorites ${offerFavoritesOnly25 ? 'checked' : ''}> Favorieten</label>
       <label class="offer-favorite-filter25"><input type="checkbox" data-offer-archive ${data.settings?.archiveExpiredOffers !== false ? 'checked' : ''}> Verlopen aanbiedingen archiveren</label>
     </div></section>
     <div class="offers-list25">${filtered.map(item => renderOfferCard25(item)).join('') || (!offerError25 && !offerLoading25 ? `<section class="card"><p class="muted">${esc(emptyMessage)}</p></section>` : '')}</div>
+    ${offerHasMore25 && !offerLoading25 && active.length ? '<div class="button-row"><button type="button" class="secondary" data-offer-more>Meer resultaten laden</button></div>' : ''}
     ${unknownStores.length ? `<section class="card offer-unknown-stores25"><h2>Niet-ondersteunde winkels</h2><p class="muted">Deze resultaten zijn door de bron teruggegeven, maar vallen niet onder de zeven supermarktfilters.</p><div class="offers-list25">${unknownStores.map(item => renderOfferCard25(item, false, true)).join('')}</div></section>` : ''}
     ${archived.length ? `<details class="card offer-archive25"><summary>Archief verlopen aanbiedingen (${archived.length})</summary><div class="offers-list25">${archived.map(item => renderOfferCard25(item, true)).join('')}</div></details>` : ''}
     ${scheduled.length ? `<details class="card offer-archive25"><summary>Binnenkort geldig (${scheduled.length})</summary><div class="offers-list25">${scheduled.map(item => renderOfferCard25(item, true)).join('')}</div></details>` : ''}
@@ -6627,7 +6678,7 @@ document.addEventListener('click', event => {
     data.offerScheduled25 = partition.upcoming;
     data.offerArchive25 = data.settings?.archiveExpiredOffers === false ? [] : partition.archive;
   }
-  async function searchOffers25(query) {
+  async function searchOffers25(query, { append = false } = {}) {
     const requestToken = offerRequestGuard25.begin();
     offerRequestController25?.abort();
     offerRequestController25 = null;
@@ -6636,9 +6687,12 @@ document.addEventListener('click', event => {
     data.offerCurrentQuery25 = term;
     offerError25 = '';
     offerSuccess25 = '';
-    data.offers25 = [];
-    data.offerArchive25 = [];
-    data.offerScheduled25 = [];
+    const categorySlug = offerFilters25.category;
+    const page = append ? offerPage25 + 1 : 1;
+    const previous = append ? [...(data.offers25 || [])] : [];
+    if (!append) { data.offers25 = []; offerHasMore25 = false; offerPage25 = 1; }
+    data.offerArchive25 = append ? data.offerArchive25 : [];
+    data.offerScheduled25 = append ? data.offerScheduled25 : [];
     offerLoading25 = false;
     save({ touch: false });
     if (!term) {
@@ -6647,9 +6701,11 @@ document.addEventListener('click', event => {
       return;
     }
     const cache = data.offerSearchCache25 && typeof data.offerSearchCache25 === 'object' ? data.offerSearchCache25 : {};
-    const cached = cache[term];
+    const cacheKey = categorySlug ? `${term}\u0001${categorySlug}` : term;
+    const cached = append ? null : cache[cacheKey];
     if (cached?.checkedAt && Date.now() - Date.parse(cached.checkedAt) < 20 * 60 * 1000) {
       setOfferResults25(cached.offers || []);
+      offerHasMore25 = cached.hasMore === true;
       offerSuccess25 = `${data.offers25.length} actuele aanbiedingen gevonden voor “${term}”.`;
       save({ touch: false });
       render();
@@ -6664,17 +6720,20 @@ document.addEventListener('click', event => {
       const base = String(syncConfig.projectUrl || DEFAULT_PROJECT_URL).replace(/\/$/, '');
       const result = await offerCore25().fetchOffers({
         query: term,
+        category: categorySlug,
+        page,
         url: `${base}/functions/v1/grocery-prices`,
         headers: { apikey: DEFAULT_PUBLISHABLE_KEY, Authorization: 'Bearer ' + DEFAULT_PUBLISHABLE_KEY },
         signal: controller?.signal
       });
       if (!offerRequestGuard25.isCurrent(requestToken)) return;
-      const offers = result.offers.map(item => ({
-        ...item,
-        category: offerCore25().normalizeOfferCategory(item.category, GROCERY_CATEGORIES, 'Onbekend')
-      }));
+      const groups = offerGroups25();
+      const fetched = result.offers.map(item => offerCore25().applyOfficialCategory(item, groups));
+      const offers = append ? offerCore25().mergeOffers(previous, fetched) : fetched;
       setOfferResults25(offers);
-      data.offerSearchCache25 = { ...cache, [term]: { offers, checkedAt: result.checkedAt } };
+      offerPage25 = page;
+      offerHasMore25 = result.hasMore === true;
+      data.offerSearchCache25 = { ...cache, [cacheKey]: { offers, hasMore: offerHasMore25, checkedAt: result.checkedAt } };
       const cacheTerms = Object.keys(data.offerSearchCache25);
       if (cacheTerms.length > 20) cacheTerms.slice(0, cacheTerms.length - 20).forEach(key => delete data.offerSearchCache25[key]);
       offerError25 = '';
@@ -6682,6 +6741,7 @@ document.addEventListener('click', event => {
       save({ touch: false });
     } catch (error) {
       if (!offerRequestGuard25.isCurrent(requestToken)) return;
+      if (append) { setOfferResults25(previous); }
       offerError25 = error.name === 'AbortError'
         ? 'De aanvraag duurde te lang. Probeer het opnieuw.'
         : `${error.message || 'Aanbiedingen zijn tijdelijk niet beschikbaar.'} De Edge Function grocery-prices moet actief zijn; er is geen actuele aanbieding geladen.`;
@@ -7260,6 +7320,27 @@ document.addEventListener('click', event => {
   };
 
   document.addEventListener('click', event => {
+    const groupBtn = event.target.closest('[data-offer-group]');
+    if (groupBtn) {
+      const id = groupBtn.dataset.offerGroup;
+      const changed = offerGroup25 !== id || offerFilters25.category;
+      const hadCategory = !!offerFilters25.category;
+      offerGroup25 = id;
+      offerFilters25.category = '';
+      if (hadCategory && offerQuery25) searchOffers25(offerQuery25); else if (changed) render();
+      return;
+    }
+    const categoryBtn = event.target.closest('[data-offer-category]');
+    if (categoryBtn) {
+      const slug = categoryBtn.dataset.offerCategory;
+      offerFilters25.category = offerFilters25.category === slug ? '' : slug;
+      if (offerQuery25) searchOffers25(offerQuery25); else render();
+      return;
+    }
+    if (event.target.closest('[data-offer-more]')) {
+      if (offerQuery25 && !offerLoading25) searchOffers25(offerQuery25, { append: true });
+      return;
+    }
     if (event.target.closest('[data-offer-filters-reset]')) {
       resetOfferFilters25();
       render();
