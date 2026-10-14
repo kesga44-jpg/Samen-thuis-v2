@@ -95,6 +95,8 @@ function normalizeOffer(x: any) {
     maxPerCustomer: numberOrNull(x.max_per_customer),
     imageUrl: x.image_url || "",
     unitPrice: x.unit_price != null ? String(x.unit_price) : "",
+    unitPriceValue: numberOrNull(x.unit_price),
+    unitPriceUnit: typeof x.unit === "string" ? x.unit.trim() : "",
     sourceUrl: x.url || x.product_url || x.offer_url || x.source_url || "",
     providerData: x,
     source: "PrijsProfeet"
@@ -102,19 +104,29 @@ function normalizeOffer(x: any) {
 }
 
 async function listCategories() {
-  const headers: Record<string,string> = { "User-Agent": "SamenThuis/1.0 (+https://github.com/)" };
+  const headers: Record<string,string> = { "User-Agent": "SamenThuis/1.0 (+https://github.com/)", "Accept": "application/json" };
   if (key) headers["X-API-Key"] = key;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 10000);
   try {
     const response = await fetch(CATEGORIES_API, { headers, signal: controller.signal });
-    if (!response.ok) return json({error:`PrijsProfeet ${response.status}`},response.status);
-    const payload = await response.json();
-    const list = Array.isArray(payload) ? payload : Array.isArray(payload?.categories) ? payload.categories : [];
+    if (!response.ok) {
+      console.error("PrijsProfeet categories HTTP", response.status);
+      return json({error:`PrijsProfeet ${response.status}`}, response.status >= 500 || response.status === 429 ? 502 : response.status);
+    }
+    let payload: any;
+    try { payload = await response.json(); }
+    catch (_) { console.error("PrijsProfeet categories: geen geldige JSON"); return json({error:"PrijsProfeet gaf geen geldige JSON terug"},502); }
+    const list = Array.isArray(payload) ? payload : Array.isArray(payload?.categories) ? payload.categories : null;
+    if (!list) { console.error("PrijsProfeet categories: onverwachte structuur"); return json({error:"Onverwachte categorie-response"},502); }
     const categories = list
       .filter((c: any) => c && typeof c.slug === "string" && c.slug)
       .map((c: any) => ({ slug: c.slug, name: c.name || c.slug, count: numberOrNull(c.count), group: c.group || "" }));
+    if (!categories.length) { console.error("PrijsProfeet categories: lege lijst"); return json({error:"Geen categorieën ontvangen"},502); }
     return json({categories,source:"PrijsProfeet",checkedAt:new Date().toISOString()});
+  } catch (error) {
+    console.error("PrijsProfeet categories mislukt:", error instanceof Error ? error.name + ": " + error.message : "onbekend");
+    return json({error:"Categorieën ophalen mislukt"},502);
   } finally { clearTimeout(timer); }
 }
 
