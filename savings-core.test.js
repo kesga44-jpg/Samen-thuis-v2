@@ -115,3 +115,81 @@ test('offers normalize timestamp validity dates and reject impossible dates', as
   assert.equal(result.offers[1].validFrom, '');
   assert.equal(result.offers[1].validTo, '');
 });
+test('supported supermarket names and aliases normalize without partial-name matches', () => {
+  const aliases = new Map([
+    ['Lidl', ['Lidl', 'Lidl Nederland']], ['PLUS', ['PLUS', 'PLUS Supermarkt']],
+    ['Jumbo', ['Jumbo']], ['Dirk', ['Dirk', 'Dirk van den Broek']],
+    ['Aldi', ['Aldi']], ['Albert Heijn (AH)', ['AH', 'Albert Heijn', 'AH to go']],
+    ['SPAR', ['SPAR', 'SPAR City', 'SPAR Express']]
+  ]);
+  assert.deepEqual(O.SUPPORTED_STORES, [...aliases.keys()]);
+  for (const [store, names] of aliases) {
+    for (const name of names) assert.equal(O.normalizeStore(name), store);
+  }
+  assert.equal(O.normalizeStore('Lidlard'), '');
+  assert.equal(O.normalizeStore('Jumbo Supermarkt in Rotterdam'), '');
+});
+test('offers can be filtered by every supported store and combined with existing categories', () => {
+  const offers = O.SUPPORTED_STORES.map((store, index) => ({
+    name: `Product ${index}`, store, category: index % 2 ? 'Groente' : 'Voorraadkast'
+  }));
+  for (const store of O.SUPPORTED_STORES) {
+    assert.equal(offers.filter(item => O.matchesOfferFilters(item, { stores: [store] })).length, 1);
+  }
+  const combined = offers.filter(item => O.matchesOfferFilters(item, {
+    stores: ['Lidl', 'PLUS'], category: 'Voorraadkast',
+    categories: ['Groente', 'Fruit', 'Brood & wraps', 'Zuivel & vega', 'Vlees & vis', 'Diepvries', 'Voorraadkast', 'Kruiden & sauzen', 'Drinken', 'Schoonmaak', 'Overig']
+  }));
+  assert.deepEqual(combined.map(item => item.store), ['Lidl']);
+  assert.equal(O.matchesOfferFilters({ name: 'Onbekend', store: 'Onbekende winkel', category: 'Groente' }), false);
+});
+test('known offer categories map to existing grocery categories and missing categories use Overig', () => {
+  const categories = ['Groente', 'Fruit', 'Brood & wraps', 'Zuivel & vega', 'Vlees & vis', 'Diepvries', 'Voorraadkast', 'Kruiden & sauzen', 'Drinken', 'Schoonmaak', 'Overig'];
+  assert.equal(O.normalizeOfferCategory('houdbare producten', categories, 'Overig'), 'Voorraadkast');
+  assert.equal(O.normalizeOfferCategory('groenten', categories, 'Overig'), 'Groente');
+  assert.equal(O.normalizeOfferCategory('', categories, 'Overig'), 'Overig');
+  assert.equal(O.normalizeOfferCategory('Onbekend uit de API', categories, 'Overig'), 'Onbekend uit de API');
+});
+test('an offer becomes a compatible unchecked grocery item that survives save and reload', () => {
+  const offer = {
+    ean: '8710001', name: 'Koffie', brand: 'Merk', store: 'AH', size: '500 g',
+    price: 4.5, category: 'houdbare producten', promotionText: '2e halve prijs',
+    validTo: '2026-10-20', sourceUrl: 'https://example.test/offer'
+  };
+  const item = O.groceryItemFromOffer(offer, () => 'grocery-unique', ['Groente', 'Voorraadkast', 'Overig']);
+  assert.deepEqual({
+    id: item.id, title: item.title, category: item.category, amount: item.amount,
+    unit: item.unit, store: item.store, done: item.done, source: item.source
+  }, {
+    id: 'grocery-unique', title: 'Koffie', category: 'Voorraadkast', amount: 1,
+    unit: '500 g', store: 'Albert Heijn (AH)', done: false, source: 'offer'
+  });
+  assert.match(item.note, /4\.50/);
+  const restored = JSON.parse(JSON.stringify({ groceries: [item] }));
+  assert.equal(restored.groceries[0].title, 'Koffie');
+  assert.equal(restored.groceries[0].offerKey, O.key(offer));
+  const unknownCategory = O.groceryItemFromOffer({ ...offer, category: 'Niet ingedeeld' }, () => 'grocery-other', ['Groente', 'Voorraadkast', 'Overig']);
+  assert.equal(unknownCategory.category, 'Overig');
+});
+test('offer duplicate detection ignores matching product names from different offers', () => {
+  const first = { ean: '111', name: 'Melk', store: 'Lidl', price: 1, validTo: '2026-10-20' };
+  const sameOffer = { ...first };
+  const differentProduct = { ...first, ean: '222' };
+  const item = O.groceryItemFromOffer(first, () => 'g1', ['Overig']);
+  assert.equal(O.offerAlreadyInGroceries([item], sameOffer), true);
+  assert.equal(O.offerAlreadyInGroceries([item], differentProduct), false);
+});
+test('latest search request guard prevents an older slow response from replacing newer results', async () => {
+  const guard = O.createLatestRequestGuard();
+  let releaseOld;
+  const result = [];
+  const oldToken = guard.begin();
+  const oldResponse = new Promise(resolve => { releaseOld = resolve; }).then(value => {
+    if (guard.isCurrent(oldToken)) result.push(value);
+  });
+  const newToken = guard.begin();
+  if (guard.isCurrent(newToken)) result.push('new search');
+  releaseOld('old search');
+  await oldResponse;
+  assert.deepEqual(result, ['new search']);
+});
