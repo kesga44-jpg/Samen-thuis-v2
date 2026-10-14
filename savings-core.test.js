@@ -95,6 +95,7 @@ test('offers fetch maps live results, drops invalid rows, and reports provider e
   assert.equal(result.offers.length, 1);
   assert.equal(result.offers[0].price, 4.5);
   assert.equal(result.offers[0].source, 'PrijsProfeet');
+  assert.equal(result.offers[0].discountPercent, null);
   await assert.rejects(O.fetchOffers({
     query: 'koffie', url: '/offers',
     fetchImpl: async () => ({ ok: false, status: 503, json: async () => ({ error: 'source unavailable' }) })
@@ -143,33 +144,116 @@ test('offers can be filtered by every supported store and combined with existing
   assert.deepEqual(combined.map(item => item.store), ['Lidl']);
   assert.equal(O.matchesOfferFilters({ name: 'Onbekend', store: 'Onbekende winkel', category: 'Groente' }), false);
 });
-test('known offer categories map to existing grocery categories and missing categories use Overig', () => {
+test('category counts use selected supported-store offers before category filtering', () => {
+  const offers = [
+    { ean: '1', name: 'Melk', store: 'AH', category: 'Vers' },
+    { ean: '1', name: 'Melk', store: 'Jumbo', category: 'Vers' },
+    { ean: '2', name: 'Koekjes', store: 'PLUS', category: 'Houdbaar' },
+    { ean: '3', name: 'Onbekend', store: 'Onbekende winkel', category: 'Vers' }
+  ];
+  assert.deepEqual(O.offerCategoryCounts(offers, {
+    stores: ['Albert Heijn (AH)', 'PLUS'],
+    categories: ['Vers', 'Houdbaar']
+  }), { Vers: 1, Houdbaar: 1 });
+  assert.deepEqual(O.offerCategoryCounts(offers, {
+    stores: O.SUPPORTED_STORES,
+    category: 'Houdbaar',
+    categories: ['Vers', 'Houdbaar']
+  }), { Vers: 2, Houdbaar: 1 });
+});
+test('Knorr example derives about 50 percent discount and retains offer details', async () => {
+  const result = await O.fetchOffers({
+    query: 'Knorr Groente bouillonblokjes voordeelpak',
+    url: '/offers',
+    fetchImpl: async () => ({ ok: true, json: async () => ({
+      source: 'PrijsProfeet',
+      offers: [{
+        name: 'Knorr Groente bouillonblokjes voordeelpak',
+        brand: 'Knorr',
+        size: '15 × 10 g',
+        contents: '150 g',
+        store: 'Albert Heijn',
+        price: '0.90',
+        originalPrice: '1.79',
+        discountPercent: null,
+        unitPrice: '€ 6,00/kg',
+        promotionText: '1 + 1 gratis',
+        promotionType: '1 + 1 gratis',
+        validFrom: '2026-10-12',
+        validTo: '2026-10-18',
+        category: 'Houdbaar',
+        sourceUrl: 'https://example.test/knorr'
+      }]
+    }) })
+  });
+  const [offer] = result.offers;
+  assert.equal(offer.price, 0.9);
+  assert.equal(offer.originalPrice, 1.79);
+  assert.ok(Math.abs(offer.discountPercent - 49.72067039106145) < 0.0001);
+  assert.equal(offer.brand, 'Knorr');
+  assert.equal(offer.size, '15 × 10 g');
+  assert.equal(offer.contents, '150 g');
+  assert.equal(offer.unitPrice, '€ 6,00/kg');
+  assert.equal(offer.promotionText, '1 + 1 gratis');
+  assert.equal(offer.validFrom, '2026-10-12');
+  assert.equal(offer.validTo, '2026-10-18');
+  assert.equal(offer.category, 'Houdbaar');
+});
+test('invalid or missing source prices never produce a fabricated zero discount', async () => {
+  const result = await O.fetchOffers({
+    query: 'invalid',
+    url: '/offers',
+    fetchImpl: async () => ({ ok: true, json: async () => ({ offers: [
+      { name: 'No original', price: 1.2 },
+      { name: 'Zero original', price: 1, originalPrice: 0 },
+      { name: 'Invalid price', price: 'not-a-price' },
+      { name: 'Negative price', price: -2 }
+    ] }) })
+  });
+  assert.equal(result.offers.length, 2);
+  assert.equal(result.offers[0].discountPercent, null);
+  assert.equal(result.offers[1].discountPercent, null);
+  assert.ok(Math.abs(O.offerDiscountPercent({ price: 0.9, originalPrice: 1.79 }) - 49.72067039106145) < 0.0001);
+  assert.equal(O.offerDiscountPercent({ price: 1, originalPrice: 0 }), null);
+});
+test('offer categories retain source classes and missing categories are explicit', () => {
   const categories = ['Groente', 'Fruit', 'Brood & wraps', 'Zuivel & vega', 'Vlees & vis', 'Diepvries', 'Voorraadkast', 'Kruiden & sauzen', 'Drinken', 'Schoonmaak', 'Overig'];
-  assert.equal(O.normalizeOfferCategory('houdbare producten', categories, 'Overig'), 'Voorraadkast');
-  assert.equal(O.normalizeOfferCategory('groenten', categories, 'Overig'), 'Groente');
-  assert.equal(O.normalizeOfferCategory('', categories, 'Overig'), 'Overig');
+  assert.equal(O.normalizeOfferCategory('Groente', categories, 'Onbekend'), 'Groente');
+  assert.equal(O.normalizeOfferCategory('Vers', categories, 'Onbekend'), 'Vers');
+  assert.equal(O.normalizeOfferCategory('Houdbaar', categories, 'Onbekend'), 'Houdbaar');
+  assert.equal(O.normalizeOfferCategory('', categories, 'Onbekend'), 'Onbekend');
   assert.equal(O.normalizeOfferCategory('Onbekend uit de API', categories, 'Overig'), 'Onbekend uit de API');
 });
 test('an offer becomes a compatible unchecked grocery item that survives save and reload', () => {
   const offer = {
-    ean: '8710001', name: 'Koffie', brand: 'Merk', store: 'AH', size: '500 g',
-    price: 4.5, category: 'houdbare producten', promotionText: '2e halve prijs',
-    validTo: '2026-10-20', sourceUrl: 'https://example.test/offer'
+    ean: '8710001', name: 'Koffie', brand: 'Merk', store: 'AH', size: '500 g', packaging: '1 pak', contents: '500 g',
+    price: 4.5, originalPrice: 6, promotionText: '2e halve prijs', promotionType: 'Bonus',
+    unitPrice: '€ 9,00/kg', category: 'Houdbaar', validFrom: '2026-10-10',
+    validTo: '2026-10-20', sourceUrl: 'https://example.test/offer', providerData: { category: 'Houdbaar' }
   };
   const item = O.groceryItemFromOffer(offer, () => 'grocery-unique', ['Groente', 'Voorraadkast', 'Overig']);
   assert.deepEqual({
     id: item.id, title: item.title, category: item.category, amount: item.amount,
-    unit: item.unit, store: item.store, done: item.done, source: item.source
+    unit: item.unit, store: item.store, done: item.done, source: item.source,
+    brand: item.brand, price: item.price, originalPrice: item.originalPrice,
+    discountPercent: item.discountPercent, unitPrice: item.unitPrice,
+    promotionText: item.promotionText, validFrom: item.validFrom, validTo: item.validTo
   }, {
-    id: 'grocery-unique', title: 'Koffie', category: 'Voorraadkast', amount: 1,
-    unit: '500 g', store: 'Albert Heijn (AH)', done: false, source: 'offer'
+    id: 'grocery-unique', title: 'Koffie', category: 'Houdbaar', amount: 1,
+    unit: '500 g', store: 'Albert Heijn (AH)', done: false, source: 'offer',
+    brand: 'Merk', price: 4.5, originalPrice: 6, discountPercent: 25,
+    unitPrice: '€ 9,00/kg', promotionText: '2e halve prijs',
+    validFrom: '2026-10-10', validTo: '2026-10-20'
   });
   assert.match(item.note, /4\.50/);
+  assert.match(item.note, /25% korting/);
+  assert.match(item.note, /€ 9,00\/kg/);
   const restored = JSON.parse(JSON.stringify({ groceries: [item] }));
   assert.equal(restored.groceries[0].title, 'Koffie');
   assert.equal(restored.groceries[0].offerKey, O.key(offer));
+  assert.equal(restored.groceries[0].providerData.category, 'Houdbaar');
   const unknownCategory = O.groceryItemFromOffer({ ...offer, category: 'Niet ingedeeld' }, () => 'grocery-other', ['Groente', 'Voorraadkast', 'Overig']);
-  assert.equal(unknownCategory.category, 'Overig');
+  assert.equal(unknownCategory.category, 'Niet ingedeeld');
 });
 test('offer duplicate detection ignores matching product names from different offers', () => {
   const first = { ean: '111', name: 'Melk', store: 'Lidl', price: 1, validTo: '2026-10-20' };

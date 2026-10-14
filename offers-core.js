@@ -170,7 +170,7 @@
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(payload.error || `Aanbiedingen ophalen mislukt (${response.status}).`);
     if (!Array.isArray(payload.offers)) throw new Error('De aanbiedingenbron gaf geen geldig aanbod terug.');
-    const offers = payload.offers.filter(item => item && String(item.name || '').trim() && finiteOrNull(item.price) != null)
+    const offers = payload.offers.filter(item => item && String(item.name || '').trim() && finiteOrNull(item.price) != null && Number(item.price) >= 0)
       .map(item => ({
         ...item,
         name: String(item.name).trim(),
