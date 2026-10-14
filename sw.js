@@ -1,5 +1,5 @@
-const CACHE='samen-thuis-v25-5-offers';
-const ASSETS=['./','./index.html','./css/tokens.css?v=249','./css/base.css?v=249','./css/layout.css?v=249','./css/components.css?v=249','./styles.css?v=254','./data-core.js?v=249','./savings-core.js?v=1','./offers-core.js?v=3','./dashboard-core.js?v=3','./chalkboard-core.js?v=1','./personal-preferences-core.js?v=2','./budget-ledger-core.js?v=1','./quotes-core.js?v=1','./app.js?v=255','./samen-thuis-update-v26-challenges.js?v=260','./manifest.webmanifest','./icon.svg'];
+const CACHE='samen-thuis-v25-6-offers';
+const ASSETS=['./','./index.html','./css/tokens.css?v=249','./css/base.css?v=249','./css/layout.css?v=249','./css/components.css?v=249','./styles.css?v=256','./data-core.js?v=249','./savings-core.js?v=1','./offers-core.js?v=4','./dashboard-core.js?v=3','./chalkboard-core.js?v=1','./personal-preferences-core.js?v=2','./budget-ledger-core.js?v=1','./quotes-core.js?v=1','./app.js?v=256','./samen-thuis-update-v26-challenges.js?v=260','./manifest.webmanifest','./icon.svg'];
 
 self.addEventListener('install',event=>{
   event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS)).then(()=>self.skipWaiting()));
