@@ -6530,8 +6530,9 @@ document.addEventListener('click', event => {
       offerCategoryNotice25 = '';
       save({ touch: false });
     } catch (error) {
-      // Geldige (gecachte) gegevens blijven staan; alleen een melding tonen.
-      offerCategoryNotice25 = 'Categorieën konden niet worden vernieuwd; de laatst bekende indeling wordt getoond.';
+      // Geldige (gecachte) gegevens blijven staan; de oorzaak wordt gelogd (geen secrets).
+      console.warn('PrijsProfeet-categorieën vernieuwen mislukt:', error?.name === 'AbortError' ? 'time-out' : (error?.message || 'onbekende fout'));
+      if (!data.offerCategoryCache25?.categories?.length) offerCategoryNotice25 = 'Categorieën konden niet worden vernieuwd; de standaardindeling wordt gebruikt.';
     } finally {
       if (timer) clearTimeout(timer);
       offerCategoryLoading25 = false;
@@ -6599,7 +6600,7 @@ document.addEventListener('click', event => {
       <div class="offer-card-head25"><div><p class="eyebrow">${unknownStore ? 'Niet-ondersteunde winkel · ' : ''}${esc(offer.store || (unknownStore ? 'Onbekende winkel' : 'Supermarkt'))}${offer.brand ? ` · ${esc(offer.brand)}` : ''}</p><h2>${esc(offer.name)}</h2>${packageDetails ? `<p class="muted offer-package25">${esc(packageDetails)}</p>` : ''}</div>${price ? `<strong class="offer-price25">${esc(price)}</strong>` : ''}</div>
       ${imageUrl ? `<img class="offer-image25" src="${esc(imageUrl)}" alt="${esc(offer.name)}" loading="lazy">` : ''}
       ${(originalPrice || percent != null) ? `<p class="offer-discount25">${originalPrice ? `<span>Was <del>${esc(originalPrice)}</del></span>` : ''}${percent != null ? `<strong>${Math.round(percent)}% korting</strong>` : ''}</p>` : ''}
-      ${offer.unitPrice ? `<p class="offer-unit-price25">${esc(offer.unitPrice)}${offer.unitPriceUnit && !String(offer.unitPrice).includes(String(offer.unitPriceUnit)) ? `/${esc(offer.unitPriceUnit)}` : ''}</p>` : ''}
+      ${core.formatUnitPrice(offer) ? `<p class="offer-unit-price25">${esc(core.formatUnitPrice(offer))}</p>` : ''}
       ${promotion ? `<p class="offer-promotion25">${esc(promotion)}</p>` : ''}
       ${extras ? `<p class="offer-promotion25">${esc(extras)}</p>` : ''}
       ${offer.deliveryInfo ? `<p class="muted">${esc(offer.deliveryInfo)}</p>` : ''}

@@ -91,7 +91,7 @@
       offer.price != null && offer.price !== '' && Number.isFinite(Number(offer.price)) ? `Prijs: €${Number(offer.price).toFixed(2)}` : '',
       offer.originalPrice != null && offer.originalPrice !== '' && Number.isFinite(Number(offer.originalPrice)) ? `Normale prijs: €${Number(offer.originalPrice).toFixed(2)}` : '',
       discountPercent != null ? `${Math.round(discountPercent)}% korting` : '',
-      offer.unitPrice || '',
+      formatUnitPrice(offer),
       offer.promotionText || '',
       offer.validFrom ? `Geldig vanaf ${offer.validFrom}` : '',
       offer.validTo ? `geldig t/m ${offer.validTo}` : ''
@@ -112,6 +112,7 @@
       discountPercent,
       unitPrice: String(offer.unitPrice || ''),
       unitPriceUnit: String(offer.unitPriceUnit || ''),
+      unitPriceValue: finiteOrNull(offer.unitPriceValue),
       promotionType: String(offer.promotionType || ''),
       promotionText: String(offer.promotionText || ''),
       validFrom: String(offer.validFrom || ''),
@@ -215,7 +216,20 @@
     const slug = String(offer?.unifiedCategory || offer?.categorySlug || '').trim();
     const cat = slug ? categoryBySlug(groups, slug) : null;
     if (cat) return { ...offer, categorySlug: cat.slug, category: cat.name, categoryGroup: cat.group };
+    const known = slug ? KNOWN_CATEGORIES.find(c => c.slug === slug) : null;
+    if (known) return { ...offer, categorySlug: known.slug, category: known.name, categoryGroup: known.group };
     return { ...offer, categorySlug: slug, category: slug ? (offer.category || slug) : 'Onbekend', categoryGroup: slug ? 'overig' : '' };
+  }
+  // unit_price is door de API al per standaardhoeveelheid berekend; alleen formatteren, niet omrekenen.
+  function formatUnitPrice(offer) {
+    const value = finiteOrNull(offer?.unitPriceValue ?? offer?.unitPrice);
+    const unit = String(offer?.unitPriceUnit || '').trim();
+    if (value == null || value < 0) {
+      const text = String(offer?.unitPrice || '').trim();
+      return text && !/^[\d.,\s]+$/.test(text) ? text : '';
+    }
+    const amount = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' }).format(value).replace(/\u00a0/g, ' ');
+    return unit ? `${amount}/${unit}` : amount;
   }
   function matchesCategorySelection(offer, { group = '', categorySlug = '' } = {}) {
     if (categorySlug) return String(offer.categorySlug || '') === categorySlug;
@@ -269,13 +283,13 @@
     const response = await fetchImpl(url, { method: 'POST', headers: { 'Content-Type': 'application/json', ...headers }, body: JSON.stringify({ categories: true }), ...(signal ? { signal } : {}) });
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(payload.error || `Categorieën ophalen mislukt (${response.status}).`);
-    const categories = normalizeCategoryList(payload.categories);
+    const categories = normalizeCategoryList(Array.isArray(payload) ? payload : payload.categories);
     if (!categories.length) throw new Error('De categoriebron gaf geen categorieën terug.');
     return { categories, checkedAt: payload.checkedAt || new Date().toISOString() };
   }
 
   return {
-    CATEGORY_GROUPS, KNOWN_CATEGORIES, normalizeCategoryList, buildCategoryGroups, categoryBySlug, applyOfficialCategory,
+    CATEGORY_GROUPS, KNOWN_CATEGORIES, normalizeCategoryList, buildCategoryGroups, categoryBySlug, applyOfficialCategory, formatUnitPrice,
     matchesCategorySelection, mergeOffers, fetchCategories,
     isActive, partition, dedupe, key, dayInTz, fetchOffers,
     SUPPORTED_STORES, normalizeStore, normalizeOfferCategory, offerDiscountPercent, offerCategoryCounts, matchesOfferFilters,

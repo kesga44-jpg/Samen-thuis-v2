@@ -62,3 +62,21 @@ test('merging pages does not create duplicates', () => {
   const o = { name: 'M', brand: 'B', size: '1l', store: 'Jumbo', price: 1 };
   assert.equal(core.mergeOffers([o], [{ ...o }, { ...o, name: 'N' }]).length, 2);
 });
+
+test('formatUnitPrice toont Nederlandse notatie met eenheid zonder te verzinnen', () => {
+  const core = require('./offers-core.js');
+  assert.equal(core.formatUnitPrice({ unitPrice: '5', unitPriceValue: 5, unitPriceUnit: 'kg' }), '€ 5,00/kg');
+  assert.equal(core.formatUnitPrice({ unitPrice: '0.99', unitPriceUnit: 'L' }), '€ 0,99/L');
+  assert.equal(core.formatUnitPrice({ unitPrice: '0.99' }), '€ 0,99');
+  assert.equal(core.formatUnitPrice({}), '');
+});
+
+test('fetchCategories weigert lege of foutieve responses en accepteert geldige', async () => {
+  const core = require('./offers-core.js');
+  const mk = (ok, body) => async () => ({ ok, status: ok ? 200 : 502, json: async () => body });
+  await assert.rejects(core.fetchCategories({ url: 'x', fetchImpl: mk(true, { results: [] }) }));
+  await assert.rejects(core.fetchCategories({ url: 'x', fetchImpl: mk(false, { error: 'PrijsProfeet 502' }) }));
+  const r = await core.fetchCategories({ url: 'x', fetchImpl: mk(true, { categories: [{ slug: 'zuivel-eieren', name: 'Zuivel & Eieren', count: 3, group: 'vers' }] }) });
+  assert.equal(r.categories[0].name, 'Zuivel & Eieren');
+  assert.equal(core.applyOfficialCategory({ unifiedCategory: 'snoep-koek-chips' }, []).category, 'Snoep, Koek & Chips');
+});
