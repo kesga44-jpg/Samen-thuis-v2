@@ -7637,3 +7637,98 @@ document.addEventListener('click', event => {
     toast('Weerlocatie opgeslagen');
   });
 })();
+
+/* Vriezer & mealprep: gekoppeld aan Voorraad (data.freezer) en Weekmenu (meal.freezerId). */
+(function () {
+  const F = window.FreezerCore;
+  if (!F) return;
+  const fzUI = { query: '', location: '', sort: 'first', open: false };
+  const list = () => (data.freezer = Array.isArray(data.freezer) ? data.freezer : []);
+  const today = () => todayISO();
+  const field = (n, label, type = 'text', extra = '') => `<label class="fz-field"><span>${label}</span><input id="fz-${n}" type="${type}" ${extra}></label>`;
+  const opts = arr => arr.map(o => `<option>${esc(o)}</option>`).join('');
+
+  function itemRow(x) {
+    const d = F.daysLeft(x, today());
+    const tag = d === null ? '' : d < 0 ? `<span class="tag red">${-d} d over datum</span>` : d <= 14 ? `<span class="tag orange">nog ${d} d</span>` : `<span class="tag green">nog ${d} d</span>`;
+    return `<section class="card fz-item"><div class="card-head"><strong>${esc(x.title)}</strong>${tag}</div>
+      <p class="muted">${esc(x.kind)} · ${esc(x.location)}${x.category ? ' · ' + esc(x.category) : ''}${x.label ? ' · 🏷 ' + esc(x.label) : ''}</p>
+      <p class="muted">${x.frozen ? 'Ingevroren ' + fmtDate(x.frozen) : x.prepared ? 'Bereid ' + fmtDate(x.prepared) : ''}${x.bestBefore ? ' · Tot ' + fmtDate(x.bestBefore) : ''}</p>
+      ${x.note ? `<p class="muted">${esc(x.note)}</p>` : ''}
+      <div class="stock-controls"><strong>${x.portions} <small>porties</small></strong></div>
+      <div class="button-row"><button class="secondary" data-fz="eaten:${x.id}">Opgegeten −1</button><button class="secondary" data-fz="thawed:${x.id}">Ontdooid −1</button><button class="secondary" data-fz="discarded:${x.id}">Weggegooid −1</button><button class="secondary" data-fz="move:${x.id}">Verplaats</button><button class="delete" data-fz="delete:${x.id}" aria-label="Verwijderen">×</button></div></section>`;
+  }
+
+  function freezerHTML() {
+    const t = today(), s = F.summary(list(), t), items = F.sortFilter(list(), fzUI, t);
+    const first = F.sortFilter(list(), { sort: 'first' }, t)[0];
+    return `<section class="card fz-panel" id="fzPanel"><div class="card-head"><div><p class="eyebrow">Vriezer & mealprep</p><h2>${s.total} porties · ${s.items} items</h2></div><button class="primary" data-fz="toggle:form">＋ Toevoegen</button></div>
+      <p class="muted">${s.urgent ? `⚠ ${s.urgent} bijna op of over datum${s.expired ? ` (${s.expired} verlopen)` : ''}. ` : ''}${first ? `Eerst gebruiken: <strong>${esc(first.title)}</strong>${first.bestBefore ? ' (' + fmtDate(first.bestBefore) + ')' : ''}` : 'Nog niets in de vriezer.'}</p>
+      <div class="fz-form" ${fzUI.open ? '' : 'hidden'}>
+        <div class="fz-grid">${field('title', 'Gerecht / product', 'text', 'list="fz-recipes" maxlength="120" required')}${field('portions', 'Porties ingevroren', 'number', 'min="1" value="2" inputmode="numeric"')}
+        <label class="fz-field"><span>Soort</span><select id="fz-kind">${opts(F.KINDS)}</select></label><label class="fz-field"><span>Plek</span><select id="fz-location">${opts(F.LOCATIONS)}</select></label>
+        ${field('frozen', 'Invriesdatum', 'date', `value="${t}"`)}${field('bestBefore', 'Uiterste gebruiksdatum', 'date')}${field('cooked', 'Porties bereid (optioneel)', 'number', 'min="1" inputmode="numeric"')}${field('category', 'Categorie')}${field('label', 'Label')}${field('note', 'Notitie')}</div>
+        <datalist id="fz-recipes">${[...new Set((data.meals || []).map(m => m.title).filter(Boolean))].slice(0, 50).map(n => `<option value="${esc(n)}">`).join('')}</datalist>
+        <div class="button-row"><button class="primary" data-fz="save:close">Opslaan</button><button class="secondary" data-fz="save:more">Opslaan & volgende</button></div></div>
+      <div class="fz-filters"><input id="fzQuery" type="search" placeholder="Zoek in vriezer en voorraad" value="${esc(fzUI.query)}" aria-label="Zoeken"><select id="fzLoc" aria-label="Plek"><option value="">Alle plekken</option>${F.LOCATIONS.map(l => `<option ${fzUI.location === l ? 'selected' : ''}>${l}</option>`).join('')}</select><select id="fzSort" aria-label="Sorteren"><option value="first" ${fzUI.sort === 'first' ? 'selected' : ''}>Eerst gebruiken</option><option value="name" ${fzUI.sort === 'name' ? 'selected' : ''}>Naam</option><option value="portions" ${fzUI.sort === 'portions' ? 'selected' : ''}>Meeste porties</option></select></div>
+      <div class="grid three">${items.map(itemRow).join('') || empty('Geen items gevonden')}</div></section>`;
+  }
+
+  function mealLinkHTML() {
+    const avail = F.sortFilter(list(), {}, today());
+    const linked = (data.meals || []).filter(m => m.freezerId);
+    const planner = avail.length ? `<div class="fz-grid"><label class="fz-field"><span>Vriezergerecht</span><select id="fzMealItem">${avail.map(x => `<option value="${x.id}">${esc(x.title)} (${x.portions})</option>`).join('')}</select></label>${field('mealDate', 'Datum', 'date', `value="${today()}"`)}<label class="fz-field"><span>Maaltijd</span><select id="fzMealType"><option>Avondeten</option><option>Lunch</option><option>Ontbijt</option></select></label>${field('mealPortions', 'Porties', 'number', 'min="1" value="2"')}</div><button class="primary" data-fz="plan:x">Inplannen</button>` : '<p class="muted">Geen beschikbare vriezergerechten.</p>';
+    const rows = linked.map(m => { const it = list().find(x => x.id === m.freezerId); const done = it && (it.log || []).some(l => l.ref === 'meal:' + m.id); return `<div class="list-item"><div class="item-main"><strong>${esc(m.title)}</strong><small>${fmtDate(m.date)} · ${esc(m.type)} · ${esc(String(m.persons || 1))} porties</small></div>${done ? '<span class="tag green">Verwerkt</span>' : `<button class="secondary" data-fz="book:${m.id}">Gegeten ✓</button>`}</div>`; }).join('');
+    const ing = (data.meals || []).filter(m => m.ingredients && m.date >= today()).length;
+    return `<section class="card" id="fzMeals"><h2>Vriezer in weekmenu</h2>${planner}<div class="list">${rows}</div>${ing ? `<div class="button-row"><button class="secondary" data-fz="shop:x">Ontbrekende ingrediënten naar boodschappen</button></div>` : ''}</section>`;
+  }
+
+  function inject() {
+    const view = document.querySelector('#view');
+    if (!view || document.querySelector('#fzPanel, #fzMeals')) return;
+    if (current === 'stock') view.insertAdjacentHTML('afterbegin', freezerHTML());
+    else if (current === 'meals') view.insertAdjacentHTML('beforeend', mealLinkHTML());
+  }
+  const prev = render;
+  render = function (...a) { const r = prev(...a); inject(); return r; };
+
+  const val = n => (document.querySelector('#fz-' + n) || {}).value || '';
+  function done(msg) { save(); render(); if (msg) toast(msg); }
+
+  document.addEventListener('input', e => { if (e.target.id === 'fzQuery') { fzUI.query = e.target.value; const p = document.querySelector('#fzPanel'); if (p) { const pos = e.target.selectionStart; p.outerHTML = freezerHTML(); const q = document.querySelector('#fzQuery'); q.focus(); q.setSelectionRange(pos, pos); } } });
+  document.addEventListener('change', e => { if (e.target.id === 'fzLoc') fzUI.location = e.target.value; else if (e.target.id === 'fzSort') fzUI.sort = e.target.value; else return; document.querySelector('#fzPanel').outerHTML = freezerHTML(); });
+  document.addEventListener('click', e => {
+    const b = e.target.closest('[data-fz]'); if (!b) return;
+    const [act, ref] = b.dataset.fz.split(':'), item = list().find(x => x.id === ref);
+    if (act === 'toggle') { fzUI.open = !fzUI.open; render(); return; }
+    if (act === 'save') {
+      const cooked = Math.floor(Number(val('cooked')) || 0), frozen = Math.floor(Number(val('portions')) || 0);
+      if (cooked && frozen > cooked) { toast('Ingevroren porties kunnen niet hoger zijn dan bereide porties.'); return; }
+      const bb = val('bestBefore'), fr = val('frozen');
+      if (bb && fr && bb < fr) { toast('Gebruiksdatum ligt vóór invriesdatum.'); return; }
+      const res = F.add(list(), { title: val('title'), portions: frozen, kind: val('kind'), location: val('location'), frozen: fr, prepared: fr, bestBefore: bb, category: val('category'), label: val('label'), note: val('note') + (cooked && cooked > frozen ? ` (${cooked - frozen} van ${cooked} porties direct gegeten)` : '') }, today());
+      if (!res.ok) { toast(res.error); return; }
+      fzUI.open = ref === 'more'; done(res.merged ? 'Samengevoegd met bestaand item' : 'Toegevoegd'); return;
+    }
+    if (act === 'plan') {
+      const it = list().find(x => x.id === (document.querySelector('#fzMealItem') || {}).value), n = Math.max(1, Math.floor(Number(val('mealPortions')) || 1));
+      if (!it) return; if (n > it.portions) { toast('Niet genoeg porties.'); return; }
+      data.meals.push({ id: id(), date: val('mealDate') || today(), type: (document.querySelector('#fzMealType') || {}).value || 'Avondeten', title: it.title, persons: n, freezerId: it.id });
+      done('Ingepland'); return;
+    }
+    if (act === 'book') {
+      const m = data.meals.find(x => x.id === ref), it = m && list().find(x => x.id === m.freezerId);
+      if (!it) { toast('Vriezergerecht niet meer beschikbaar.'); return; }
+      const r = F.bookMeal(it, m); done(r.ok ? 'Voorraad bijgewerkt' : r.error); return;
+    }
+    if (act === 'shop') {
+      let added = 0;
+      data.meals.filter(m => m.ingredients && m.date >= today()).forEach(m => F.missingIngredients(m.ingredients, data.stock, data.groceries).forEach(t => { data.groceries.push({ id: id(), title: t, category: categorizeProduct(t), done: false }); added++; }));
+      done(added ? `${added} ingrediënt(en) toegevoegd` : 'Niets ontbreekt'); return;
+    }
+    if (!item) return;
+    if (act === 'delete') { if (confirm('Verwijderen?')) { data.freezer = list().filter(x => x !== item); done(); } return; }
+    if (act === 'move') { const to = prompt('Verplaats naar (' + F.LOCATIONS.join(', ') + ')', item.location === 'Vriezer' ? 'Koelkast' : 'Vriezer'); if (!to) return; const n = prompt('Aantal porties (1-' + item.portions + ')', item.portions); const r = F.move(list(), item, to.trim().replace(/^./, c => c.toUpperCase()), n); if (!r.ok) toast(r.error); else done('Verplaatst'); return; }
+    const r = F.consume(item, act, 1); if (!r.ok) toast(r.error); else done(act === 'thawed' ? 'Ontdooid — vergeet de maaltijd niet in te plannen' : 'Bijgewerkt');
+  });
+})();
