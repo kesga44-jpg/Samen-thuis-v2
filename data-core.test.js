@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { hasConcurrentChanges, mergeUnique, nextDue, normalizeFuelMateFill, preserveUnknownFields, resolveSyncConflict, createConflictStore, sameData, remoteChangedSinceChoice, conditionalUpdateSucceeded } = require('../data-core.js');
+const { hasConcurrentChanges, mergeUnique, nextDue, normalizeFuelMateFill, preserveUnknownFields, resolveSyncConflict, createConflictStore, sameData, remoteChangedSinceChoice, conditionalUpdateSucceeded, preserveCorruptData, loadWithRecovery, listCorruptBackups, restoreCorruptBackup } = require('./data-core.js');
 
 test('concurrent sync edits are detected after a shared baseline', () => {
   assert.equal(hasConcurrentChanges('2026-10-07T10:00:00Z', '2026-10-07T10:01:00Z', '2026-10-07T09:00:00Z'), true);
@@ -118,4 +118,103 @@ test('smart recurrence uses the actual completion date and clamps month ends', (
   assert.equal(nextDue('', '2026-10-07', 'Eenmalig'), '2026-10-07');
   assert.equal(nextDue('2026-10-01', '', 'Eenmalig'), '');
   assert.equal(nextDue('2026-10-01', '', 'Wanneer nodig'), '');
+});
+
+function fakeStorage() { const m = {}; return { getItem: k => (k in m ? m[k] : null), setItem: (k, v) => { m[k] = v; }, removeItem: k => { delete m[k]; } }; }
+
+test('corrupt storage is preserved once and empty storage is ignored', () => {
+  const s = fakeStorage();
+  assert.equal(preserveCorruptData(s, '', 'bak', 't1'), false);
+  assert.equal(s.getItem('bak'), null);
+  assert.equal(preserveCorruptData(s, '{kapot', 'bak', 't1'), true);
+  assert.equal(preserveCorruptData(s, '{kapot', 'bak', 't2'), true);
+  const saved = JSON.parse(s.getItem('bak'));
+  assert.equal(saved.raw, '{kapot');
+  assert.equal(saved.items.length, 1);
+  preserveCorruptData(s, '{ander', 'bak', 't3');
+  assert.equal(JSON.parse(s.getItem('bak')).items.length, 2);
+});
+
+test('preserveCorruptData reports failure when storage is full', () => {
+  const s = { getItem: () => null, setItem() { throw new Error('quota'); } };
+  assert.equal(preserveCorruptData(s, '{kapot', 'bak', 't1'), false);
+});
+
+const K = { storageKey: 'd', legacyKey: 'old', backupKey: 'pre', backupAtKey: 'preAt', corruptKey: 'bad', preRestoreKey: 'prr' };
+const opts = { ...K, migrate: d => { if (d.boom) throw new Error('migratie'); return { ...d, migrated: true }; }, fresh: () => ({ fresh: true }), now: () => 'nu' };
+
+test('loadData route: empty storage gives fresh data and writes nothing', () => {
+  const s = fakeStorage();
+  const r = loadWithRecovery(s, opts);
+  assert.deepEqual(r, { data: { fresh: true }, status: 'empty' });
+  assert.equal(s.getItem('bad'), null);
+  assert.equal(s.getItem('pre'), null);
+});
+
+test('loadData route: valid data is migrated and snapshotted once', () => {
+  const s = fakeStorage(); s.setItem('d', '{"a":1}');
+  assert.equal(loadWithRecovery(s, opts).status, 'ok');
+  assert.equal(s.getItem('pre'), '{"a":1}');
+  s.setItem('d', '{"a":2}');
+  loadWithRecovery(s, opts);
+  assert.equal(s.getItem('pre'), '{"a":1}');
+});
+
+test('loadData route: invalid JSON is preserved, never snapshotted, falls back to fresh', () => {
+  const s = fakeStorage(); s.setItem('d', '{kapot');
+  const r = loadWithRecovery(s, opts);
+  assert.equal(r.status, 'fresh');
+  assert.equal(s.getItem('pre'), null);
+  assert.equal(JSON.parse(s.getItem('bad')).items[0].raw, '{kapot');
+  assert.equal(s.getItem('d'), '{kapot');
+});
+
+test('loadData route: non-object JSON is treated as corrupt', () => {
+  const s = fakeStorage(); s.setItem('d', '[1,2]');
+  assert.equal(loadWithRecovery(s, opts).status, 'fresh');
+  assert.equal(JSON.parse(s.getItem('bad')).items[0].raw, '[1,2]');
+});
+
+test('loadData route: migration failure recovers from safety snapshot and keeps source', () => {
+  const s = fakeStorage(); s.setItem('pre', '{"ok":1}'); s.setItem('d', '{"boom":true}');
+  const r = loadWithRecovery(s, opts);
+  assert.equal(r.status, 'recovered');
+  assert.equal(r.data.ok, 1);
+  assert.equal(JSON.parse(s.getItem('bad')).items[0].raw, '{"boom":true}');
+});
+
+test('loadData route: failing snapshot falls back to fresh, source preserved', () => {
+  const s = fakeStorage(); s.setItem('pre', '{kapot2'); s.setItem('d', '{"boom":true}');
+  assert.equal(loadWithRecovery(s, opts).status, 'fresh');
+  assert.equal(JSON.parse(s.getItem('bad')).items[0].raw, '{"boom":true}');
+});
+
+test('corrupt backups are listed with validity and restored only when valid', () => {
+  const s = fakeStorage(); s.setItem('d', '{"boom":true}');
+  loadWithRecovery(s, opts);
+  preserveCorruptData(s, '{"x":1}', 'bad', 't');
+  const list = listCorruptBackups(s, 'bad', opts.migrate);
+  assert.deepEqual(list.map(i => i.valid), [false, true]);
+  assert.throws(() => restoreCorruptBackup(s, opts, 0));
+  assert.equal(s.getItem('d'), '{"boom":true}');
+  assert.throws(() => restoreCorruptBackup(s, opts, 9));
+  const data = restoreCorruptBackup(s, opts, 1);
+  assert.equal(data.x, 1);
+  assert.equal(JSON.parse(s.getItem('d')).x, 1);
+  assert.equal(s.getItem('prr'), '{"boom":true}');
+  assert.deepEqual(listCorruptBackups(fakeStorage(), 'bad', opts.migrate), []);
+});
+
+test('loadData route: failed corrupt-backup write is reported via preserved=false and source stays untouched', () => {
+  const m = { d: '{kapot' };
+  const s = { getItem: k => (k in m ? m[k] : null), setItem(k, v) { if (k === 'bad') throw new Error('quota'); m[k] = v; } };
+  const r = loadWithRecovery(s, opts);
+  assert.equal(r.status, 'fresh');
+  assert.equal(r.preserved, false);
+  assert.equal(m.d, '{kapot');
+});
+
+test('restore hold: a restored copy that differs from cloud data is detected by sameData', () => {
+  assert.equal(sameData({ a: 1, meta: { updatedAt: 'x' } }, { meta: { updatedAt: 'x' }, a: 1 }), true);
+  assert.equal(sameData({ a: 1 }, { a: 2 }), false);
 });
