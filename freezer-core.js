@@ -13,6 +13,7 @@
   function normalize(raw, today) {
     const r = raw || {};
     const portions = Math.max(0, Math.floor(num(r.portions)));
+    const log = Array.isArray(r.log) ? r.log : [];
     return {
       ...r,
       id: r.id || newId(), title: String(r.title || '').trim().slice(0, 120),
@@ -22,15 +23,15 @@
       note: String(r.note || '').trim().slice(0, 300), portions,
       batchPortions: Math.max(portions, Math.floor(num(r.batchPortions ?? portions))),
       prepared: r.prepared || today || '', frozen: r.frozen || '', bestBefore: r.bestBefore || '',
-      recipe: r.recipe || '', log: Array.isArray(r.log) ? r.log : [],
+      recipe: r.recipe || '', log,
+      processedRefs: Array.isArray(r.processedRefs) ? r.processedRefs : [],
       createdAt: r.createdAt || new Date().toISOString()
     };
   }
   function migrateLegacyStock(stock, freezer, today) {
     const source = Array.isArray(stock) ? stock : [];
     const batches = Array.isArray(freezer) ? freezer.slice() : [];
-    const occurrences = new Map();
-    const migratedKeys = new Set(batches.map(item => item.legacyStockKey).filter(Boolean));
+    const seenSources = new Map();
     const remaining = [];
     let migrated = 0;
     source.forEach(item => {
@@ -45,28 +46,35 @@
       }
 
       const sourceValue = JSON.stringify(legacy);
-      const identity = legacy.id == null || legacy.id === ''
+      const key = legacy.id == null || legacy.id === ''
         ? `value:${sourceValue}`
         : `id:${String(legacy.id)}`;
-      const occurrence = occurrences.get(identity) || 0;
-      occurrences.set(identity, occurrence + 1);
-      const key = `${identity}:${occurrence}`;
-      const id = `legacy-stock-${hash(key)}`;
-      if (!migratedKeys.has(key)) {
-        const legacyStock = JSON.parse(sourceValue);
-        batches.push(normalize({
-          id, title, kind: 'Los product', location: 'Vriezer',
-          category: legacy.category === 'Vriezer' ? '' : legacy.category || '',
-          label: legacy.label || '', note: legacy.note || legacy.notes || '',
-          portions: amount, batchPortions: amount,
-          prepared: legacy.prepared || legacy.preparedAt || '',
-          frozen: legacy.frozen || legacy.frozenAt || '',
-          bestBefore: legacy.bestBefore || legacy.expiry || legacy.expiresOn || '',
-          legacyStockKey: key, legacyStock
-        }, today));
-        migratedKeys.add(key);
-        migrated += 1;
+      if (seenSources.has(key)) {
+        if (seenSources.get(key) !== sourceValue) remaining.push(item);
+        return;
       }
+      seenSources.set(key, sourceValue);
+      const existing = batches.find(batch => batch && batch.legacyStockKey === key);
+      if (existing) {
+        if (JSON.stringify(existing.legacyStock) !== sourceValue) remaining.push(item);
+        return;
+      }
+      let id = `legacy-stock-${hash(key)}`, suffix = 0;
+      while (batches.some(batch => batch && batch.id === id && batch.legacyStockKey !== key)) {
+        id = `legacy-stock-${hash(key)}-${++suffix}`;
+      }
+      const legacyStock = JSON.parse(sourceValue);
+      batches.push(normalize({
+        id, title, kind: 'Los product', location: 'Vriezer',
+        category: legacy.category === 'Vriezer' ? '' : legacy.category || '',
+        label: legacy.label || '', note: legacy.note || legacy.notes || '',
+        portions: amount, batchPortions: amount,
+        prepared: legacy.prepared || legacy.preparedAt || '',
+        frozen: legacy.frozen || legacy.frozenAt || '',
+        bestBefore: legacy.bestBefore || legacy.expiry || legacy.expiresOn || '',
+        legacyStockKey: key, legacyStock
+      }, today));
+      migrated += 1;
     });
     return { stock: remaining, freezer: batches, migrated };
   }
@@ -97,11 +105,14 @@
     if (!ACTIONS[action]) return { ok: false, error: 'Onbekende actie.' };
     qty = Math.floor(num(qty) || 1);
     if (qty < 1) return { ok: false, error: 'Ongeldig aantal.' };
-    if (ref && item.log.some(l => l.ref === ref)) return { ok: true, skipped: true };
+    item.log ||= [];
+    item.processedRefs ||= [];
+    if (ref && (item.processedRefs.includes(ref) || item.log.some(l => l.ref === ref))) return { ok: true, skipped: true };
     if (qty > item.portions) return { ok: false, error: 'Niet genoeg porties.' };
     item.portions -= qty;
     item.log.push({ id: newId(), action, qty, ref: ref || '', at: when || new Date().toISOString() });
     item.log = item.log.slice(-50);
+    if (ref) item.processedRefs.push(ref);
     return { ok: true };
   }
   function move(list, item, location, qty) {
@@ -110,7 +121,7 @@
     if (qty < 1 || qty > item.portions) return { ok: false, error: 'Ongeldig aantal.' };
     if (qty === item.portions) { item.location = location; return { ok: true, item }; }
     item.portions -= qty;
-    return add(list, { ...item, id: '', log: [], location, portions: qty });
+    return add(list, { ...item, id: '', log: [], location, portions: qty, batchPortions: qty });
   }
   const daysLeft = (item, today) => item.bestBefore ? Math.round((new Date(item.bestBefore + 'T00:00:00Z') - new Date(today + 'T00:00:00Z')) / 864e5) : null;
   function summary(list, today, soon) {
@@ -134,12 +145,15 @@
     if (!meal.freezerId) return { ok: false, error: 'Geen vriezergerecht gekoppeld.' };
     return consume(item, 'eaten', meal.persons ? Math.max(1, Math.floor(num(meal.persons))) : 1, 'meal:' + meal.id);
   }
+  function wasProcessed(item, ref) {
+    return Boolean(item && ref && ((item.processedRefs || []).includes(ref) || (item.log || []).some(entry => entry.ref === ref)));
+  }
   function planMeal(meals, item, meal, today) {
     if (!item || !meal || !meal.id) return { ok: false, error: 'Maaltijd of vriezerbatch ontbreekt.' };
     const existing = meals.find(entry => entry.id === meal.id);
     if (existing) return { ok: true, meal: existing, skipped: true };
     const portions = Math.max(1, Math.floor(num(meal.persons) || 1));
-    const consumed = new Set((item.log || []).map(entry => entry.ref).filter(Boolean));
+    const consumed = new Set([...(item.processedRefs || []), ...(item.log || []).map(entry => entry.ref)].filter(Boolean));
     const reserved = meals.filter(entry => entry.freezerId === item.id
       && (!today || !entry.date || entry.date >= today)
       && !consumed.has(`meal:${entry.id}`))
@@ -167,5 +181,5 @@
       const k = norm(s); if (!k || have.has(k) || listed.has(k) || seen.has(k)) return false; seen.add(k); return true;
     });
   }
-  return { LOCATIONS, KINDS, ACTIONS, normalize, migrateLegacyStock, add, consume, move, daysLeft, summary, sortFilter, bookMeal, planMeal, cancelMeal, matchMealTitle, missingIngredients, addDaysISO };
+  return { LOCATIONS, KINDS, ACTIONS, normalize, migrateLegacyStock, add, consume, move, daysLeft, summary, sortFilter, bookMeal, wasProcessed, planMeal, cancelMeal, matchMealTitle, missingIngredients, addDaysISO };
 });

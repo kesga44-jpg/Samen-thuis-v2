@@ -123,6 +123,15 @@ const syncConflictStore = SamenThuisCore.createConflictStore(localStorage, SYNC_
 const id = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 const esc = (value = '') => String(value).replace(/[&<>'"]/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[character]));
 const fmtDate = (value, options = { weekday: 'short', day: 'numeric', month: 'short' }) => value ? new Intl.DateTimeFormat('nl-NL', options).format(parseDate(value)) : 'Geen datum';
+function migrateLegacyFreezerStock(target) {
+  const freezerCore = window.FreezerCore;
+  if (!freezerCore?.migrateLegacyStock) return;
+  const result = freezerCore.migrateLegacyStock(target.stock, target.freezer, todayISO());
+  target.stock = result.stock;
+  target.freezer = result.freezer.map(item => item && typeof item === 'object'
+    ? freezerCore.normalize(item, todayISO())
+    : item);
+}
 const groupBy = (items, keyFn) => items.reduce((groups, item) => {
   const key = keyFn(item);
   (groups[key] ||= []).push(item);
@@ -139,11 +148,7 @@ function migrateData(raw) {
   ['planning', 'meals', 'groceries', 'chores', 'stock', 'ideas', 'home', 'trips', 'freezer'].forEach(key => {
     if (Array.isArray(raw[key])) migrated[key] = raw[key];
   });
-  if (window.FreezerCore?.migrateLegacyStock) {
-    const freezerMigration = window.FreezerCore.migrateLegacyStock(migrated.stock, migrated.freezer, todayISO());
-    migrated.stock = freezerMigration.stock;
-    migrated.freezer = freezerMigration.freezer;
-  }
+  migrateLegacyFreezerStock(migrated);
   if (Array.isArray(raw.tripFolders)) {
     migrated.tripFolders = raw.tripFolders.filter(folder => folder && folder.id && folder.name).map(folder => ({ endDate: '', note: '', ...folder }));
   } else {
@@ -312,6 +317,7 @@ function formConfig(view) {
 }
 
 function save({ touch = true, sync = true } = {}) {
+  migrateLegacyFreezerStock(data);
   if (touch) data.meta.updatedAt = new Date().toISOString();
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
   const saveState = document.querySelector('#saveState');
@@ -7688,7 +7694,7 @@ document.addEventListener('click', event => {
     const avail = F.sortFilter(list(), {}, today());
     const linked = (data.meals || []).filter(m => m.freezerId);
     const planner = avail.length ? `<div class="fz-grid"><label class="fz-field"><span>Vriezergerecht</span><select id="fzMealItem">${avail.map(x => `<option value="${x.id}">${esc(x.title)} (${x.portions})</option>`).join('')}</select></label>${field('mealDate', 'Datum', 'date', `value="${today()}"`)}<label class="fz-field"><span>Maaltijd</span><select id="fzMealType"><option>Avondeten</option><option>Lunch</option><option>Ontbijt</option></select></label>${field('mealPortions', 'Porties', 'number', 'min="1" value="2"')}</div><button class="primary" data-fz="plan:x">Inplannen</button>` : '<p class="muted">Geen beschikbare vriezergerechten.</p>';
-    const rows = linked.map(m => { const it = list().find(x => x.id === m.freezerId); const done = it && (it.log || []).some(l => l.ref === 'meal:' + m.id); return `<div class="list-item"><div class="item-main"><strong>${esc(m.title)}</strong><small>${fmtDate(m.date)} · ${esc(m.type)} · ${esc(String(m.persons || 1))} porties</small></div>${done ? '<span class="tag green">Verwerkt</span>' : `<button class="secondary" data-fz="book:${m.id}">Gegeten ✓</button>`}</div>`; }).join('');
+    const rows = linked.map(m => { const it = list().find(x => x.id === m.freezerId); const done = F.wasProcessed(it, 'meal:' + m.id); return `<div class="list-item"><div class="item-main"><strong>${esc(m.title)}</strong><small>${fmtDate(m.date)} · ${esc(m.type)} · ${esc(String(m.persons || 1))} porties</small></div>${done ? '<span class="tag green">Verwerkt</span>' : `<button class="secondary" data-fz="book:${m.id}">Gegeten ✓</button>`}</div>`; }).join('');
     const ing = (data.meals || []).filter(m => m.ingredients && m.date >= today()).length;
     return `<section class="card" id="fzMeals"><h2>Vriezer in weekmenu</h2>${planner}<div class="list">${rows}</div>${ing ? `<div class="button-row"><button class="secondary" data-fz="shop:x">Ontbrekende ingrediënten naar boodschappen</button></div>` : ''}</section>`;
   }
