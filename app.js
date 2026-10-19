@@ -216,34 +216,28 @@ function migrateData(raw) {
   return migrated;
 }
 
+const RECOVERY_KEYS = {
+  storageKey: STORAGE_KEY, legacyKey: LEGACY_STORAGE_KEY,
+  backupKey: 'samenThuisPreV23Backup', backupAtKey: 'samenThuisPreV23BackupAt',
+  corruptKey: 'samenThuisCorruptBackup', preRestoreKey: 'samenThuisPreRestoreBackup'
+};
+
+function recoveryOptions() {
+  return { ...RECOVERY_KEYS, migrate: migrateData, fresh: freshLocalData, now: () => new Date().toISOString() };
+}
+
 function loadData() {
-  let stored = null;
   try {
-    stored = localStorage.getItem(STORAGE_KEY) || localStorage.getItem(LEGACY_STORAGE_KEY);
-    if (!stored) return freshLocalData();
-
-    // v23.1 DATA-VEILIG: maak vóór migratie automatisch een ongewijzigde snapshot.
-    // De normale opslagkey blijft samenThuisDataV2, dus bestaande Voorraad,
-    // Boodschappen, Huishouden, Reizen enz. blijven op dezelfde plek staan.
-    try {
-      if (!localStorage.getItem('samenThuisPreV23Backup')) {
-        localStorage.setItem('samenThuisPreV23Backup', stored);
-        localStorage.setItem('samenThuisPreV23BackupAt', new Date().toISOString());
-      }
-    } catch {}
-
-    return migrateData(JSON.parse(stored));
+    return SamenThuisCore.loadWithRecovery(localStorage, recoveryOptions()).data;
   } catch {
-    // Bewaar de oorspronkelijke tekst eerst, zodat een volgende save() deze niet kwijtraakt.
-    SamenThuisCore.preserveCorruptData(localStorage, stored, 'samenThuisCorruptBackup', new Date().toISOString());
-    // Bij een parse/migratiefout proberen we de safety snapshot terug te lezen
-    // in plaats van direct met voorbeelddata te starten.
-    try {
-      const backup = localStorage.getItem('samenThuisPreV23Backup');
-      if (backup) return migrateData(JSON.parse(backup));
-    } catch {}
     return freshLocalData();
   }
+}
+
+function recoveryCard() {
+  const items = SamenThuisCore.listCorruptBackups(localStorage, RECOVERY_KEYS.corruptKey, migrateData);
+  if (!items.length) return '';
+  return `<section class="card settings-card"><div class="card-head"><div><p class="eyebrow">Gegevens</p><h2>Beschadigde gegevens herstellen</h2></div></div><p>Onleesbare gegevens zijn veilig bewaard. Herstellen kan alleen als de gegevens geldig zijn; je huidige gegevens worden eerst apart bewaard.</p>${items.map(item => `<div class="button-row"><span>${esc(item.at ? new Date(item.at).toLocaleString('nl-NL') : 'Onbekende datum')} · ${item.size} tekens · ${item.valid ? 'geldig' : 'niet herstelbaar'}</span><button class="secondary" data-restore-corrupt="${item.index}" ${item.valid ? '' : 'disabled'}>Herstellen</button></div>`).join('')}</section>`;
 }
 
 // Een leeg/nieuw apparaat krijgt een tijdstempel van 1970, zodat synchronisatie
@@ -660,6 +654,7 @@ function renderSettings() {
     ${renderCalendarSettings()}
     ${renderSyncConflictCard()}
     <section class="card settings-card"><div class="card-head"><div><p class="eyebrow">Gegevens</p><h2>Back-up</h2></div></div><p>Maak een los JSON-bestand of herstel een eerdere back-up. Herstellen vervangt alle huidige gegevens op dit apparaat; Importeren voegt gegevens samen. De synchronisatiecode en sleutel worden niet in de back-up gezet.</p><div class="button-row"><button class="secondary" data-action="backup">Back-up maken</button><button class="secondary" data-action="restore">Back-up herstellen (vervangen)</button></div></section>
+    ${recoveryCard()}
     <section class="card settings-card"><div class="card-head"><div><p class="eyebrow">Apple Opdracht</p><h2>Eenvoudig tekstformaat</h2></div></div><p>Laat de Opdracht per afspraak één regel maken:</p><pre><code>Agendanaam | 2026-09-04 | 09:00 | Titel</code></pre><p>De persoon volgt uit de agenda. Een vijfde veld met Kees, Daphne of Samen is optioneel en gaat voor de agendakeuze. Een zesde veld mag de eindtijd bevatten. Bij onbekende namen kies je de persoon één keer.</p><p>Dit is een import, geen tweerichtingskoppeling. Verplaatsen of verwijderen in Apple Agenda wordt niet automatisch overgenomen.</p></section>
   </div>`;
 }
@@ -1610,6 +1605,18 @@ document.addEventListener('click', event => {
   if (picker) { document.querySelector(`#${picker.dataset.pickFile}`).click(); return; }
   if (event.target.closest('[data-sync-now]')) { syncNow({ manual: true }); return; }
   const action = event.target.closest('[data-action]')?.dataset.action;
+  const corruptBtn = event.target.closest('[data-restore-corrupt]');
+  if (corruptBtn) {
+    if (confirm('Deze bewaarde gegevens herstellen? Je huidige gegevens worden eerst apart bewaard.')) {
+      try {
+        data = SamenThuisCore.restoreCorruptBackup(localStorage, recoveryOptions(), Number(corruptBtn.dataset.restoreCorrupt));
+        save({ touch: false });
+        render();
+        toast('Gegevens hersteld');
+      } catch (error) { toast(error.message || 'Herstellen mislukt'); }
+    }
+    return;
+  }
   if (action === 'backup') exportBackup();
   if (action === 'restore') {
     if (confirm('Back-up herstellen vervangt alle huidige gegevens op dit apparaat. Gebruik Importeren als je gegevens wilt samenvoegen. Doorgaan?')) {

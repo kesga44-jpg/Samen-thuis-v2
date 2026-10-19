@@ -168,5 +168,57 @@
     } catch { return false; }
   }
 
-  return { preserveCorruptData, hasConcurrentChanges, mergeUnique, nextDue, normalizeFuelMateFill, preserveUnknownFields, resolveSyncConflict, createConflictStore, sameData, remoteChangedSinceChoice, conditionalUpdateSucceeded };
+  function parseStoredData(raw, migrate) {
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('Geen geldige Samen Thuis-gegevens');
+    return migrate(parsed);
+  }
+
+  // Laadt lokale gegevens; beschadigde brondata blijft bewaard en wordt nooit stil weggegooid.
+  function loadWithRecovery(storage, o) {
+    let stored = null;
+    try {
+      stored = storage.getItem(o.storageKey) || (o.legacyKey ? storage.getItem(o.legacyKey) : null);
+      if (!stored) return { data: o.fresh(), status: 'empty' };
+      const data = parseStoredData(stored, o.migrate);
+      try {
+        if (!storage.getItem(o.backupKey)) {
+          storage.setItem(o.backupKey, stored);
+          storage.setItem(o.backupAtKey, o.now());
+        }
+      } catch {}
+      return { data, status: 'ok' };
+    } catch {
+      const preserved = preserveCorruptData(storage, stored, o.corruptKey, o.now());
+      try {
+        const backup = storage.getItem(o.backupKey);
+        if (backup && backup !== stored) return { data: parseStoredData(backup, o.migrate), status: 'recovered', preserved };
+      } catch {}
+      return { data: o.fresh(), status: 'fresh', preserved };
+    }
+  }
+
+  function listCorruptBackups(storage, key, migrate) {
+    let items = [];
+    try { items = JSON.parse(storage.getItem(key) || 'null')?.items || []; } catch { return []; }
+    return items.map((item, index) => {
+      let valid = true;
+      try { parseStoredData(item.raw, migrate); } catch { valid = false; }
+      return { index, at: item.at || '', size: String(item.raw || '').length, valid };
+    });
+  }
+
+  // Valideert vóór herstel; de huidige gegevens gaan eerst naar een aparte kopie.
+  function restoreCorruptBackup(storage, o, index) {
+    const items = JSON.parse(storage.getItem(o.corruptKey) || 'null')?.items || [];
+    const item = items[index];
+    if (!item) throw new Error('Back-up niet gevonden');
+    const data = parseStoredData(item.raw, o.migrate);
+    const current = storage.getItem(o.storageKey);
+    if (current && current !== item.raw) storage.setItem(o.preRestoreKey, current);
+    storage.setItem(o.storageKey, JSON.stringify(data));
+    return data;
+  }
+
+  return { loadWithRecovery, listCorruptBackups, restoreCorruptBackup, preserveCorruptData, hasConcurrentChanges, mergeUnique, nextDue, normalizeFuelMateFill, preserveUnknownFields, resolveSyncConflict, createConflictStore, sameData, remoteChangedSinceChoice, conditionalUpdateSucceeded };
 });
