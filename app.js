@@ -84,6 +84,7 @@ const initialData = {
     { id: 'g2', title: 'Basilicum', category: 'Groente', done: false },
     { id: 'g3', title: 'Havermelk', category: 'Zuivel & vega', done: true }
   ],
+  freezer: [],
   chores: [
     { id: 'c1', title: 'Keuken opruimen', person: 'Samen', due: todayISO(), repeat: 'Dagelijks', secondWeekday: '', notes: '', completedDates: [] },
     { id: 'c2', title: 'Bed verschonen', person: 'Kees', due: addDays(todayISO(), 2), repeat: 'Wekelijks', secondWeekday: '', notes: '', completedDates: [] },
@@ -135,9 +136,14 @@ function migrateData(raw) {
   // Bekende structuren worden hieronder nog genormaliseerd, onbekende structuren
   // worden één-op-één meegenomen zodat een update ze niet stilzwijgend verwijdert.
   SamenThuisCore.preserveUnknownFields(raw, migrated, clone);
-  ['planning', 'meals', 'groceries', 'chores', 'stock', 'ideas', 'home', 'trips'].forEach(key => {
+  ['planning', 'meals', 'groceries', 'chores', 'stock', 'ideas', 'home', 'trips', 'freezer'].forEach(key => {
     if (Array.isArray(raw[key])) migrated[key] = raw[key];
   });
+  if (window.FreezerCore?.migrateLegacyStock) {
+    const freezerMigration = window.FreezerCore.migrateLegacyStock(migrated.stock, migrated.freezer, todayISO());
+    migrated.stock = freezerMigration.stock;
+    migrated.freezer = freezerMigration.freezer;
+  }
   if (Array.isArray(raw.tripFolders)) {
     migrated.tripFolders = raw.tripFolders.filter(folder => folder && folder.id && folder.name).map(folder => ({ endDate: '', note: '', ...folder }));
   } else {
@@ -1531,7 +1537,11 @@ document.addEventListener('click', event => {
   const deleteButton = event.target.closest('[data-delete]');
   if (deleteButton) {
     const [type, itemId] = deleteButton.dataset.delete.split(':');
-    data[type] = data[type].filter(item => item.id !== itemId);
+    if (type === 'meals' && window.FreezerCore?.cancelMeal) {
+      data.meals = window.FreezerCore.cancelMeal(data.meals, itemId).meals;
+    } else {
+      data[type] = data[type].filter(item => item.id !== itemId);
+    }
     save(); render(); return;
   }
   const toggle = event.target.closest('[data-toggle]');
@@ -5710,7 +5720,7 @@ function fuelMate243(obj){
 }
 function sigImport246(x,kind=''){if(!x||typeof x!=='object')return String(x);if(kind==='cars')return plateImport243(x.plate||'')||String(x.id||'');if(kind==='fuelEntries')return [x.carId||'',String(x.date||'').slice(0,10),num243(x.odometer),num243(x.liters||x.volume),num243(x.total||x.totalCost)].join('|');if(kind==='planning')return [x.title||'',x.date||'',x.time||'',x.person||''].join('|').toLowerCase();return String(x.id||[x.title||x.name||'',x.date||x.due||'',x.category||''].join('|')).toLowerCase()}
 function mergeArray246(a,b,kind=''){return SamenThuisCore.mergeUnique(a,b,x=>sigImport246(x,kind))}
-function mergeBackup246(raw){const incoming=typeof migrateData==='function'?migrateData(raw):raw;if(!incoming||typeof incoming!=='object')throw new Error('Ongeldige Samen Thuis back-up');const keys=['planning','meals','groceries','chores','stock','trips','ideas','home','cars','fuelEntries'];keys.forEach(k=>{if(Array.isArray(incoming[k]))data[k]=mergeArray246(data[k],incoming[k],k)});Object.entries(incoming).forEach(([k,v])=>{if(keys.includes(k)||v==null)return;if(v&&typeof v==='object'&&!Array.isArray(v)){data[k]={...v,...((data[k]&&typeof data[k]==='object'&&!Array.isArray(data[k]))?data[k]:{})}}else if(data[k]===undefined||data[k]===null||data[k]==='')data[k]=v})}
+function mergeBackup246(raw){const incoming=typeof migrateData==='function'?migrateData(raw):raw;if(!incoming||typeof incoming!=='object')throw new Error('Ongeldige Samen Thuis back-up');const keys=['planning','meals','groceries','chores','stock','trips','ideas','home','freezer','cars','fuelEntries'];keys.forEach(k=>{if(Array.isArray(incoming[k]))data[k]=mergeArray246(data[k],incoming[k],k)});Object.entries(incoming).forEach(([k,v])=>{if(keys.includes(k)||v==null)return;if(v&&typeof v==='object'&&!Array.isArray(v)){data[k]={...v,...((data[k]&&typeof data[k]==='object'&&!Array.isArray(data[k]))?data[k]:{})}}else if(data[k]===undefined||data[k]===null||data[k]==='')data[k]=v})}
 async function runImport243(){
  if(!importFile243)return toast('Kies eerst een bestand');
  try{
@@ -5731,7 +5741,7 @@ async function runImport243(){
 function template243(){
  const x=IMPORT243[importTarget243],isJson=['backup','budget','auto'].includes(importTarget243);
  let content=x.example,name=`samen-thuis-${importTarget243}-voorbeeld.${isJson?'json':'csv'}`;
- if(importTarget243==='backup')content=JSON.stringify({planning:[],meals:[],groceries:[],chores:[],stock:[],trips:[],ideas:[],home:[],cars:[],fuelEntries:[],budgetV23:{}},null,2);
+ if(importTarget243==='backup')content=JSON.stringify({planning:[],meals:[],groceries:[],chores:[],stock:[],trips:[],ideas:[],home:[],freezer:[],cars:[],fuelEntries:[],budgetV23:{}},null,2);
  if(importTarget243==='auto')content=JSON.stringify({app:'fuelmate',version:1,vehicles:[{id:1,name:'Kees',makeModel:'Seat Ibiza',year:2012,plate:'JB796D',tankLiters:45,isDefault:1}],fillups:[{id:1,vehicleId:1,date:'2026-09-19T11:43:00',odometer:165275,volume:46.4,totalCost:108.44,partial:0,missedFill:0,station:'',grade:0,note:''}]},null,2);
  const blob=new Blob([content],{type:isJson?'application/json':'text/csv'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)
 }
@@ -7652,10 +7662,10 @@ document.addEventListener('click', event => {
     const d = F.daysLeft(x, today());
     const tag = d === null ? '' : d < 0 ? `<span class="tag red">${-d} d over datum</span>` : d <= 14 ? `<span class="tag orange">nog ${d} d</span>` : `<span class="tag green">nog ${d} d</span>`;
     return `<section class="card fz-item"><div class="card-head"><strong>${esc(x.title)}</strong>${tag}</div>
-      <p class="muted">${esc(x.kind)} · ${esc(x.location)}${x.category ? ' · ' + esc(x.category) : ''}${x.label ? ' · 🏷 ' + esc(x.label) : ''}</p>
+      <p class="muted">${esc(x.kind)} · ${esc(x.location)}${x.category ? ' · ' + esc(x.category) : ''}${x.label ? ' · 🏷 ' + esc(x.label) : ''}${x.recipe ? ' · Recept: ' + esc(x.recipe) : ''}</p>
       <p class="muted">${x.frozen ? 'Ingevroren ' + fmtDate(x.frozen) : x.prepared ? 'Bereid ' + fmtDate(x.prepared) : ''}${x.bestBefore ? ' · Tot ' + fmtDate(x.bestBefore) : ''}</p>
       ${x.note ? `<p class="muted">${esc(x.note)}</p>` : ''}
-      <div class="stock-controls"><strong>${x.portions} <small>porties</small></strong></div>
+      <div class="stock-controls"><strong>${x.portions} <small>${esc(x.legacyStock?.unit || 'porties')}${x.batchPortions > x.portions ? ` · ${x.batchPortions} ingevroren` : ''}</small></strong></div>
       <div class="button-row"><button class="secondary" data-fz="eaten:${x.id}">Opgegeten −1</button><button class="secondary" data-fz="thawed:${x.id}">Ontdooid −1</button><button class="secondary" data-fz="discarded:${x.id}">Weggegooid −1</button><button class="secondary" data-fz="move:${x.id}">Verplaats</button><button class="delete" data-fz="delete:${x.id}" aria-label="Verwijderen">×</button></div></section>`;
   }
 
@@ -7706,14 +7716,16 @@ document.addEventListener('click', event => {
       if (cooked && frozen > cooked) { toast('Ingevroren porties kunnen niet hoger zijn dan bereide porties.'); return; }
       const bb = val('bestBefore'), fr = val('frozen');
       if (bb && fr && bb < fr) { toast('Gebruiksdatum ligt vóór invriesdatum.'); return; }
-      const res = F.add(list(), { title: val('title'), portions: frozen, kind: val('kind'), location: val('location'), frozen: fr, prepared: fr, bestBefore: bb, category: val('category'), label: val('label'), note: val('note') + (cooked && cooked > frozen ? ` (${cooked - frozen} van ${cooked} porties direct gegeten)` : '') }, today());
+      const recipe = F.matchMealTitle(val('title'), data.meals);
+      const res = F.add(list(), { title: val('title'), portions: frozen, kind: val('kind'), location: val('location'), frozen: fr, prepared: fr, bestBefore: bb, category: val('category'), label: val('label'), recipe: recipe?.title || '', note: val('note') + (cooked && cooked > frozen ? ` (${cooked - frozen} van ${cooked} porties direct gegeten)` : '') }, today());
       if (!res.ok) { toast(res.error); return; }
       fzUI.open = ref === 'more'; done(res.merged ? 'Samengevoegd met bestaand item' : 'Toegevoegd'); return;
     }
     if (act === 'plan') {
       const it = list().find(x => x.id === (document.querySelector('#fzMealItem') || {}).value), n = Math.max(1, Math.floor(Number(val('mealPortions')) || 1));
-      if (!it) return; if (n > it.portions) { toast('Niet genoeg porties.'); return; }
-      data.meals.push({ id: id(), date: val('mealDate') || today(), type: (document.querySelector('#fzMealType') || {}).value || 'Avondeten', title: it.title, persons: n, freezerId: it.id });
+      if (!it) return;
+      const planned = F.planMeal(data.meals, it, { id: id(), date: val('mealDate') || today(), type: (document.querySelector('#fzMealType') || {}).value || 'Avondeten', title: it.title, persons: n }, today());
+      if (!planned.ok) { toast(planned.error); return; }
       done('Ingepland'); return;
     }
     if (act === 'book') {

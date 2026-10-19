@@ -14,15 +14,69 @@
     const r = raw || {};
     const portions = Math.max(0, Math.floor(num(r.portions)));
     return {
+      ...r,
       id: r.id || newId(), title: String(r.title || '').trim().slice(0, 120),
       kind: KINDS.includes(r.kind) ? r.kind : 'Mealprep',
       location: LOCATIONS.includes(r.location) ? r.location : 'Vriezer',
       category: String(r.category || '').trim().slice(0, 40), label: String(r.label || '').trim().slice(0, 40),
       note: String(r.note || '').trim().slice(0, 300), portions,
+      batchPortions: Math.max(portions, Math.floor(num(r.batchPortions ?? portions))),
       prepared: r.prepared || today || '', frozen: r.frozen || '', bestBefore: r.bestBefore || '',
       recipe: r.recipe || '', log: Array.isArray(r.log) ? r.log : [],
       createdAt: r.createdAt || new Date().toISOString()
     };
+  }
+  function migrateLegacyStock(stock, freezer, today) {
+    const source = Array.isArray(stock) ? stock : [];
+    const batches = Array.isArray(freezer) ? freezer.slice() : [];
+    const occurrences = new Map();
+    const migratedKeys = new Set(batches.map(item => item.legacyStockKey).filter(Boolean));
+    const remaining = [];
+    let migrated = 0;
+    source.forEach(item => {
+      const legacy = item || {};
+      const isFreezer = legacy.location === 'Vriezer' || (!legacy.location && legacy.category === 'Vriezer');
+      const title = String(legacy.title || '').trim();
+      const amountText = legacy.amount == null ? '' : String(legacy.amount).trim();
+      const amount = Number(amountText.replace(',', '.'));
+      if (!isFreezer || !title || !amountText || !Number.isFinite(amount) || amount < 0 || !Number.isInteger(amount)) {
+        remaining.push(item);
+        return;
+      }
+
+      const sourceValue = JSON.stringify(legacy);
+      const identity = legacy.id == null || legacy.id === ''
+        ? `value:${sourceValue}`
+        : `id:${String(legacy.id)}`;
+      const occurrence = occurrences.get(identity) || 0;
+      occurrences.set(identity, occurrence + 1);
+      const key = `${identity}:${occurrence}`;
+      const id = `legacy-stock-${hash(key)}`;
+      if (!migratedKeys.has(key)) {
+        const legacyStock = JSON.parse(sourceValue);
+        batches.push(normalize({
+          id, title, kind: 'Los product', location: 'Vriezer',
+          category: legacy.category === 'Vriezer' ? '' : legacy.category || '',
+          label: legacy.label || '', note: legacy.note || legacy.notes || '',
+          portions: amount, batchPortions: amount,
+          prepared: legacy.prepared || legacy.preparedAt || '',
+          frozen: legacy.frozen || legacy.frozenAt || '',
+          bestBefore: legacy.bestBefore || legacy.expiry || legacy.expiresOn || '',
+          legacyStockKey: key, legacyStock
+        }, today));
+        migratedKeys.add(key);
+        migrated += 1;
+      }
+    });
+    return { stock: remaining, freezer: batches, migrated };
+  }
+  function hash(value) {
+    let result = 2166136261;
+    for (let index = 0; index < value.length; index += 1) {
+      result ^= value.charCodeAt(index);
+      result = Math.imul(result, 16777619);
+    }
+    return (result >>> 0).toString(36);
   }
   // Add an item; merge with an identical batch (same title, location, dates) to prevent duplicates.
   function add(list, raw, today) {
@@ -31,7 +85,11 @@
     if (item.portions < 1) return { ok: false, error: 'Aantal moet minimaal 1 zijn.' };
     const same = list.find(x => x.title.toLowerCase() === item.title.toLowerCase() && x.location === item.location &&
       x.frozen === item.frozen && x.prepared === item.prepared && x.bestBefore === item.bestBefore && !raw.id);
-    if (same) { same.portions += item.portions; return { ok: true, item: same, merged: true }; }
+    if (same) {
+      same.batchPortions = Math.max(same.portions, num(same.batchPortions)) + item.batchPortions;
+      same.portions += item.portions;
+      return { ok: true, item: same, merged: true };
+    }
     list.push(item); return { ok: true, item };
   }
   // Consume portions. `ref` makes the booking idempotent (no double stock deduction).
@@ -76,6 +134,29 @@
     if (!meal.freezerId) return { ok: false, error: 'Geen vriezergerecht gekoppeld.' };
     return consume(item, 'eaten', meal.persons ? Math.max(1, Math.floor(num(meal.persons))) : 1, 'meal:' + meal.id);
   }
+  function planMeal(meals, item, meal, today) {
+    if (!item || !meal || !meal.id) return { ok: false, error: 'Maaltijd of vriezerbatch ontbreekt.' };
+    const existing = meals.find(entry => entry.id === meal.id);
+    if (existing) return { ok: true, meal: existing, skipped: true };
+    const portions = Math.max(1, Math.floor(num(meal.persons) || 1));
+    const consumed = new Set((item.log || []).map(entry => entry.ref).filter(Boolean));
+    const reserved = meals.filter(entry => entry.freezerId === item.id
+      && (!today || !entry.date || entry.date >= today)
+      && !consumed.has(`meal:${entry.id}`))
+      .reduce((sum, entry) => sum + Math.max(1, Math.floor(num(entry.persons) || 1)), 0);
+    if (portions > item.portions - reserved) return { ok: false, error: 'Niet genoeg porties.' };
+    const planned = { ...meal, title: meal.title || item.title, persons: portions, freezerId: item.id };
+    meals.push(planned);
+    return { ok: true, meal: planned };
+  }
+  function cancelMeal(meals, mealId) {
+    const meal = meals.find(item => item.id === mealId);
+    return { meals: meals.filter(item => item.id !== mealId), meal };
+  }
+  function matchMealTitle(title, meals) {
+    const key = String(title || '').trim().toLocaleLowerCase('nl-NL');
+    return key ? (meals || []).find(meal => String(meal.title || '').trim().toLocaleLowerCase('nl-NL') === key) || null : null;
+  }
   // Ontbrekende ingrediënten (komma/regel-gescheiden tekst) t.o.v. voorraad + boodschappenlijst.
   function missingIngredients(text, stock, groceries) {
     const norm = s => String(s).toLowerCase().replace(/^[\d.,/\s]*(g|gr|kg|ml|l|el|tl|stuks?|st|teentjes?|blik(ken)?)?\s+/i, '').trim();
@@ -86,5 +167,5 @@
       const k = norm(s); if (!k || have.has(k) || listed.has(k) || seen.has(k)) return false; seen.add(k); return true;
     });
   }
-  return { LOCATIONS, KINDS, ACTIONS, normalize, add, consume, move, daysLeft, summary, sortFilter, bookMeal, missingIngredients, addDaysISO };
+  return { LOCATIONS, KINDS, ACTIONS, normalize, migrateLegacyStock, add, consume, move, daysLeft, summary, sortFilter, bookMeal, planMeal, cancelMeal, matchMealTitle, missingIngredients, addDaysISO };
 });
