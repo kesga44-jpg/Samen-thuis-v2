@@ -208,23 +208,35 @@
     });
   }
 
-  // Valideert vóór herstel; de huidige gegevens gaan eerst naar een aparte kopie.
-  function restoreCorruptBackup(storage, o, index) {
-    const items = JSON.parse(storage.getItem(o.corruptKey) || 'null')?.items || [];
-    const item = items[index];
-    if (!item) throw new Error('Back-up niet gevonden');
-    const data = parseStoredData(item.raw, o.migrate);
+  // Schrijft herstelde gegevens: eerst de herstelvlag, dan de herstelkopie, dan pas de gegevens.
+  // Bij een fout blijven de oorspronkelijke gegevens intact en wordt de vlag weer verwijderd.
+  function writeRestored(storage, o, data, sourceRaw) {
     const current = storage.getItem(o.storageKey);
-    // Herstelvlag eerst: lukt dat niet, dan blijven de oorspronkelijke gegevens onaangetast.
     if (o.holdKey) storage.setItem(o.holdKey, '1');
     try {
-      if (current && current !== item.raw) storage.setItem(o.preRestoreKey, current);
+      if (current && current !== sourceRaw) storage.setItem(o.preRestoreKey, current);
       storage.setItem(o.storageKey, JSON.stringify(data));
     } catch (error) {
       if (o.holdKey) { try { storage.removeItem(o.holdKey); } catch {} }
       throw error;
     }
     return data;
+  }
+
+  // Valideert vóór herstel; de huidige gegevens gaan eerst naar een aparte kopie.
+  function restoreCorruptBackup(storage, o, index) {
+    const items = JSON.parse(storage.getItem(o.corruptKey) || 'null')?.items || [];
+    const item = items[index];
+    if (!item) throw new Error('Back-up niet gevonden');
+    const data = parseStoredData(item.raw, o.migrate);
+    return writeRestored(storage, o, data, item.raw);
+  }
+
+  // Herstel vanuit een back-upbestand: zelfde bescherming als restoreCorruptBackup.
+  // De updatedAt van de back-up blijft ongewijzigd, zodat de eerstvolgende sync via de hold een conflictkeuze vraagt.
+  function restoreBackupText(storage, o, text) {
+    const data = parseStoredData(text, o.migrate);
+    return writeRestored(storage, o, data, null);
   }
 
   // Bepaalt de synchronisatiestap. Een herstelde kopie die afwijkt van de cloud wordt nooit automatisch geüpload.
@@ -241,5 +253,5 @@
     return 'none';
   }
 
-  return { planSync, loadWithRecovery, listCorruptBackups, restoreCorruptBackup, preserveCorruptData, hasConcurrentChanges, mergeUnique, nextDue, normalizeFuelMateFill, preserveUnknownFields, resolveSyncConflict, createConflictStore, sameData, remoteChangedSinceChoice, conditionalUpdateSucceeded };
+  return { restoreBackupText, planSync, loadWithRecovery, listCorruptBackups, restoreCorruptBackup, preserveCorruptData, hasConcurrentChanges, mergeUnique, nextDue, normalizeFuelMateFill, preserveUnknownFields, resolveSyncConflict, createConflictStore, sameData, remoteChangedSinceChoice, conditionalUpdateSucceeded };
 });

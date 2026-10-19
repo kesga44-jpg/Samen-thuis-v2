@@ -54,15 +54,14 @@ test('AUDIT versleuteling: de huishoudcode bepaalt record-id én sleutel; wie de
   assert.notEqual(other.ciphertext, payload.ciphertext, 'verse salt/iv per versleuteling');
 });
 
-test('AUDIT importBackup: bestandsherstel zet geen restore-hold en raakt met save() de updatedAt (bevestigd in code)', () => {
+test('B4 opgelost: importBackup herstelt via restoreBackupText met hold en zonder updatedAt-aanraking', () => {
   const body = extract('importBackup');
-  assert.match(body, /save\(\)/);
-  assert.doesNotMatch(body, /RESTORE_HOLD_KEY|preRestore/);
-  // Gevolg: een nieuwere updatedAt zonder hold wordt automatisch geüpload en kan afwijkende cloudgegevens overschrijven.
+  assert.match(body, /restoreBackupText\(localStorage, \{ \.\.\.recoveryOptions\(\), holdKey: RESTORE_HOLD_KEY \}/);
+  assert.match(body, /save\(\{ touch: false, sync: false \}\)/);
+  assert.doesNotMatch(body, /save\(\)/);
+  // Een geïmporteerde back-up met nieuwere updatedAt leidt met hold niet meer tot upload.
   const cloud = { a: 'cloud', meta: { updatedAt: '2026-10-01T00:00:00Z' } };
   const restored = { a: 'oud-bestand', meta: { updatedAt: '2026-10-19T00:00:00Z' } };
-  assert.equal(planSync({ local: restored, remote: cloud, hold: false, lastSyncedAt: '2026-10-19T00:00:00Z' }), 'upload');
-  // Met hold zou dit een conflictkeuze zijn.
   assert.equal(planSync({ local: restored, remote: cloud, hold: true, lastSyncedAt: '2026-10-19T00:00:00Z' }), 'conflict');
 });
 

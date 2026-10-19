@@ -1363,11 +1363,20 @@ async function exportBackup() {
 
 async function importBackup(file) {
   try {
-    const parsed = JSON.parse(await file.text());
-    data = migrateData(parsed);
-    save();
+    const text = await file.text();
+    try { SamenThuisCore.restoreBackupText({ getItem: () => null, setItem() {}, removeItem() {} }, recoveryOptions(), text); }
+    catch { toast('Dit bestand is geen geldige back-up'); return; }
+    if (storageProtected) { toast('Opslaan is geblokkeerd; back-up niet geladen. Maak ruimte vrij.'); return; }
+    // Herstelvlag en kopie van de huidige gegevens worden vóór het overschrijven vastgelegd.
+    try {
+      data = SamenThuisCore.restoreBackupText(localStorage, { ...recoveryOptions(), holdKey: RESTORE_HOLD_KEY }, text);
+    } catch {
+      toast('Back-up laden mislukt; je huidige gegevens zijn ongewijzigd');
+      return;
+    }
+    save({ touch: false, sync: false });
     render();
-    toast('Back-up hersteld');
+    toast(syncConfigured() ? 'Back-up hersteld · bij de volgende synchronisatie kies je zelf welke versie geldt' : 'Back-up hersteld');
   } catch {
     toast('Dit bestand is geen geldige back-up');
   }
