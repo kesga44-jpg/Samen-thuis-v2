@@ -215,10 +215,31 @@
     if (!item) throw new Error('Back-up niet gevonden');
     const data = parseStoredData(item.raw, o.migrate);
     const current = storage.getItem(o.storageKey);
-    if (current && current !== item.raw) storage.setItem(o.preRestoreKey, current);
-    storage.setItem(o.storageKey, JSON.stringify(data));
+    // Herstelvlag eerst: lukt dat niet, dan blijven de oorspronkelijke gegevens onaangetast.
+    if (o.holdKey) storage.setItem(o.holdKey, '1');
+    try {
+      if (current && current !== item.raw) storage.setItem(o.preRestoreKey, current);
+      storage.setItem(o.storageKey, JSON.stringify(data));
+    } catch (error) {
+      if (o.holdKey) { try { storage.removeItem(o.holdKey); } catch {} }
+      throw error;
+    }
     return data;
   }
 
-  return { loadWithRecovery, listCorruptBackups, restoreCorruptBackup, preserveCorruptData, hasConcurrentChanges, mergeUnique, nextDue, normalizeFuelMateFill, preserveUnknownFields, resolveSyncConflict, createConflictStore, sameData, remoteChangedSinceChoice, conditionalUpdateSucceeded };
+  // Bepaalt de synchronisatiestap. Een herstelde kopie die afwijkt van de cloud wordt nooit automatisch geüpload.
+  function planSync({ local, remote, hold, resolution, lastSyncedAt }) {
+    if (!remote) return 'upload';
+    if (!resolution && ((hold && !sameData(local, remote))
+      || hasConcurrentChanges(local.meta?.updatedAt, remote.meta?.updatedAt, lastSyncedAt, local, remote))) return 'conflict';
+    if (resolution === 'remote') return 'remote';
+    if (resolution === 'local') return 'upload';
+    const l = new Date(local.meta?.updatedAt || 0).getTime();
+    const r = new Date(remote.meta?.updatedAt || 0).getTime();
+    if (r > l) return 'remote';
+    if (l > r) return 'upload';
+    return 'none';
+  }
+
+  return { planSync, loadWithRecovery, listCorruptBackups, restoreCorruptBackup, preserveCorruptData, hasConcurrentChanges, mergeUnique, nextDue, normalizeFuelMateFill, preserveUnknownFields, resolveSyncConflict, createConflictStore, sameData, remoteChangedSinceChoice, conditionalUpdateSucceeded };
 });

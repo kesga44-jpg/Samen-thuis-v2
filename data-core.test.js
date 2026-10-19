@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { hasConcurrentChanges, mergeUnique, nextDue, normalizeFuelMateFill, preserveUnknownFields, resolveSyncConflict, createConflictStore, sameData, remoteChangedSinceChoice, conditionalUpdateSucceeded, preserveCorruptData, loadWithRecovery, listCorruptBackups, restoreCorruptBackup } = require('./data-core.js');
+const { hasConcurrentChanges, mergeUnique, nextDue, normalizeFuelMateFill, preserveUnknownFields, resolveSyncConflict, createConflictStore, sameData, remoteChangedSinceChoice, conditionalUpdateSucceeded, preserveCorruptData, loadWithRecovery, listCorruptBackups, restoreCorruptBackup, planSync } = require('./data-core.js');
 
 test('concurrent sync edits are detected after a shared baseline', () => {
   assert.equal(hasConcurrentChanges('2026-10-07T10:00:00Z', '2026-10-07T10:01:00Z', '2026-10-07T09:00:00Z'), true);
@@ -217,4 +217,30 @@ test('loadData route: failed corrupt-backup write is reported via preserved=fals
 test('restore hold: a restored copy that differs from cloud data is detected by sameData', () => {
   assert.equal(sameData({ a: 1, meta: { updatedAt: 'x' } }, { meta: { updatedAt: 'x' }, a: 1 }), true);
   assert.equal(sameData({ a: 1 }, { a: 2 }), false);
+});
+
+test('restore sets hold first; failing storage keeps original data and no hold', () => {
+  const m = { d: '{kapot', bad: JSON.stringify({ items: [{ raw: '{"x":1}', at: 't' }] }) };
+  const mk = failKey => ({ getItem: k => (k in m ? m[k] : null), removeItem: k => { delete m[k]; }, setItem(k, v) { if (k === failKey) throw new Error('quota'); m[k] = v; } });
+  const o = { ...opts, holdKey: 'hold' };
+  assert.throws(() => restoreCorruptBackup(mk('hold'), o, 0));
+  assert.equal(m.d, '{kapot'); assert.equal(m.hold, undefined);
+  assert.throws(() => restoreCorruptBackup(mk('prr'), o, 0));
+  assert.equal(m.d, '{kapot'); assert.equal(m.hold, undefined);
+  const data = restoreCorruptBackup(mk(''), o, 0);
+  assert.equal(data.x, 1); assert.equal(m.hold, '1');
+});
+
+test('planSync: restore hold never auto-overwrites differing cloud data', () => {
+  const local = { a: 1, meta: { updatedAt: '2026-10-10T10:00:00Z' } };
+  const remote = { a: 2, meta: { updatedAt: '2026-10-01T10:00:00Z' } };
+  const base = { local, remote, lastSyncedAt: '2026-10-11T00:00:00Z' };
+  assert.equal(planSync({ ...base, hold: true }), 'conflict');
+  assert.equal(planSync({ ...base, hold: false }), 'upload');
+  assert.equal(planSync({ ...base, hold: true, resolution: 'remote' }), 'remote');
+  assert.equal(planSync({ ...base, hold: true, resolution: 'local' }), 'upload');
+  assert.equal(planSync({ ...base, hold: true, remote: local }), 'none');
+  assert.equal(planSync({ ...base, hold: true, remote: null }), 'upload');
+  const fresh = { meta: { updatedAt: new Date(0).toISOString() } };
+  assert.equal(planSync({ local: fresh, remote, hold: false, lastSyncedAt: '' }), 'remote');
 });
