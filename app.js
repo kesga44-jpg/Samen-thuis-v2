@@ -219,7 +219,7 @@ function migrateData(raw) {
 function loadData() {
   try {
     const stored = localStorage.getItem(STORAGE_KEY) || localStorage.getItem(LEGACY_STORAGE_KEY);
-    if (!stored) return clone(initialData);
+    if (!stored) return freshLocalData();
 
     // v23.1 DATA-VEILIG: maak vóór migratie automatisch een ongewijzigde snapshot.
     // De normale opslagkey blijft samenThuisDataV2, dus bestaande Voorraad,
@@ -239,8 +239,16 @@ function loadData() {
       const backup = localStorage.getItem('samenThuisPreV23Backup');
       if (backup) return migrateData(JSON.parse(backup));
     } catch {}
-    return clone(initialData);
+    return freshLocalData();
   }
+}
+
+// Een leeg/nieuw apparaat krijgt een tijdstempel van 1970, zodat synchronisatie
+// de bestaande cloudgegevens laadt in plaats van ze te overschrijven met voorbeelddata.
+function freshLocalData() {
+  const fresh = clone(initialData);
+  fresh.meta = { ...fresh.meta, updatedAt: new Date(0).toISOString() };
+  return fresh;
 }
 
 function loadSyncConfig() {
