@@ -155,5 +155,18 @@
     return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
   }
 
-  return { hasConcurrentChanges, mergeUnique, nextDue, normalizeFuelMateFill, preserveUnknownFields, resolveSyncConflict, createConflictStore, sameData, remoteChangedSinceChoice, conditionalUpdateSucceeded };
+  // Bewaar onleesbare opslag onder een eigen sleutel (eenmalig per inhoud) voordat save() deze kan overschrijven.
+  function preserveCorruptData(storage, raw, key, now) {
+    if (!raw) return false;
+    try {
+      const existing = JSON.parse(storage.getItem(key) || 'null');
+      if (existing && existing.raw === raw) return true;
+      const list = Array.isArray(existing?.items) ? existing.items : [];
+      const items = list.concat({ raw, at: now }).slice(-3);
+      storage.setItem(key, JSON.stringify({ raw, at: now, items }));
+      return true;
+    } catch { return false; }
+  }
+
+  return { preserveCorruptData, hasConcurrentChanges, mergeUnique, nextDue, normalizeFuelMateFill, preserveUnknownFields, resolveSyncConflict, createConflictStore, sameData, remoteChangedSinceChoice, conditionalUpdateSucceeded };
 });

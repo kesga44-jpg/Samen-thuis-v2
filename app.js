@@ -217,8 +217,9 @@ function migrateData(raw) {
 }
 
 function loadData() {
+  let stored = null;
   try {
-    const stored = localStorage.getItem(STORAGE_KEY) || localStorage.getItem(LEGACY_STORAGE_KEY);
+    stored = localStorage.getItem(STORAGE_KEY) || localStorage.getItem(LEGACY_STORAGE_KEY);
     if (!stored) return freshLocalData();
 
     // v23.1 DATA-VEILIG: maak vóór migratie automatisch een ongewijzigde snapshot.
@@ -233,6 +234,8 @@ function loadData() {
 
     return migrateData(JSON.parse(stored));
   } catch {
+    // Bewaar de oorspronkelijke tekst eerst, zodat een volgende save() deze niet kwijtraakt.
+    SamenThuisCore.preserveCorruptData(localStorage, stored, 'samenThuisCorruptBackup', new Date().toISOString());
     // Bij een parse/migratiefout proberen we de safety snapshot terug te lezen
     // in plaats van direct met voorbeelddata te starten.
     try {

@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { hasConcurrentChanges, mergeUnique, nextDue, normalizeFuelMateFill, preserveUnknownFields, resolveSyncConflict, createConflictStore, sameData, remoteChangedSinceChoice, conditionalUpdateSucceeded } = require('./data-core.js');
+const { hasConcurrentChanges, mergeUnique, nextDue, normalizeFuelMateFill, preserveUnknownFields, resolveSyncConflict, createConflictStore, sameData, remoteChangedSinceChoice, conditionalUpdateSucceeded, preserveCorruptData } = require('./data-core.js');
 
 test('concurrent sync edits are detected after a shared baseline', () => {
   assert.equal(hasConcurrentChanges('2026-10-07T10:00:00Z', '2026-10-07T10:01:00Z', '2026-10-07T09:00:00Z'), true);
@@ -118,4 +118,24 @@ test('smart recurrence uses the actual completion date and clamps month ends', (
   assert.equal(nextDue('', '2026-10-07', 'Eenmalig'), '2026-10-07');
   assert.equal(nextDue('2026-10-01', '', 'Eenmalig'), '');
   assert.equal(nextDue('2026-10-01', '', 'Wanneer nodig'), '');
+});
+
+function fakeStorage() { const m = {}; return { getItem: k => (k in m ? m[k] : null), setItem: (k, v) => { m[k] = v; }, removeItem: k => { delete m[k]; } }; }
+
+test('corrupt storage is preserved once and empty storage is ignored', () => {
+  const s = fakeStorage();
+  assert.equal(preserveCorruptData(s, '', 'bak', 't1'), false);
+  assert.equal(s.getItem('bak'), null);
+  assert.equal(preserveCorruptData(s, '{kapot', 'bak', 't1'), true);
+  assert.equal(preserveCorruptData(s, '{kapot', 'bak', 't2'), true);
+  const saved = JSON.parse(s.getItem('bak'));
+  assert.equal(saved.raw, '{kapot');
+  assert.equal(saved.items.length, 1);
+  preserveCorruptData(s, '{ander', 'bak', 't3');
+  assert.equal(JSON.parse(s.getItem('bak')).items.length, 2);
+});
+
+test('preserveCorruptData reports failure when storage is full', () => {
+  const s = { getItem: () => null, setItem() { throw new Error('quota'); } };
+  assert.equal(preserveCorruptData(s, '{kapot', 'bak', 't1'), false);
 });
