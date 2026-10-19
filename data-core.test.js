@@ -204,3 +204,17 @@ test('corrupt backups are listed with validity and restored only when valid', ()
   assert.equal(s.getItem('prr'), '{"boom":true}');
   assert.deepEqual(listCorruptBackups(fakeStorage(), 'bad', opts.migrate), []);
 });
+
+test('loadData route: failed corrupt-backup write is reported via preserved=false and source stays untouched', () => {
+  const m = { d: '{kapot' };
+  const s = { getItem: k => (k in m ? m[k] : null), setItem(k, v) { if (k === 'bad') throw new Error('quota'); m[k] = v; } };
+  const r = loadWithRecovery(s, opts);
+  assert.equal(r.status, 'fresh');
+  assert.equal(r.preserved, false);
+  assert.equal(m.d, '{kapot');
+});
+
+test('restore hold: a restored copy that differs from cloud data is detected by sameData', () => {
+  assert.equal(sameData({ a: 1, meta: { updatedAt: 'x' } }, { meta: { updatedAt: 'x' }, a: 1 }), true);
+  assert.equal(sameData({ a: 1 }, { a: 2 }), false);
+});

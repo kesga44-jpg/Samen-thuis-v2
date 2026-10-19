@@ -226,9 +226,15 @@ function recoveryOptions() {
   return { ...RECOVERY_KEYS, migrate: migrateData, fresh: freshLocalData, now: () => new Date().toISOString() };
 }
 
+let storageProtected = false;
+const RESTORE_HOLD_KEY = 'samenThuisRestoreHold';
+
 function loadData() {
   try {
-    return SamenThuisCore.loadWithRecovery(localStorage, recoveryOptions()).data;
+    const result = SamenThuisCore.loadWithRecovery(localStorage, recoveryOptions());
+    // Kon de beschadigde bron niet veilig bewaard worden, dan blokkeren we opslaan zodat die bron niet wordt overschreven.
+    if (result.status !== 'ok' && result.status !== 'empty' && !result.preserved) storageProtected = true;
+    return result.data;
   } catch {
     return freshLocalData();
   }
@@ -323,6 +329,10 @@ function formConfig(view) {
 
 function save({ touch = true, sync = true } = {}) {
   migrateLegacyFreezerStock(data);
+  if (storageProtected) {
+    toast('Opslaan is geblokkeerd: beschadigde gegevens konden niet veilig worden bewaard. Maak een back-up en maak ruimte vrij.');
+    return;
+  }
   if (touch) data.meta.updatedAt = new Date().toISOString();
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
   const saveState = document.querySelector('#saveState');
@@ -1610,9 +1620,10 @@ document.addEventListener('click', event => {
     if (confirm('Deze bewaarde gegevens herstellen? Je huidige gegevens worden eerst apart bewaard.')) {
       try {
         data = SamenThuisCore.restoreCorruptBackup(localStorage, recoveryOptions(), Number(corruptBtn.dataset.restoreCorrupt));
-        save({ touch: false });
+        try { localStorage.setItem(RESTORE_HOLD_KEY, '1'); } catch {}
+        save({ touch: false, sync: false });
         render();
-        toast('Gegevens hersteld');
+        toast(syncConfigured() ? 'Gegevens hersteld · bij de volgende synchronisatie kies je zelf welke versie geldt' : 'Gegevens hersteld');
       } catch (error) { toast(error.message || 'Herstellen mislukt'); }
     }
     return;
@@ -2206,9 +2217,9 @@ if (syncConfigured()) syncNow();
 
       if (!remoteData) {
         await uploadSyncData(baseUrl, householdId, rows[0]);
-      } else if (!syncConflictResolution && SamenThuisCore.hasConcurrentChanges(
+      } else if (!syncConflictResolution && ((localStorage.getItem(RESTORE_HOLD_KEY) && !SamenThuisCore.sameData(data, remoteData)) || SamenThuisCore.hasConcurrentChanges(
         data.meta?.updatedAt, remoteData.meta?.updatedAt, syncConfig.lastSyncedAt, data, remoteData
-      )) {
+      ))) {
         const conflict = {
           localData: clone(data),
           remoteData: clone(remoteData),
@@ -2245,6 +2256,7 @@ if (syncConfigured()) syncNow();
 
       syncConfig.lastSyncedAt = nowIso();
       localStorage.setItem(SYNC_KEY, JSON.stringify(syncConfig));
+      try { localStorage.removeItem(RESTORE_HOLD_KEY); } catch {}
       if (syncConflictResolution) {
         if (syncConflictStore.clear()) syncConflictResolution = '';
       }
