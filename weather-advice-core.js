@@ -21,7 +21,7 @@
     const feels = Math.round(Number(current && current.apparent_temperature != null ? current.apparent_temperature : current && current.temperature_2m));
     if (!Number.isFinite(feels)) return null;
     const rain = Number(daily && daily.precipitation_probability_max && daily.precipitation_probability_max[0]) || 0;
-    const wind = Number(current && current.wind_speed_10m) || 0, code = Number(current && current.weather_code);
+    const wind = Number(current && current.wind_speed_10m) || 0, code = current && current.weather_code != null ? Number(current.weather_code) : NaN;
     const ids = [];
     if (feels <= 5) ids.push('coat', 'sweater', 'pants', 'scarf');
     else if (feels <= 11) ids.push('coat', 'sweater', 'pants');
@@ -30,7 +30,7 @@
     else ids.push('tshirt', 'shorts');
     if (rain >= 40) ids.push('umbrella');
     if (wind >= 30) ids.push('wind');
-    if (code <= 1 && feels >= 18) ids.push('sunglasses');
+    if (Number.isFinite(code) && code <= 1 && feels >= 18) ids.push('sunglasses');
     return { feels, rain, wind, items: ids.map(id => ({ id, label: LABELS[id] })) };
   }
   const icon = id => ICONS[id] ? `<svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[id]}</svg>` : '';

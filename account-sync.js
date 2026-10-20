@@ -90,7 +90,7 @@
       if (!st.household) throw new Error('Maak eerst een huishouden aan of voeg je toe met de code van je huisgenoot.');
       let legacyNote = '';
       try { legacyNote = (await c.importLegacy(st.household.id, await sha256(code()))) ? ' Bestaande clouddata is veilig gekopieerd.' : ''; }
-      catch (e) { const k = HS.classifyError(e); if (k.kind === 'migration' || k.kind === 'auth') throw new Error(k.message); }
+      catch (e) { const k = HS.classifyError(e); if (k.kind === 'migration' || k.kind === 'auth') throw new Error(k.message); legacyNote = ' Let op: oude clouddata kon niet worden gekopieerd (' + k.message + ').'; }
       st.busy = false;
       const cfg = load(); cfg.enabled = true; cfg.householdId = st.household.id; store(cfg);
       await accountSync({ manual: true });

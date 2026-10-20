@@ -26,6 +26,7 @@ create policy "members read state" on public.household_state
 create or replace function public.limit_household_members()
 returns trigger language plpgsql as $$
 begin
+  perform pg_advisory_xact_lock(hashtext(new.household_id::text));
   if (select count(*) from public.household_members where household_id = new.household_id) >= 2 then
     raise exception 'Een huishouden ondersteunt maximaal twee accounts';
   end if;
@@ -62,7 +63,7 @@ end $$;
 -- Eenmalige, niet-destructieve kopie van de oude anon-rij (id = gehashte huishoudcode) naar de nieuwe tabel.
 create or replace function public.import_legacy_household_data(p_household uuid, p_legacy_id text)
 returns boolean language plpgsql security definer set search_path = public as $$
-declare legacy jsonb;
+declare legacy jsonb; inserted int;
 begin
   if auth.uid() is null or not public.is_household_member(p_household) then
     raise exception 'Geen toegang tot dit huishouden' using errcode = '42501';
@@ -72,7 +73,8 @@ begin
   insert into public.household_state (household_id, section, payload, updated_by)
     values (p_household, 'legacy_full', legacy, auth.uid())
     on conflict do nothing;
-  return true;
+  get diagnostics inserted = row_count;
+  return inserted > 0;
 end $$;
 
 revoke all on function public.put_household_state(uuid, text, jsonb, bigint),

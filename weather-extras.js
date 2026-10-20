@@ -36,6 +36,6 @@
       : '<section class="card"><div class="card-head"><h2>Pollen & luchtkwaliteit</h2></div><p class="muted">Gegevens niet beschikbaar (geen verbinding of geen metingen voor deze locatie).</p></section>';
     holder.innerHTML = clothes + air;
   }
-  new MutationObserver(() => { paint(); }).observe(document.body, { childList: true, subtree: true });
+  let timer; new MutationObserver(() => { clearTimeout(timer); timer = setTimeout(paint, 150); }).observe(document.querySelector('#view') || document.body, { childList: true, subtree: true });
   paint();
 })();
