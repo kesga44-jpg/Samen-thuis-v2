@@ -12,7 +12,8 @@
 
   function refresh() {
     const s = read(), fresh = IC.generate(data, todayISO(), s.prefs, window.FreezerCore);
-    if (s.prefs.sync && window.SamenThuisAccountSync?.conflicts().length) fresh.push({ key: `sync:conflict:${todayISO()}`, category: 'sync', title: 'Synchronisatieconflict', body: 'Kies bij Instellingen welke versie je bewaart.', page: 'settings' });
+    const conflicts = window.SamenThuisAccountSync?.conflicts() || [];
+    if (s.prefs.sync && conflicts.length) fresh.push({ key: 'sync:conflict:' + conflicts.map(c => c.section).sort().join(','), category: 'sync', title: 'Synchronisatieconflict', body: 'Kies bij Instellingen welke versie je bewaart.', page: 'settings' });
     const m = IC.merge(s.items, fresh, new Date().toISOString());
     if (m.added) write({ ...s, items: m.items });
     paintBadge(IC.unread(m.items));

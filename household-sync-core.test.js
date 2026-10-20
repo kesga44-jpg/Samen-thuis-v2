@@ -112,3 +112,82 @@ test('client bevat geen service-role key en migratie sluit aan op clientnamen', 
   for (const p of ['p_household', 'p_section', 'p_payload', 'p_expected_version', 'p_legacy_id']) { assert.match(sql, new RegExp(p)); assert.match(js, new RegExp(p)); }
   assert.match(sql, /household_state/); assert.match(js, /household_state\?select=section,payload,version,updated_at/);
 });
+
+// ---- Aanvullende risico's (gesimuleerd met nepserver; geen bewijs voor live RLS/Supabase) ----
+test('route: ingeschakeld blijft accountroute zonder sessie (geen stille terugval naar anon-sync)', () => {
+  assert.equal(H.syncRoute({}, true), 'legacy');
+  assert.equal(H.syncRoute({ enabled: true }, true), 'account');
+  assert.equal(H.syncRoute({ enabled: true }, false), 'account-signed-out');
+  assert.equal(H.shouldEnable('ok'), true); assert.equal(H.shouldEnable('conflict'), true);
+  for (const s of ['offline', 'network', 'migration', 'auth', 'partial', 'error', 'signed-out']) assert.equal(H.shouldEnable(s), false, s);
+});
+test('cloud kan apparaatinstellingen/gereserveerde onderdelen niet overschrijven', async () => {
+  const s = server();
+  s.st.state.hh1 = { settings: { version: 1, payload: { enc: JSON.stringify({ householdCode: 'gestolen' }) } }, meta: { version: 1, payload: { enc: '{"x":1}' } }, 'bad name': { version: 1, payload: { enc: '1' } } };
+  const r = await run(s.client('A'), D({ tasks: [1] }));
+  assert.deepEqual(r.pulls, {}); assert.ok(!('settings' in r.base) && !('meta' in r.base));
+});
+test('twee apparaten wijzigen hetzelfde onderdeel én verschillende onderdelen', async () => {
+  const s = server(), a0 = await run(s.client('A'), D({ tasks: [1], notes: ['n'] })), b0 = await run(s.client('B'), D());
+  await run(s.client('A'), D({ tasks: [1, 'a'], notes: ['n'] }), { base: a0.base });          // A wijzigt tasks
+  const b1 = await run(s.client('B'), D({ tasks: [1], notes: ['n', 'b'] }), { base: b0.base }); // B wijzigt notes
+  assert.equal(b1.status, 'ok'); assert.deepEqual(b1.pulls.tasks, [1, 'a']); assert.deepEqual(b1.pushed, ['notes']);
+  assert.deepEqual(JSON.parse(s.st.state.hh1.tasks.payload.enc), [1, 'a'], 'tasks niet overschreven door B');
+});
+test('conflictkeuze voor één onderdeel raakt een ander onderdeel niet', async () => {
+  const s = server(), a0 = await run(s.client('A'), D({ tasks: [1], notes: ['n'] })), b0 = await run(s.client('B'), D());
+  await run(s.client('A'), D({ tasks: ['A'], notes: ['A'] }), { base: a0.base });
+  const c = await run(s.client('B'), D({ tasks: ['B'], notes: ['B'] }), { base: b0.base });
+  assert.deepEqual(c.conflicts.map(x => x.section).sort(), ['notes', 'tasks']);
+  const r = await run(s.client('B'), D({ tasks: ['B'], notes: ['B'] }), { base: b0.base, resolutions: { tasks: 'local' } });
+  assert.deepEqual(r.pushed, ['tasks']); assert.deepEqual(r.conflicts.map(x => x.section), ['notes']);
+  assert.deepEqual(JSON.parse(s.st.state.hh1.notes.payload.enc), ['A'], 'notes ongemoeid');
+});
+test('accountwissel met openstaand conflict: basisstand van account A geldt niet voor account B', async () => {
+  const s = server(), a0 = await run(s.client('A'), D({ tasks: [1] }));
+  await run(s.client('B'), D({ tasks: [1, 'b'] }), { base: a0.base });
+  // Zelfde lokale data, maar B heeft een eigen (lege) basis: geen stille push over de cloud heen.
+  const r = await run(s.client('B'), D({ tasks: ['andere'] }), { base: {} });
+  assert.equal(r.status, 'conflict'); assert.equal(s.st.state.hh1.tasks.version, 2);
+});
+test('offline wijzigingen worden bij hervatten gepusht; tussentijdse cloudwijziging geeft conflict', async () => {
+  const s = server(), a0 = await run(s.client('A'), D({ tasks: [1], notes: ['n'] }));
+  const off = H.createCloud({ url: 'https://x', anonKey: 'k', getToken: async () => 'A', fetchImpl: async () => { throw new TypeError('Failed to fetch'); } });
+  const local = D({ tasks: [1, 'offline'], notes: ['n'] });
+  assert.equal(H.classifyError(await run(off, local, { base: a0.base }).catch(e => e)).kind, 'network');
+  const resumed = await run(s.client('A'), local, { base: a0.base });
+  assert.deepEqual(resumed.pushed, ['tasks']);
+  const b0 = await run(s.client('B'), D(), {});
+  await run(s.client('B'), D({ tasks: ['B'], notes: ['n'] }), { base: b0.base, resolutions: { tasks: 'local' } });
+  const again = await run(s.client('A'), D({ tasks: [1, 'offline', 'x'], notes: ['n'] }), { base: resumed.base });
+  assert.equal(again.status, 'conflict');
+});
+test('mislukte migratie/RPC: ontbrekende functie of tabel -> duidelijke melding met vervolgstap, lokale data intact', async () => {
+  for (const [status, code] of [[404, 'PGRST202'], [404, 'PGRST205'], [400, '42P01']]) {
+    const cloud = H.createCloud({ url: 'https://x', anonKey: 'k', getToken: async () => 't', fetchImpl: async () => ({ ok: false, status, json: async () => ({ code, message: 'x' }) }) });
+    const local = D({ tasks: [1] }), copy = JSON.stringify(local);
+    const e = await run(cloud, local).catch(x => x), c = H.classifyError(e);
+    assert.equal(c.kind, 'migration'); assert.match(c.message, /migraties/); assert.equal(JSON.stringify(local), copy);
+  }
+});
+test('deels mislukte push: gelukte onderdelen krijgen basisversie, mislukte niet (volgende ronde probeert opnieuw)', async () => {
+  const s = server(), real = s.client('A'), orig = real.putState;
+  real.putState = async (h, sec, p, v) => { if (sec === 'notes') throw new H.CloudError(500, { message: 'boem' }); return orig(h, sec, p, v); };
+  const r = await run(real, D({ tasks: [1], notes: ['n'] }));
+  assert.equal(r.status, 'partial'); assert.ok(r.base.tasks && !r.base.notes); assert.equal(r.failed[0].section, 'notes');
+  const retry = await run(s.client('A'), D({ tasks: [1], notes: ['n'] }), { base: r.base });
+  assert.deepEqual(retry.pushed, ['notes']);
+});
+test('dubbele/deels mislukte legacy-import: legacy_full wordt niet naar lokale data of cloud overschreven', async () => {
+  const s = server();
+  s.st.state.hh1 = { legacy_full: { version: 1, payload: { enc: JSON.stringify({ tasks: ['oud'] }) } } };
+  const r1 = await run(s.client('A'), D({ tasks: ['oud'] }));          // gelijk -> adopt
+  const r2 = await run(s.client('B'), D({ tasks: ['oud'] }), { base: r1.base });
+  assert.deepEqual(r2.pushed, []); assert.deepEqual(r2.conflicts, []);
+  assert.deepEqual(Object.keys(s.st.state.hh1), ['legacy_full'], 'niets onnodig geschreven');
+});
+test('rollback/herstel na mislukte overstap: foutieve ronde schrijft geen basisstand en geen lokale pulls', async () => {
+  const cloud = H.createCloud({ url: 'https://x', anonKey: 'k', getToken: async () => 't', fetchImpl: async () => ({ ok: false, status: 500, json: async () => ({ message: 'serverfout' }) }) });
+  const e = await run(cloud, D({ tasks: [1] })).catch(x => x);
+  assert.ok(e instanceof H.CloudError); assert.equal(H.classifyError(e).kind, 'other');
+});

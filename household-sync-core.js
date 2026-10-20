@@ -25,9 +25,11 @@
     if (typeof v === 'object') return Object.keys(v).length === 0;
     return false;
   }
+  const RESERVED = ['meta', 'settings', 'legacy_full', '__proto__', 'constructor', 'prototype'];
+  const validSection = n => typeof n === 'string' && /^[\w.-]{1,60}$/.test(n) && !RESERVED.includes(n);
   function sectionsOf(data) {
     const out = {};
-    Object.keys(data || {}).forEach(k => { if (!SKIP_KEYS.includes(k) && /^[\w.-]{1,60}$/.test(k)) out[k] = data[k]; });
+    Object.keys(data || {}).forEach(k => { if (validSection(k)) out[k] = data[k]; });
     return out;
   }
 
@@ -60,13 +62,21 @@
 
   function classifyError(err) {
     const status = err?.status || 0, code = String(err?.code || ''), msg = String(err?.message || '');
-    if (code === '40001' || /Versieconflict/i.test(msg)) return { kind: 'conflict', message: 'De andere versie is ondertussen bijgewerkt; synchroniseer opnieuw om te vergelijken.' };
-    if (status === 401 || status === 403 || code === '42501' || code === 'PGRST301') return { kind: 'auth', message: 'Geen toegang: meld je opnieuw aan of controleer je huishoudlidmaatschap.' };
-    if (code === 'PGRST202' || code === '42P01' || code === 'PGRST205' || status === 404) return { kind: 'migration', message: 'De Supabase-migratie 20261014000000 is nog niet handmatig toegepast; accountsynchronisatie is niet beschikbaar.' };
-    if (err instanceof TypeError || /failed to fetch|network/i.test(msg)) return { kind: 'network', message: 'Geen verbinding; wijzigingen blijven lokaal bewaard en worden later gesynchroniseerd.' };
-    if (err?.name === 'OperationError' || /huishoudcode/i.test(msg)) return { kind: 'key', message: 'De huishoudcode past niet bij de versleutelde cloudgegevens.' };
+    if (code === '40001' || /Versieconflict/i.test(msg)) return { kind: 'conflict', message: 'De andere versie is ondertussen bijgewerkt. Je lokale gegevens zijn niet overschreven: tik op Nu synchroniseren en kies per onderdeel welke versie je bewaart.' };
+    if (status === 401 || status === 403 || code === '42501' || code === 'PGRST301') return { kind: 'auth', message: 'Geen toegang. Meld je opnieuw aan via Instellingen en controleer of je lid bent van dit huishouden. Je lokale gegevens zijn veilig.' };
+    if (code === 'PGRST202' || code === '42P01' || code === 'PGRST205' || status === 404) return { kind: 'migration', message: 'Accountsynchronisatie is nog niet beschikbaar: de Supabase-migraties moeten eerst handmatig zijn toegepast. Je gebruikt voorlopig de oude code-sync of werkt lokaal; er gaat niets verloren.' };
+    if (err instanceof TypeError || /failed to fetch|network/i.test(msg)) return { kind: 'network', message: 'Geen verbinding. Je wijzigingen blijven lokaal bewaard en worden automatisch gesynchroniseerd zodra je weer online bent.' };
+    if (err?.name === 'OperationError' || /huishoudcode/i.test(msg)) return { kind: 'key', message: 'De huishoudcode past niet bij de versleutelde cloudgegevens. Controleer de code bij Instellingen; er is niets geschreven of overschreven.' };
     return { kind: 'other', message: msg || 'Synchronisatie mislukt' };
   }
+
+  // Eenmaal ingeschakeld blijft de accountroute leidend, ook zonder sessie: nooit stilzwijgend terugvallen op anon-sync.
+  function syncRoute(cfg, hasSession) {
+    if (cfg && cfg.enabled) return hasSession ? 'account' : 'account-signed-out';
+    return 'legacy';
+  }
+  // Schakelt pas in na een geslaagde (of conflict-)ronde; bij fouten/offline blijft de oude route actief.
+  const shouldEnable = status => status === 'ok' || status === 'conflict';
 
   class CloudError extends Error { constructor(status, body) { super((body && (body.message || body.msg)) || ('Supabase ' + status)); this.status = status; this.code = body && body.code; } }
 
@@ -102,7 +112,8 @@
     for (const row of rows || []) {
       const value = await decrypt(row.payload); // sleutelfout stopt vóór enig schrijven
       if (row.section === LEGACY_SECTION) legacy = value;
-      else remote[row.section] = { version: Number(row.version), value };
+      else if (validSection(row.section)) remote[row.section] = { version: Number(row.version), value };
+      // Onbekende/gereserveerde namen (bijv. settings) uit de cloud worden genegeerd: nooit apparaatinstellingen overschrijven.
     }
     if (legacy && typeof legacy === 'object') {
       for (const [k, v] of Object.entries(sectionsOf(legacy))) if (!(k in remote)) remote[k] = { version: 0, value: v };
@@ -128,5 +139,5 @@
     return { status: failed.length ? 'partial' : conflicts.length ? 'conflict' : 'ok', pulls, base: newBase, pushed, conflicts, failed, hadLegacy: !!legacy };
   }
 
-  return { SKIP_KEYS, LEGACY_SECTION, hashValue, isEmptyValue, sectionsOf, planSections, classifyError, createCloud, runAccountSync, CloudError };
+  return { syncRoute, shouldEnable, validSection, SKIP_KEYS, LEGACY_SECTION, hashValue, isEmptyValue, sectionsOf, planSections, classifyError, createCloud, runAccountSync, CloudError };
 });

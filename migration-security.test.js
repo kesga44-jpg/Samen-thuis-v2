@@ -24,3 +24,14 @@ test('anon-revoke staat buiten migrations (handmatige fase 3)', () => {
   for (const f of fs.readdirSync(d + 'migrations').filter(n => !n.includes('rollback'))) assert.doesNotMatch(fs.readFileSync(d + 'migrations/' + f, 'utf8').replace(/--.*$/gm, ''), /revoke[^;]*public\.household_data\b/i, f);
   assert.ok(fs.existsSync(d + 'migrations/20261014000000_household_state_sync.rollback.sql'));
 });
+test('fase 3 is bewaakt, trekt niets in binnen migrations en raakt coach_data niet aan', () => {
+  const p3 = fs.readFileSync(d + 'manual/phase3_revoke_anon_household_data.sql', 'utf8');
+  assert.match(p3, /Fase 3 geweigerd/); assert.match(p3, /to_regprocedure\('public\.put_household_state/); assert.doesNotMatch(p3.replace(/--.*$/gm, ''), /coach_data/);
+  assert.match(p3.split('\n').find(l => /^drop policy/.test(l)) || '', /household_data/);
+});
+test('import_legacy: lidmaatschapscontrole, id-formaat, claim-tabel en geen overschrijving in SQL', () => {
+  const sql = up.slice(up.indexOf('function public.import_legacy_household_data'));
+  assert.match(sql, /is_household_member\(p_household\)/); assert.match(sql, /\^\[0-9a-f\]\{64\}\$/);
+  assert.match(sql, /household_legacy_imports/); assert.match(sql, /on conflict do nothing/); assert.doesNotMatch(sql, /update public\.household_data|delete from/i);
+});
+test('ledenlimiet gebruikt een advisory lock', () => assert.match(up, /pg_advisory_xact_lock/));

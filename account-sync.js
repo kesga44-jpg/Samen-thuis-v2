@@ -6,10 +6,15 @@
   if (window.__ST_ACCOUNT_SYNC__ || !HS || !AUTH) return;
   window.__ST_ACCOUNT_SYNC__ = true;
   const KEY = 'samenThuisAccountSyncV1', PRE_KEY = 'samenThuisPreAccountSyncBackup';
-  const st = { household: null, conflicts: [], message: '', busy: false };
+  const st = { household: null, conflicts: [], message: '', busy: false, uid: AUTH.session()?.user?.id || '' };
+  // Accountwissel: nooit huishouden/conflicten van het vorige account blijven gebruiken.
+  function syncIdentity() {
+    const uid = AUTH.session()?.user?.id || '';
+    if (uid !== st.uid) Object.assign(st, { uid, household: null, conflicts: [], message: '' });
+  }
   const load = () => { try { return JSON.parse(localStorage.getItem(KEY) || '{}'); } catch (_) { return {}; } };
   const store = v => { try { localStorage.setItem(KEY, JSON.stringify(v)); return true; } catch (_) { return false; } };
-  const accountMode = () => !!load().enabled && !!AUTH.session()?.user?.id;
+  const accountMode = () => HS.syncRoute(load(), !!AUTH.session()?.user?.id) !== 'legacy';
   const slot = () => `${AUTH.session()?.user?.id || ''}:${st.household?.id || load().householdId || ''}`;
   const cloud = () => HS.createCloud({
     url: DEFAULT_PROJECT_URL, anonKey: DEFAULT_PUBLISHABLE_KEY,
@@ -19,8 +24,11 @@
   const code = () => String(syncConfig.householdCode || '').trim();
 
   async function accountSync({ manual = false, resolutions = {} } = {}) {
-    if (syncing || st.busy) return;
-    if (!navigator.onLine) { if (manual) toast('Geen internetverbinding; wijzigingen blijven lokaal bewaard'); syncError = ''; return; }
+    syncIdentity();
+    if (syncing || st.busy) return { status: 'busy' };
+    if (!navigator.onLine) { if (manual) toast('Geen internetverbinding; wijzigingen blijven lokaal bewaard'); syncError = ''; st.message = 'Offline: lokale wijzigingen worden later gesynchroniseerd.'; return { status: 'offline' }; }
+    if (!AUTH.session()?.user?.id) { syncError = 'Aanmelden vereist'; st.message = 'Meld je aan via Instellingen om te synchroniseren. Je lokale gegevens blijven bewaard.'; if (manual) toast(st.message); updateSyncBadge(); return { status: 'signed-out' }; }
+    let outcome = 'error';
     syncing = true; syncError = ''; updateSyncBadge();
     try {
       if (!window.crypto?.subtle) throw new Error('Versleuteling vereist HTTPS');
@@ -48,6 +56,7 @@
       const next = load(); next.bases = { ...(next.bases || {}), [slot()]: { base, lastSyncedAt: new Date().toISOString() } };
       next.householdId = st.household.id; store(next);
       st.conflicts = result.conflicts;
+      outcome = result.status;
       if (result.status === 'ok') {
         syncConfig.lastSyncedAt = new Date().toISOString(); localStorage.setItem(SYNC_KEY, JSON.stringify(syncConfig));
         try { localStorage.removeItem(RESTORE_HOLD_KEY); } catch (_) {}
@@ -61,12 +70,14 @@
         if (manual) toast(f.message);
       }
       if (current === 'settings' || pulled.length) render();
+      return { status: outcome };
     } catch (error) {
       const c = HS.classifyError(error);
       console.error('Accountsynchronisatie mislukt', error);
       syncError = c.kind === 'network' ? '' : c.message; st.message = c.message;
       if (manual) toast(c.message);
       if (current === 'settings') render();
+      return { status: HS.classifyError(error).kind };
     } finally { syncing = false; updateSyncBadge(); }
   }
 
@@ -77,8 +88,8 @@
     legacyBadge(message);
     const badge = document.querySelector('#syncState');
     if (!badge || message || !accountMode()) return;
-    badge.textContent = syncing ? 'Synchroniseren…' : !navigator.onLine ? 'Offline · later synchroniseren' : st.conflicts.length ? 'Conflict · kies versie' : syncError ? 'Sync controleren' : 'Account-sync gelijk';
-    badge.classList.toggle('connected', !syncing && !syncError && !st.conflicts.length);
+    badge.textContent = syncing ? 'Synchroniseren…' : !AUTH.session()?.user?.id ? 'Aanmelden vereist · lokaal bewaard' : !navigator.onLine ? 'Offline · later synchroniseren' : st.conflicts.length ? 'Conflict · kies versie' : syncError ? 'Sync controleren' : 'Account-sync gelijk';
+    badge.classList.toggle('connected', !syncing && !syncError && !st.conflicts.length && !!AUTH.session()?.user?.id);
   };
 
   async function activate() {
@@ -92,9 +103,14 @@
       try { legacyNote = (await c.importLegacy(st.household.id, await sha256(code()))) ? ' Bestaande clouddata is veilig gekopieerd.' : ''; }
       catch (e) { const k = HS.classifyError(e); if (k.kind === 'migration' || k.kind === 'auth') throw new Error(k.message); legacyNote = ' Let op: oude clouddata kon niet worden gekopieerd (' + k.message + ').'; }
       st.busy = false;
-      const cfg = load(); cfg.enabled = true; cfg.householdId = st.household.id; store(cfg);
-      await accountSync({ manual: true });
-      if (syncError && !st.conflicts.length) { cfg.enabled = false; store(cfg); } else st.message += legacyNote;
+      // Eerst één geslaagde ronde, pas dán inschakelen; bij fout/offline blijft de oude route onaangetast.
+      const first = await accountSync({ manual: true });
+      if (HS.shouldEnable(first.status)) {
+        const cfg = load(); cfg.enabled = true; cfg.householdId = st.household.id; store(cfg);
+        st.message = (st.message || '') + legacyNote;
+      } else {
+        st.message = 'Overstappen niet voltooid: ' + (st.message || 'controleer je verbinding en probeer opnieuw') + ' De oude code-sync blijft actief; er is niets gewijzigd.';
+      }
     } catch (e) { st.message = e.message || 'Overstappen mislukt'; toast(st.message); }
     finally { st.busy = false; render(); }
   }
@@ -111,7 +127,7 @@
     const signed = !!AUTH.session()?.user?.id, on = accountMode();
     const conflicts = st.conflicts.map(c => `<li class="list-item"><div class="item-main"><strong>${esc2(c.section)}</strong><small>Lokaal en cloud verschillen</small></div><button class="secondary" data-acct-resolve="${esc2(c.section)}:local">Mijn versie</button><button class="secondary" data-acct-resolve="${esc2(c.section)}:remote">Cloudversie</button></li>`).join('');
     const hh = st.household ? `<p class="muted">Huishouden <strong>${esc2(st.household.name)}</strong> · uitnodigingscode voor je partner: <code>${esc2(st.household.join_code)}</code> (maximaal 2 accounts)</p>` : '';
-    const body = !signed ? '<p class="muted">Meld je hierboven aan met je persoonlijke account om over te stappen.</p>'
+    const body = (!signed && !on) ? '<p class="muted">Meld je hierboven aan met je persoonlijke account om over te stappen.</p>'
       : on ? `${hh}<div class="button-row"><button class="primary" data-acct-sync>Nu synchroniseren</button><button class="secondary" data-acct-off>Terug naar oude code-sync</button></div>`
       : `${hh}<form class="form-grid compact-form" data-acct-create><label class="field">Nieuw huishouden<input name="name" maxlength="80" placeholder="Naam huishouden"></label><button class="secondary">Aanmaken</button></form>
          <form class="form-grid compact-form" data-acct-join><label class="field">Code van je partner<input name="code" maxlength="20" autocomplete="off"></label><button class="secondary">Toevoegen</button></form>
@@ -130,7 +146,11 @@
     const t = e.target.closest('[data-acct-on],[data-acct-sync],[data-acct-off],[data-acct-resolve]'); if (!t) return;
     if (t.matches('[data-acct-on]')) activate();
     else if (t.matches('[data-acct-sync]')) accountSync({ manual: true });
-    else if (t.matches('[data-acct-off]')) { const c = load(); c.enabled = false; store(c); st.conflicts = []; st.message = 'Oude code-sync is weer actief.'; render(); updateSyncBadge(); }
+    else if (t.matches('[data-acct-off]')) {
+      try { localStorage.setItem(PRE_KEY + 'Off', JSON.stringify({ at: new Date().toISOString(), data })); } catch (_) {}
+      // Herstelvlag: de oude sync overschrijft pas na een bewuste keuze, zodat wijzigingen van het partnerapparaat niet verloren gaan.
+      try { localStorage.setItem(RESTORE_HOLD_KEY, '1'); } catch (_) {}
+      const c = load(); c.enabled = false; store(c); st.conflicts = []; st.message = 'Oude code-sync is weer actief. Bij verschillen vraagt de app eerst welke versie je bewaart.'; render(); updateSyncBadge(); }
     else { const [s, ch] = t.dataset.acctResolve.split(':'); accountSync({ manual: true, resolutions: { [s]: ch } }); }
   });
   document.addEventListener('submit', e => {

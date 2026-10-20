@@ -19,6 +19,8 @@ test('merge dedupliceert en bewaart gelezen-status', () => {
   const again = I.merge(r.items, I.generate(data, T, {}, F), 'later');
   assert.equal(again.added, 0); assert.equal(I.unread(again.items), r.items.length - 1);
   assert.equal(I.unread(I.markAllRead(again.items)), 0);
-  assert.equal(I.merge(again.items, I.generate(data, '2026-10-21', {}, F), 'x').added > 0, true);
+  assert.equal(I.merge(again.items, I.generate(data, '2026-10-21', {}, F), 'x').added, 0, 'zelfde situatie op een andere dag geeft geen dubbele melding');
+  const changed = { ...data, stock: [{ id: 's', title: 'Pasta', amount: 0, min: 2, unit: 'pakken' }] };
+  assert.equal(I.merge(again.items, I.generate(changed, T, {}, F), 'x').added, 1, 'nieuwe toestand geeft wel een nieuwe melding');
 });
 test('beschadigde opslag wordt genormaliseerd', () => assert.deepEqual(I.normalizeItems([null, { key: 1 }, 'x']), []));

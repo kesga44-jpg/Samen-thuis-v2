@@ -21,18 +21,19 @@
   // Herinneringen worden afgeleid uit bestaande data; de key voorkomt duplicaten en bewaart de gelezen-status.
   function generate(data, today, prefs, freezerCore) {
     const out = [], p = normalizePrefs(prefs), d = data || {};
-    const add = (category, key, title, body, page) => { if (p[category]) out.push({ key: `${category}:${key}:${today}`, category, title, body, page }); };
+    // Sleutel = onderwerp + toestand (niet de dag): dezelfde situatie meldt zich niet elke dag opnieuw en een gelezen melding blijft gelezen.
+    const add = (category, key, title, body, page) => { if (p[category]) out.push({ key: `${category}:${key}`, category, title, body, page }); };
     (d.chores || []).forEach(c => {
       if (!c || !c.due || c.due > today || (c.completedDates || []).includes(c.due)) return;
-      add('chores', c.id, c.due < today ? 'Taak te laat' : 'Taak vandaag', `${c.title}${c.person ? ' · ' + c.person : ''}`, 'chores');
+      add('chores', c.id + ':' + c.due, c.due < today ? 'Taak te laat' : 'Taak vandaag', `${c.title}${c.person ? ' · ' + c.person : ''}`, 'chores');
     });
-    (d.planning || []).forEach(a => { if (a && a.date === today) add('agenda', a.id, 'Afspraak vandaag', `${a.time ? a.time + ' ' : ''}${a.title}`, 'planning'); });
+    (d.planning || []).forEach(a => { if (a && a.date === today) add('agenda', a.id + ':' + a.date, 'Afspraak vandaag', `${a.time ? a.time + ' ' : ''}${a.title}`, 'planning'); });
     if (freezerCore) (d.freezer || []).forEach(f => {
       if (!f || !(f.portions > 0)) return;
       const left = freezerCore.daysLeft(f, today);
-      if (left !== null && left <= 3) add('freezer', f.id, left < 0 ? 'Vriezerproduct verlopen' : 'Vriezerproduct bijna over datum', f.title, 'stock');
+      if (left !== null && left <= 3) add('freezer', f.id + ':' + f.bestBefore, left < 0 ? 'Vriezerproduct verlopen' : 'Vriezerproduct bijna over datum', f.title, 'stock');
     });
-    (d.stock || []).forEach(s => { if (s && Number(s.amount) < Number(s.min)) add('stock', s.id, 'Voorraad bijna op', `${s.title}: ${s.amount} ${s.unit || ''}`.trim(), 'stock'); });
+    (d.stock || []).forEach(s => { if (s && Number(s.amount) < Number(s.min)) add('stock', s.id + ':' + s.amount, 'Voorraad bijna op', `${s.title}: ${s.amount} ${s.unit || ''}`.trim(), 'stock'); });
     return out;
   }
   // Voegt nieuwe meldingen toe zonder bestaande (en hun gelezen-status) te wijzigen.

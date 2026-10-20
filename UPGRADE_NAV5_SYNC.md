@@ -51,10 +51,43 @@ Account A maakt huishouden (create_household), account B voegt toe met code; wij
 
 **Resterende risico's**: de anon-policies op `household_data` blijven bestaan tot fase 3 (`supabase/manual/phase3_revoke_anon_household_data.sql`) — pas toe nadat beide apparaten op accountsync draaien én een verse export is gemaakt. Eerste synchronisatie versleutelt elk onderdeel apart (PBKDF2 250k iteraties) en kan enkele seconden duren. Het bestaande krijtbord/huishoudlid-RPC `join_household` geeft toegang met alleen de uitnodigingscode; de limiet van 2 leden wordt door de migratie-trigger afgedwongen.
 
-## Handmatige stappen
-1. Back-up: exporteer `household_data`/`coach_data` en maak in de app een back-up op beide apparaten.
-2. Pas migraties toe in volgorde: `20261012…`, `20261013…`, `20261014…`.
-3. Beide accounts: aanmelden (Instellingen › Persoonlijk account); account A maakt huishouden, B voegt toe met de uitnodigingscode.
-4. A: Instellingen › Accountsynchronisatie › Overstappen. Controleer conflictlijst; kies per onderdeel. Daarna B hetzelfde.
-5. Test: wijziging op A zichtbaar op B; offline wijzigen en online zetten; conflict forceren.
-6. Rollback: "Terug naar oude code-sync" in de app (lokale data intact; veiligheidskopie in `samenThuisPreAccountSyncBackup`), en daarna desgewenst `20261014000000_household_state_sync.rollback.sql`.
+## Review-ronde: gevonden en opgeloste problemen
+| Probleem | Oplossing |
+|---|---|
+| Een lid dat opnieuw "joinde" kreeg de limietfout bij 2 leden | Trigger slaat bestaande leden over (no-op) |
+| Gelijktijdige eerste schrijver gaf 23505 i.p.v. versieconflict | `unique_violation` → SQLSTATE 40001 |
+| `put_household_state` accepteerde elke sectienaam/payload (ook `settings`, `legacy_full`) | Naamregex, gereserveerde namen, max 8 MB, null-/negatieve-versiecontrole |
+| Client pulde onderdelen met willekeurige naam uit de cloud (`settings` bevat de huishoudcode) | Client negeert ongeldige/gereserveerde namen |
+| `import_legacy_household_data` kon dezelfde oude rij in meerdere huishoudens kopiëren | Tabel `household_legacy_imports` (1 claim per oude rij), id-formaat (64 hex), dubbele import = no-op `false` |
+| Account-wissel hergebruikte huishouden/conflicten van vorig account | State reset zodra gebruikers-ID wijzigt |
+| Afmelden schakelde stil terug naar anon-sync | Ingeschakeld = accountroute blijft; zonder sessie "Aanmelden vereist" (lokaal bewaard) |
+| Overstap werd ingeschakeld vóór een geslaagde sync (ook offline) | Pas inschakelen na `ok`/`conflict`; anders blijft oude sync actief met uitleg |
+| Terugschakelen kon partnerwijzigingen in oude sync stil overschrijven | Veiligheidskopie `samenThuisPreAccountSyncBackupOff` + herstelvlag (conflictkeuze bij verschil) |
+| Fase-3-script kon altijd draaien | Script weigert (en wijzigt niets) zonder migratie-objecten én een 2-ledenhuishouden met gesynchroniseerde onderdelen |
+| Inbox meldde dezelfde situatie elke dag opnieuw | Sleutel = onderwerp + toestand; gelezen blijft gelezen |
+| Foutmeldingen zonder vervolgstap | Meldingen noemen of lokale data veilig is en wat te doen |
+
+Statusweergave (badge): Alleen dit apparaat · Offline · Synchroniseren… · Account-sync gelijk · Conflict · Aanmelden vereist · Sync controleren.
+
+## Tests: wat is bewezen en wat niet
+- `node --test <bestand>` per `*.test.js`; `node --check` op alle JS.
+- **Gesimuleerd (nepserver in JS)**: `household-sync-core.test.js` — twee leden, vreemd huishouden, conflicten, races, offline/hervatten, mislukte RPC/migratie, deels mislukte push, accountwissel, reserved sections, legacy-sectie.
+- **Echte SQL op een LOKALE tijdelijke PostgreSQL** (`migrations-pg.test.js`, met nagebouwde rollen/`auth.uid()` uit `supabase/tests/stub_supabase.sql`): migraties in volgorde, RLS/RPC-toegang per gebruiker, versiecontrole, naamvalidatie, ledenlimiet incl. echt parallelle sessies, legacy-import (dubbel, ander huishouden, oude rij onaangetast), fase-3-bewaking en effect, rollback + opnieuw toepassen. Wordt overgeslagen als PostgreSQL ontbreekt. **Dit bewijst de SQL-logica, niet dat live Supabase (PostgREST, echte Auth-JWT's, bestaande policies/grants) zich identiek gedraagt.**
+- **Niet uitgevoerd**: browser-/apparaattests, live Supabase, e-mailbevestiging, echte twee-apparaten-test, pushmeldingen (buiten scope).
+
+## Handmatige stappen (in deze volgorde)
+**0. Vóór alles — back-ups**: (a) exporteer `household_data` en `coach_data` uit Supabase (CSV/`pg_dump`); (b) in de app op BEIDE apparaten: Instellingen › Back-up maken; bewaar het bestand buiten het apparaat; (c) noteer de rijaantallen (laatst bekend: household_data 4, coach_data 2).
+**1. Controles vóór migratie** (SQL editor, alleen lezen): bestaan `households`, `household_members`, `chalkboard_messages`, `personal_preferences` nog NIET (verwacht); `select count(*) from household_data` = verwacht aantal; controleer dat Supabase Auth e-mailaanmelding aan staat.
+**2. Migraties, elk apart en in deze volgorde**: `20261012000000_personal_preferences.sql` → `20261013000000_chalkboard.sql` → `20261014000000_household_state_sync.sql`. Stop bij een fout en ga NIET door; rollback zie hieronder. `coach_data` wordt niet geraakt.
+**3. Controles na migratie**: tabellen `households`, `household_members`, `chalkboard_messages`, `personal_preferences`, `household_state`, `household_legacy_imports` bestaan met RLS aan; functies `create_household`, `join_household`, `put_household_state`, `import_legacy_household_data` bestaan; `household_data`/`coach_data` rijaantallen ongewijzigd; anon heeft geen toegang tot de nieuwe tabellen.
+**4. Twee echte accounts, twee apparaten**: A: aanmelden (Instellingen › Persoonlijk account), huishouden aanmaken, uitnodigingscode noteren. B: aanmelden, "Toevoegen" met de code. Een derde account moet "maximaal twee accounts" krijgen. Op A en B dezelfde huishoudcode (sleutel) invullen. A: "Overstappen naar accountsync" (maakt legacy-kopie), controleer status "Account-sync gelijk". Daarna B hetzelfde; bij verschillen kies je per onderdeel.
+**5. Acceptatiecriteria**: (1) alle bestaande gegevens zichtbaar op A en B, vergeleken met de back-up; (2) wijziging op A binnen ~1 min zichtbaar op B en omgekeerd; (3) wijziging van verschillende onderdelen op beide apparaten gaat niets verloren; (4) zelfde onderdeel op beide gewijzigd → conflictkeuze, geen stille overschrijving; (5) offline wijzigen en online zetten synchroniseert zonder verlies; (6) afmelden → status "Aanmelden vereist", lokale data intact; (7) een derde, niet-gekoppeld account ziet niets (probeer in de REST-API: `household_state` leeg); (8) `household_data` rijen onveranderd; (9) back-up maken/herstellen werkt nog op beide apparaten; (10) alle 19 pagina's bereikbaar.
+**6. Fase 3 (anon intrekken) — alleen als**: stap 5 volledig geslaagd op BEIDE apparaten gedurende meerdere dagen, verse export van `household_data`/`coach_data` gemaakt, géén apparaat meer op de oude code-sync staat. Voer dan `supabase/manual/phase3_revoke_anon_household_data.sql` uit; het script weigert zelf als de migratie of een gebruikt 2-ledenhuishouden ontbreekt. Test daarna opnieuw stap 5 (2) en (5). Rollback fase 3: de GRANT/POLICY-regels onderaan het script.
+**Rollback migratie 3**: in de app op beide apparaten "Terug naar oude code-sync" (kiest bij verschil bewust; veiligheidskopieën in `samenThuisPreAccountSyncBackup[Off]`), daarna `20261014000000_household_state_sync.rollback.sql` (verwijdert alleen `household_state`, `household_legacy_imports` en bijbehorende functies/trigger; export `household_state` eerst als je de onderdelen wilt bewaren). Migraties 1 en 2 zijn additief; verwijder die alleen met een eigen, gecontroleerde `drop` als dat nodig is. Herstel altijd vanuit de back-ups uit stap 0.
+
+## Resterende risico's
+- Live gedrag niet getest (zie boven); de oude anon-policies blijven tot fase 3 en tot dan kan iedereen met de huishoudcode-hash de oude rij lezen/schrijven.
+- `import_legacy_household_data` vertrouwt erop dat de 64-hex legacy-ID alleen bij de huishoudcode-bezitters bekend is; de data blijft client-side versleuteld.
+- Onderdelen worden per top-level sleutel gesynchroniseerd: twee wijzigingen in verschillende items van dezelfde lijst geven een conflict (geen automatische itemmerge).
+- Meldingen en voorkeuren voor meldingen zijn lokaal per account; na aanmelden begint de inbox leeg.
+- Pushmeldingen buiten scope.
