@@ -7021,6 +7021,7 @@ document.addEventListener('click', event => {
     localStorage.setItem(AUTH_KEY25, JSON.stringify(authSession25));
     return authSession25;
   }
+  window.SamenThuisAuth25 = { session: () => authSession25, ready: readySession25 };
   function uiDefault25() { return { theme: 'system', accent: 'purple', accentColor: '#7057d9', density: 'comfortable' }; }
   function setPersonalPreferences25(value) {
     const normalized = personalPreferencesCore25?.normalize(value, DASH_DEFAULTS, dashboardCore, DASH_DEFAULT_VISIBLE) || value || {};
