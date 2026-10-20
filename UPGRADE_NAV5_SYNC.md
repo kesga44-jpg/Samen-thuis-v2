@@ -24,11 +24,18 @@ Geen pagina verwijderd. Deep links/`SamenThuisGo(key)` werken ongewijzigd; `nav-
 `supabase/migrations/20261014000000_household_state_sync.sql` (+ `.rollback.sql`), `supabase/manual/phase3_revoke_anon_household_data.sql`.
 
 ## Migraties (handmatig, volgorde)
-1. Back-up: exporteer household_data en coach_data (en de app-back-up op beide apparaten).
-2. `20261012000000_personal_preferences.sql` → `20261013000000_chalkboard.sql` → `20261014000000_household_state_sync.sql`.
-   Nieuw: `household_state` (RLS, alleen leden lezen), `put_household_state` (versiecontrole, SQLSTATE 40001 bij conflict), `import_legacy_household_data` (kopieert, wijzigt niets), maximaal 2 leden per huishouden.
-3. Rollback: `20261014000000_household_state_sync.rollback.sql`. Oude sync blijft intussen ongewijzigd werken.
-4. Fase 3 (pas na bewezen werking op 2 apparaten): `supabase/manual/phase3_revoke_anon_household_data.sql`.
+**Verplichte startgate — begin NIET aan 20261012 voordat alle punten geslaagd zijn** (zie ook "0. Vóór alles — back-ups" onderaan):
+1. Exporteer `public.household_data` en `public.coach_data` afzonderlijk.
+2. Open beide exports daadwerkelijk en controleer dat ze de verwachte kolommen en rijen bevatten.
+3. Noteer de actuele rijaantallen van beide tabellen. De laatst bekende aantallen (4 en 2) zijn geen actuele waarheid; wijken de actuele aantallen af, stop dan en onderzoek het verschil vóór de migratie.
+4. Controleer dat de app-back-up (Instellingen › Back-up maken) op BEIDE apparaten is gemaakt en lokaal beschikbaar is.
+5. Is een controle mislukt of onduidelijk: stop en voer geen migratie uit.
+
+Daarna, in deze volgorde en elk apart (controles na iedere migratie: zie "3. Controles na migratie"):
+1. `20261012000000_personal_preferences.sql` → `20261013000000_chalkboard.sql` → `20261014000000_household_state_sync.sql`.
+   Nieuw in de laatste: `household_state` (RLS, alleen leden lezen), `household_legacy_imports`, `put_household_state` (versiecontrole, SQLSTATE 40001 bij conflict), `import_legacy_household_data` (kopieert, wijzigt niets), maximaal 2 leden per huishouden.
+2. Rollback (alleen 20261014): `20261014000000_household_state_sync.rollback.sql`. Oude sync blijft intussen ongewijzigd werken.
+3. Fase 3 (pas na bewezen werking op 2 apparaten): `supabase/manual/phase3_revoke_anon_household_data.sql`.
 
 ## Testen op twee apparaten
 Account A maakt huishouden (create_household), account B voegt toe met code; wijzig op A een taak, controleer B; zet A offline, wijzig, ga online; controleer conflictmelding en dat lokale back-up/herstel nog werkt.
@@ -76,7 +83,7 @@ Statusweergave (badge): Alleen dit apparaat · Offline · Synchroniseren… · A
 - **Niet uitgevoerd**: browser-/apparaattests, live Supabase, e-mailbevestiging, echte twee-apparaten-test, pushmeldingen (buiten scope).
 
 ## Handmatige stappen (in deze volgorde)
-**0. Vóór alles — back-ups**: (a) exporteer `household_data` en `coach_data` uit Supabase (CSV/`pg_dump`); (b) in de app op BEIDE apparaten: Instellingen › Back-up maken; bewaar het bestand buiten het apparaat; (c) noteer de rijaantallen (laatst bekend: household_data 4, coach_data 2).
+**0. Vóór alles — back-ups (verplichte gate, zie bovenaan)**: (a) exporteer `household_data` en `coach_data` uit Supabase (CSV/`pg_dump`); (b) in de app op BEIDE apparaten: Instellingen › Back-up maken; bewaar het bestand buiten het apparaat; (c) noteer de rijaantallen (laatst bekend: household_data 4, coach_data 2).
 **1. Controles vóór migratie** (SQL editor, alleen lezen): bestaan `households`, `household_members`, `chalkboard_messages`, `personal_preferences` nog NIET (verwacht); `select count(*) from household_data` = verwacht aantal; controleer dat Supabase Auth e-mailaanmelding aan staat.
 **2. Migraties, elk apart en in deze volgorde**: `20261012000000_personal_preferences.sql` → `20261013000000_chalkboard.sql` → `20261014000000_household_state_sync.sql`. Stop bij een fout en ga NIET door; rollback zie hieronder. `coach_data` wordt niet geraakt.
 **3. Controles na migratie**: tabellen `households`, `household_members`, `chalkboard_messages`, `personal_preferences`, `household_state`, `household_legacy_imports` bestaan met RLS aan; functies `create_household`, `join_household`, `put_household_state`, `import_legacy_household_data` bestaan; `household_data`/`coach_data` rijaantallen ongewijzigd; anon heeft geen toegang tot de nieuwe tabellen.
