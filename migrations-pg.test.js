@@ -108,6 +108,33 @@ test('fase-3-script weigert zonder bewezen migratie en past daarna toe zonder ni
   const r = run(['psql', '-h', dir, '-p', String(port), '-U', 'postgres', '-d', 'app', '-At', '-c', `set role anon; select * from household_data`]);
   assert.notEqual(r.status, 0);
 });
+test('fase 3 regressie: bij falende controle blijven alle anon-policies en -rechten ongewijzigd, ook zonder ON_ERROR_STOP', { skip }, () => {
+  const p3 = root + 'manual/phase3_revoke_anon_household_data.sql';
+  const snap = () => psql(`select coalesce(string_agg(policyname||':'||cmd||':'||roles::text, ',' order by policyname),'') || '|' || (select coalesce(string_agg(privilege_type, ',' order by privilege_type),'') from information_schema.role_table_grants where grantee='anon' and table_name='household_data') from pg_policies where tablename='household_data'`).out;
+  // Vorige test heeft fase 3 al toegepast: herstel eerst de oude anon-situatie (zoals de rollbackregels in het script).
+  ok(psql(`grant select, insert, update on public.household_data to anon;
+    create policy "encrypted household read" on public.household_data for select to anon using (true);
+    create policy "encrypted household insert" on public.household_data for insert to anon with check (true);
+    create policy "encrypted household update" on public.household_data for update to anon using (true) with check (true);`));
+  const before = snap();
+  assert.match(before, /encrypted household read/); assert.match(before, /\|.*INSERT.*SELECT.*UPDATE/);
+  // Scenario 1: migratie-object ontbreekt. Scenario 2: te weinig leden. Beide via psql ZONDER ON_ERROR_STOP (loopt door na fouten)
+  // en via één -c (zoals een editor die de hele tekst als één query verstuurt).
+  const loose = () => run(['psql', '-h', dir, '-p', String(port), '-U', 'postgres', '-d', 'app', '-q', '-f', p3]);
+  const oneShot = () => run(['psql', '-h', dir, '-p', String(port), '-U', 'postgres', '-d', 'app', '-q', '-c', fs.readFileSync(p3, 'utf8')]);
+  ok(psql(`alter table household_state rename to household_state_x`));
+  for (const go of [loose, oneShot]) { const r = go(); assert.match(r.stderr, /Fase 3 geweigerd/); assert.equal(snap(), before, 'niets gewijzigd (ontbrekend object)'); }
+  ok(psql(`alter table household_state_x rename to household_state`));
+  ok(psql(`create table st_backup as select * from household_state; delete from household_state`));
+  for (const go of [loose, oneShot]) { const r = go(); assert.match(r.stderr, /Fase 3 geweigerd/); assert.equal(snap(), before, 'niets gewijzigd (onvoldoende leden/onderdelen)'); }
+  // Geldig scenario: alleen de bedoelde anon-rechten verdwijnen; overige policies/rechten blijven.
+  ok(psql(`create policy "other anon keep" on household_data for select to anon using (false); insert into household_state select * from st_backup; drop table st_backup`));
+  const r = oneShot(); assert.equal(r.status, 0, r.stderr);
+  const after = psql(`select string_agg(policyname,',') from pg_policies where tablename='household_data'`).out;
+  assert.equal(after, 'other anon keep', 'alleen de drie bedoelde policies zijn weg');
+  assert.equal(psql(`select count(*) from information_schema.role_table_grants where grantee='anon' and table_name='household_data' and privilege_type in ('SELECT','INSERT','UPDATE')`).out, '0');
+  ok(psql(`drop policy "other anon keep" on household_data`));
+});
 test('rollback-bestand verwijdert alleen de nieuwe objecten en laat household_data intact', { skip }, () => {
   ok(file(root + 'migrations/20261014000000_household_state_sync.rollback.sql'));
   assert.equal(psql(`select to_regclass('public.household_state') is null`).out, 't');

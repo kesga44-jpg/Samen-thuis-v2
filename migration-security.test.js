@@ -27,7 +27,10 @@ test('anon-revoke staat buiten migrations (handmatige fase 3)', () => {
 test('fase 3 is bewaakt, trekt niets in binnen migrations en raakt coach_data niet aan', () => {
   const p3 = fs.readFileSync(d + 'manual/phase3_revoke_anon_household_data.sql', 'utf8');
   assert.match(p3, /Fase 3 geweigerd/); assert.match(p3, /to_regprocedure\('public\.put_household_state/); assert.doesNotMatch(p3.replace(/--.*$/gm, ''), /coach_data/);
-  assert.match(p3.split('\n').find(l => /^drop policy/.test(l)) || '', /household_data/);
+  assert.match(p3.split('\n').find(l => /^\s*drop policy/.test(l)) || '', /household_data/);
+  const code = p3.replace(/--.*$/gm, ''), end = code.lastIndexOf('end $$;');
+  assert.ok(end > code.indexOf('Fase 3 geweigerd') && !/\b(drop|revoke|grant|create|alter)\b/i.test(code.slice(end + 7)), 'geen wijzigende statements buiten het DO-blok');
+  assert.ok(code.indexOf('revoke') < end && code.indexOf('drop policy') < end);
 });
 test('import_legacy: lidmaatschapscontrole, id-formaat, claim-tabel en geen overschrijving in SQL', () => {
   const sql = up.slice(up.indexOf('function public.import_legacy_household_data'));

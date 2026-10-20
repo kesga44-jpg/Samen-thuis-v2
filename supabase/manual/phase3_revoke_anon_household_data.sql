@@ -4,6 +4,9 @@
 --  * minstens één huishouden heeft 2 leden en gesynchroniseerde onderdelen (anders dan legacy_full).
 -- De nieuwe sync gebruikt household_data alleen via de security-definer-functie import_legacy_household_data
 -- (draait als eigenaar, dus blijft werken na intrekken van anon-rechten). coach_data wordt niet aangeraakt.
+-- Controle én wijziging staan bewust in ÉÉN enkel DO-blok (= één statement = atomair): faalt de controle, dan wordt
+-- niets uitgevoerd, ongeacht of de SQL-runner na een fout doorgaat (psql zonder ON_ERROR_STOP, SQL-editor, enz.).
+-- Voeg hier GEEN losse statements buiten het blok toe.
 do $$
 begin
   if to_regclass('public.household_state') is null or to_regclass('public.household_legacy_imports') is null
@@ -18,12 +21,12 @@ begin
   ) then
     raise exception 'Fase 3 geweigerd: nog geen huishouden met 2 leden en gesynchroniseerde onderdelen in household_state';
   end if;
-end $$;
 
-drop policy if exists "encrypted household read" on public.household_data;
-drop policy if exists "encrypted household insert" on public.household_data;
-drop policy if exists "encrypted household update" on public.household_data;
-revoke select, insert, update on public.household_data from anon;
+  drop policy if exists "encrypted household read" on public.household_data;
+  drop policy if exists "encrypted household insert" on public.household_data;
+  drop policy if exists "encrypted household update" on public.household_data;
+  revoke select, insert, update on public.household_data from anon;
+end $$;
 -- Rollback (handmatig):
 -- grant select, insert, update on public.household_data to anon;
 -- create policy "encrypted household read" on public.household_data for select to anon using (true);
