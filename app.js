@@ -331,7 +331,7 @@ function save({ touch = true, sync = true } = {}) {
   migrateLegacyFreezerStock(data);
   if (storageProtected) {
     toast('Opslaan is geblokkeerd: beschadigde gegevens konden niet veilig worden bewaard. Maak een back-up en maak ruimte vrij.');
-    return;
+    return false;
   }
   if (touch) data.meta.updatedAt = new Date().toISOString();
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
@@ -341,6 +341,7 @@ function save({ touch = true, sync = true } = {}) {
     setTimeout(() => { saveState.textContent = 'Lokaal bewaard'; }, 1200);
   }
   if (sync && syncConfigured()) scheduleSync();
+  return true;
 }
 
 function toast(message) {
@@ -1362,11 +1363,20 @@ async function exportBackup() {
 
 async function importBackup(file) {
   try {
-    const parsed = JSON.parse(await file.text());
-    data = migrateData(parsed);
-    save();
+    const text = await file.text();
+    try { SamenThuisCore.restoreBackupText({ getItem: () => null, setItem() {}, removeItem() {} }, recoveryOptions(), text); }
+    catch { toast('Dit bestand is geen geldige back-up'); return; }
+    if (storageProtected) { toast('Opslaan is geblokkeerd; back-up niet geladen. Maak ruimte vrij.'); return; }
+    // Herstelvlag en kopie van de huidige gegevens worden vóór het overschrijven vastgelegd.
+    try {
+      data = SamenThuisCore.restoreBackupText(localStorage, { ...recoveryOptions(), holdKey: RESTORE_HOLD_KEY }, text);
+    } catch {
+      toast('Back-up laden mislukt; je huidige gegevens zijn ongewijzigd');
+      return;
+    }
+    save({ touch: false, sync: false });
     render();
-    toast('Back-up hersteld');
+    toast(syncConfigured() ? 'Back-up hersteld · bij de volgende synchronisatie kies je zelf welke versie geldt' : 'Back-up hersteld');
   } catch {
     toast('Dit bestand is geen geldige back-up');
   }
@@ -1619,8 +1629,7 @@ document.addEventListener('click', event => {
   if (corruptBtn) {
     if (confirm('Deze bewaarde gegevens herstellen? Je huidige gegevens worden eerst apart bewaard.')) {
       try {
-        data = SamenThuisCore.restoreCorruptBackup(localStorage, recoveryOptions(), Number(corruptBtn.dataset.restoreCorrupt));
-        try { localStorage.setItem(RESTORE_HOLD_KEY, '1'); } catch {}
+        data = SamenThuisCore.restoreCorruptBackup(localStorage, { ...recoveryOptions(), holdKey: RESTORE_HOLD_KEY }, Number(corruptBtn.dataset.restoreCorrupt));
         save({ touch: false, sync: false });
         render();
         toast(syncConfigured() ? 'Gegevens hersteld · bij de volgende synchronisatie kies je zelf welke versie geldt' : 'Gegevens hersteld');
@@ -2215,11 +2224,13 @@ if (syncConfigured()) syncNow();
       const remoteTime = new Date(remoteData?.meta?.updatedAt || 0).getTime();
       let remoteLoaded = false;
 
+      const plan = SamenThuisCore.planSync({
+        local: data, remote: remoteData, hold: !!localStorage.getItem(RESTORE_HOLD_KEY),
+        resolution: syncConflictResolution, lastSyncedAt: syncConfig.lastSyncedAt
+      });
       if (!remoteData) {
         await uploadSyncData(baseUrl, householdId, rows[0]);
-      } else if (!syncConflictResolution && ((localStorage.getItem(RESTORE_HOLD_KEY) && !SamenThuisCore.sameData(data, remoteData)) || SamenThuisCore.hasConcurrentChanges(
-        data.meta?.updatedAt, remoteData.meta?.updatedAt, syncConfig.lastSyncedAt, data, remoteData
-      ))) {
+      } else if (plan === 'conflict') {
         const conflict = {
           localData: clone(data),
           remoteData: clone(remoteData),
@@ -2240,7 +2251,7 @@ if (syncConfigured()) syncNow();
       } else if (syncConflictResolution === 'remote') {
         data = clone(pendingConflict?.selectedData || remoteData);
         normaliseTravelData();
-        save({ touch: false, sync: false });
+        if (save({ touch: false, sync: false }) === false) throw new Error('Lokaal opslaan is geblokkeerd; synchronisatie niet afgerond');
         remoteLoaded = true;
       } else if (syncConflictResolution === 'local') {
         data = clone(pendingConflict?.selectedData || data);
@@ -2248,7 +2259,7 @@ if (syncConfigured()) syncNow();
       } else if (remoteTime > localTime) {
         data = remoteData;
         normaliseTravelData();
-        save({ touch: false, sync: false });
+        if (save({ touch: false, sync: false }) === false) throw new Error('Lokaal opslaan is geblokkeerd; synchronisatie niet afgerond');
         remoteLoaded = true;
       } else if (localTime > remoteTime) {
         await uploadSyncData(baseUrl, householdId, rows[0]);
@@ -6934,7 +6945,12 @@ document.addEventListener('click', event => {
     const step = Math.max(1, Math.ceil(labels.length / 8));
     const ticks = labels.map((label, index) => index % step === 0
       ? `<text x="${x(index).toFixed(1)}" y="${height - 20}" text-anchor="middle">${esc(label)}</text>` : '').join('');
-    return `<section class="card weather-chart25"><div class="card-head"><h2>${esc(title)}</h2></div><div class="weather-svg25"><svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${esc(title)}"><line x1="${left}" y1="${top + innerHeight}" x2="${width - right}" y2="${top + innerHeight}"/><g class="weather-rain25">${bars}</g><g class="weather-low25">${polyline(low || [])}</g><g class="weather-high25">${polyline(high)}</g>${ticks}<text x="${left}" y="${height - 2}">— temperatuur °C · ▮ neerslag mm</text></svg></div><p class="small-note">${esc(suffix)}</p></section>`;
+    const hasLow = Array.isArray(low) && low.length === labels.length && low.every(Number.isFinite);
+    const axis = [max, min].map(value => `<text x="${left - 6}" y="${(y(value) + 4).toFixed(1)}" text-anchor="end">${value}°</text>`).join('');
+    const valueLabels = (values, offset) => values.map((value, index) => index % step === 0
+      ? `<text class="weather-val25" x="${x(index).toFixed(1)}" y="${(y(value) + offset).toFixed(1)}" text-anchor="middle">${Math.round(value)}°</text>` : '').join('');
+    const points = high.map((value, index) => `<circle cx="${x(index).toFixed(1)}" cy="${y(value).toFixed(1)}" r="8"><title>${esc(labels[index])}: ${hasLow ? `${Math.round(low[index])}–${Math.round(value)}` : Math.round(value)} °C</title></circle>`).join('');
+    return `<section class="card weather-chart25"><div class="card-head"><h2>${esc(title)}</h2></div><div class="weather-svg25"><svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${esc(title)}"><line x1="${left}" y1="${top + innerHeight}" x2="${width - right}" y2="${top + innerHeight}"/><g class="weather-rain25">${bars}</g><g class="weather-low25">${polyline(low || [])}</g><g class="weather-high25">${polyline(high)}</g>${axis}${valueLabels(high, -7)}${hasLow ? valueLabels(low, 15) : ''}<g class="weather-pts25">${points}</g>${ticks}<text x="${left}" y="${height - 2}">— temperatuur °C · ▮ neerslag mm</text></svg></div><p class="small-note">${esc(suffix)}</p></section>`;
   }
 
   function weatherMarkup25(forecast) {

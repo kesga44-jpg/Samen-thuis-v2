@@ -1811,3 +1811,5 @@ html[data-accent20="custom"] .mobile-nav23 button.active{
 .fz-field input,.fz-field select,.fz-filters input,.fz-filters select{min-height:44px;font-size:16px}
 .fz-filters{display:flex;flex-wrap:wrap;gap:.5rem;margin:.6rem 0}.fz-filters input{flex:1 1 200px}
 .fz-panel,#fzMeals{margin-bottom:1rem}.fz-item .button-row button{min-height:40px}
+.weather-svg25 svg .weather-val25{font-size:11px;font-weight:600}
+.weather-pts25 circle{fill:transparent}
